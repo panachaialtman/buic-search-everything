@@ -1,0 +1,19 @@
+BU International Center Workspace — data sync 2026-09-15
+
+Source: Reference_Data abc.xlsx (uploaded by user)
+
+Runtime changes applied exactly from the workbook:
+- Countries: 2 edited records
+- Country_Aliases: 2 edited aliases
+- Embassy: 6 edited records
+- Embassy_Aliases: 10 edited aliases
+- Faculty/Major and all other runtime sheets are unchanged from V4.6.12
+
+Implementation:
+- app-core.js preserves the previous V4.6.12 app.js byte-for-byte.
+- app.js is now a small loader that applies the workbook delta to the bundled snapshot and any saved V4.6.12 browser dataset, then starts app-core.js.
+- This lets returning users see the latest staff edits without clearing local browser data.
+
+The uploaded workbook contains the value "ประเทษสหรัฐอเมริกา" in C237/CA2796; it is preserved exactly because this sync follows the supplied workbook rather than silently correcting source data.
+
+Word templates were not changed.
