@@ -1,0 +1,9 @@
+BU International Center Workspace V4.6.2
+
+Template Manager hotfix
+-----------------------
+- Fixed the Word Template Manager error: ReadAllText - Empty path name is not legal.
+- WinForms replacement logic now carries workspace paths in persistent control context rather than relying on event-scope local variables.
+- Added a guard that reports a clear message if workspace path context is ever unavailable.
+- Updated the BAT launcher to pass ProjectRoot without a trailing backslash inside quotes.
+- Retains the V4.6.1 Bachelor Degree template update and automatic backup / embedded-template synchronization.

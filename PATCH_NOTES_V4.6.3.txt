@@ -1,0 +1,16 @@
+BU International Center Workspace V4.6.3
+
+Faculty & Major search cleanup
+------------------------------
+- Removed internal source/audit metadata from the normal Faculty & Major result UI:
+  * Source status
+  * Record status detail row
+  * Official source context
+  * Source review note
+  * Source-backed EN/TH alternate rows
+  * Official source / Source wording review / AI-review badges
+- Removed audit/source metadata from Faculty & Major search indexing and Copy All output.
+- Floating Faculty & Major windows now show only operational information.
+- Kept the underlying audit/source columns in Reference_Data.xlsx for maintenance and future verification.
+- Kept the Source link button when a valid web source URL is available.
+- Legacy / Intake-specific / Transition warnings remain visible because they affect whether a program record should be used operationally.

@@ -1,0 +1,31 @@
+BU International Center Workspace V4.6.4
+Date: 2026-08-31
+
+Faculty/Major UI cleanup
+- Removed the duplicate "Program / Degree" row from the expanded Faculty/Major card body.
+- The card header/subtitle still shows program type and degree level.
+- "Copy all" output is intentionally unchanged and still includes the Program line.
+- Floating reference windows retain Program / Degree because they do not have the same card-header context.
+
+Field-level source-confidence indicator
+- Added a small red notification dot beside Faculty EN, Faculty TH, Major EN, Major TH, or Credits when that specific displayed value is not confirmed as exact/source-backed.
+- Hover the red dot to see why it is flagged.
+- Source-backed, source-specific, legacy-source, intake-specific, official, and exact user-source values do not receive a red dot.
+- Imported older workbooks that lack the new Faculty EN/TH source-status columns are treated conservatively and may show a red dot until re-audited.
+
+Faculty/Major re-audit
+- Re-audited all 82 active Faculty/Major records against current official Bangkok University faculty/program pages plus 2026/2569 tuition/admission references.
+- Added Faculty EN Source Status, Faculty TH Source Status, Reaudit Checked, and Reaudit Notes columns to Faculty_Major.
+- Refreshed old audit/reconciliation metadata so it no longer contradicts the 2026-08-31 re-audit.
+- After the conservative re-audit, 6 displayed field values across 5 active records remain non-exact/AI-assisted and therefore receive the red dot:
+  FM008 Major TH
+  FM009 Major TH
+  FM010 Major TH
+  FM021 Major EN
+  FM021 Major TH
+  FM037 Major TH (AI Translate)
+- No stored Faculty/Major display wording was silently replaced in this patch; uncertain wording is flagged instead.
+
+Data integrity
+- Reference_Data.xlsx and data/Reference_Data.xlsx were regenerated from the same edited workbook.
+- Bundled reference-snapshot.js/json were regenerated with the new source-status fields.

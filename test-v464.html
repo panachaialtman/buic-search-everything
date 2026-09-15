@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>BU International Center Workspace V4.6</title>
+  <link rel="stylesheet" href="vendor/flags.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-wrap">
+        <div class="brand-mark" aria-hidden="true">IC</div>
+        <div>
+          <div class="brand-title">BU International Center Workspace</div>
+          <div class="brand-subtitle">Reference · Communication · Student Documents</div>
+        </div>
+      </div>
+          <nav class="workspace-nav" aria-label="Workspace sections">
+      <button class="workspace-tab active" data-workspace="reference" type="button">Reference Search</button>
+      <button class="workspace-tab" data-workspace="communication" type="button">Communication</button>
+      <button class="workspace-tab" data-workspace="documents" type="button">Student Documents</button>
+      <button class="workspace-tab" data-workspace="data" type="button">Data</button>
+    </nav>
+      <div class="top-actions">
+        <div class="theme-picker-wrap">
+          <button class="ghost-btn theme-btn" id="themeToggle" type="button" title="Choose theme" aria-label="Choose theme" aria-expanded="false">
+            <span class="theme-icon" id="themeIcon">◐</span>
+            <span id="themeLabel">Light</span>
+            <span class="theme-caret">⌄</span>
+          </button>
+          <div class="theme-menu hidden" id="themeMenu" role="menu">
+            <button type="button" data-theme-choice="light"><span class="theme-swatch swatch-light"></span><span>Light</span></button>
+            <button type="button" data-theme-choice="dark"><span class="theme-swatch swatch-dark"></span><span>Dark</span></button>
+            <button type="button" data-theme-choice="graphite"><span class="theme-swatch swatch-graphite"></span><span>Graphite Gray</span></button>
+            <button type="button" data-theme-choice="purple-night"><span class="theme-swatch swatch-purple"></span><span>Purple Night</span></button>
+            <button type="button" data-theme-choice="red-blue"><span class="theme-swatch swatch-redblue"></span><span>Light Red-Blue</span></button>
+            <button type="button" data-theme-choice="forest"><span class="theme-swatch swatch-forest"></span><span>Forest</span></button>
+            <button type="button" data-theme-choice="sand"><span class="theme-swatch swatch-sand"></span><span>Warm Sand</span></button>
+          </div>
+        </div>
+        <button class="ghost-btn data-status-compact" id="dataStatusBtn" type="button" title="View data status">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="dataSourceLabel">Bundled data</span>
+        </button>
+        <input id="excelInput" type="file" accept=".xlsx,.xls" hidden />
+      </div>
+    </header>
+
+
+    <main class="main-layout">
+      <div id="workspaceReference" class="workspace-pane active">
+      <section class="hero-panel" id="heroPanel">
+        <div class="hero-copy">
+          <div class="hero-eyebrow">INTERNATIONAL CENTER WORKSPACE</div>
+          <h1>BUIC Reference Search</h1>
+          <p>Search official and working-reference data in English or Thai by country, nationality, faculty, major, embassy, city, or related terms.</p>
+        </div>
+
+        <div class="search-shell" id="searchShell">
+          <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.4-4.4m2.4-5.1a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="searchInput" autocomplete="off" spellcheck="false" placeholder="Search everything — e.g. British, BUI, Yangon..." aria-label="Search reference data" />
+          <kbd>/</kbd>
+          <button id="clearSearch" class="clear-search" type="button" aria-label="Clear search" title="Clear search">×</button>
+          <div id="searchSuggestions" class="search-suggestions hidden" role="listbox" aria-label="Search suggestions"></div>
+        </div>
+
+        <nav class="tabs" aria-label="Search sections">
+          <button class="tab active" data-tab="all" type="button"><span>All</span><span class="tab-count" data-tab-count="all"></span></button>
+          <button class="tab" data-tab="countries" type="button"><span>Country & Nationality</span><span class="tab-count" data-tab-count="countries"></span></button>
+          <button class="tab" data-tab="faculty" type="button"><span>Faculty & Major</span><span class="tab-count" data-tab-count="faculty"></span></button>
+          <button class="tab" data-tab="embassy" type="button"><span>Thai Embassy</span><span class="tab-count" data-tab-count="embassy"></span></button>
+        </nav>
+
+        <div class="degree-filter hidden" id="facultyDegreeFilter" aria-label="Faculty degree level">
+          <span class="degree-filter-label">Degree level</span>
+          <div class="degree-segmented">
+            <button class="degree-option active" data-degree="all" type="button">All <span class="degree-count" id="degreeAllCount">0</span></button>
+            <button class="degree-option" data-degree="bachelor" type="button">Bachelor <span class="degree-count" id="degreeBachelorCount">0</span></button>
+            <button class="degree-option" data-degree="master" type="button">Master <span class="degree-count" id="degreeMasterCount">0</span></button>
+          </div>
+        </div>
+      </section>
+
+      <section id="overview" class="overview-grid">
+        <button class="stat-card stat-card-button" data-browse-type="countries" type="button" title="Browse country and nationality records"><div class="stat-number" id="countryCount">—</div><div class="stat-label">Country / territory records</div><div class="stat-action">Browse records →</div></button>
+        <button class="stat-card stat-card-button" data-browse-type="faculty" type="button" title="Browse faculty and major records"><div class="stat-number" id="facultyCount">—</div><div class="stat-label">Faculty / major records</div><div class="stat-action">Browse records →</div></button>
+        <button class="stat-card stat-card-button" data-browse-type="embassy" type="button" title="Browse embassy and consular records"><div class="stat-number" id="embassyCount">—</div><div class="stat-label">Embassy / consular records</div><div class="stat-action">Browse records →</div></button>
+        <button class="stat-card stat-card-button review-card" data-browse-type="review" type="button" title="Browse records that still require source review"><div class="stat-number" id="reviewCount">—</div><div class="stat-label">Records flagged for review</div><div class="stat-breakdown" id="reviewBreakdown"></div><div class="stat-action">Review records →</div></button>
+      </section>
+
+      <section id="starter" class="starter-panel history-panel">
+        <div class="starter-block history-block">
+          <div class="section-heading-row compact-heading history-heading">
+            <div>
+              <h2>Recent searches</h2>
+              <p>Your latest searches are stored only in this browser. Up to 30 are shown here.</p>
+            </div>
+            <button class="text-btn" id="clearRecent" type="button">Clear history</button>
+          </div>
+          <div class="recent-history" id="recentChips"></div>
+          <div class="history-empty" id="historyEmpty">Your search history will appear here.</div>
+        </div>
+      </section>
+
+      <section id="resultsSection" class="results-section hidden" aria-live="polite">
+        <div class="section-heading-row result-heading">
+          <div>
+            <h2 id="resultTitle">Results</h2>
+            <p id="resultMeta"></p>
+          </div>
+          <div class="result-tools">
+            <label class="toggle-label"><input id="reviewOnly" type="checkbox" /> <span>Review flagged only</span></label>
+            <label class="toggle-label"><input id="showInactive" type="checkbox" /> <span>Show inactive</span></label>
+          </div>
+        </div>
+        <div id="results"></div>
+      </section>
+      </div>
+
+      <section id="workspaceCommunication" class="workspace-pane workspace-page">
+        <div class="workspace-page-heading">
+          <div><div class="hero-eyebrow">COMMUNICATION</div><h1>Create student messages from the Excel library.</h1><p>Select a channel and topic, enter the case details, review the generated draft, then copy the finished message.</p></div>
+          <div class="comm-channel-switch" role="group" aria-label="Communication channel">
+            <button class="comm-channel active" data-channel="email" type="button">Email <span id="emailTopicCount">55</span></button>
+            <button class="comm-channel" data-channel="chat" type="button">Chat Reply <span id="chatTopicCount">30</span></button>
+          </div>
+        </div>
+        <div class="comm-layout">
+          <aside class="comm-topic-panel">
+            <section class="comm-step comm-step-topic">
+              <div class="comm-step-head"><span class="comm-step-number">1</span><div><strong>Select topic</strong><small>Choose the main communication topic.</small></div></div>
+              <div id="commCategoryList" class="comm-category-list"></div>
+            </section>
+            <section class="comm-step comm-step-options">
+              <div class="comm-step-head"><span class="comm-step-number">2</span><div><strong>See options</strong><small id="commOptionHint">Select a topic above first.</small></div></div>
+              <div class="comm-topic-search"><input id="commTopicSearch" type="search" placeholder="Search options..." autocomplete="off" /></div>
+              <div id="commTopicList" class="comm-topic-list"></div>
+            </section>
+          </aside>
+          <section class="comm-builder-panel">
+            <div id="commEmpty" class="comm-empty"><div class="empty-icon">✉</div><strong>Choose a topic</strong><p>Select a topic, then choose one of its options to start building the message.</p></div>
+            <div id="commBuilder" class="hidden">
+              <div class="comm-builder-head">
+                <div><div class="comm-builder-kicker" id="commBuilderChannel">EMAIL</div><h2 id="commSelectedTopic"></h2><p id="commSelectedContext"></p></div>
+                <div id="commTemplateStatus" class="comm-template-status"></div>
+              </div>
+
+              <details class="case-details" open>
+                <summary>Student case information</summary>
+                <div class="case-grid">
+                  <label class="field-group"><span>Student number</span><input id="caseStudentNumber" autocomplete="off" placeholder="3408" /></label>
+                  <label class="field-group"><span>Student name</span><input id="caseStudentName" autocomplete="off" placeholder="Miss ABC" /></label>
+                  <label class="field-group"><span>Passport number</span><input id="casePassportNo" autocomplete="off" /></label>
+                  <label class="field-group"><span>Country</span><input id="caseCountry" list="countryOptions" autocomplete="off" placeholder="Myanmar" /></label>
+                  <label class="field-group"><span>Nationality</span><input id="caseNationality" autocomplete="off" placeholder="Myanmar" /></label>
+                  <label class="field-group"><span>Faculty / Major</span><input id="caseMajor" list="majorOptions" autocomplete="off" placeholder="International Tourism and Hospitality Management" /></label>
+                  <label class="field-group field-wide"><span>Thai Embassy / Consulate</span><input id="caseEmbassy" list="embassyOptions" autocomplete="off" placeholder="Royal Thai Embassy in Yangon" /></label>
+                </div>
+                <datalist id="countryOptions"></datalist><datalist id="majorOptions"></datalist><datalist id="embassyOptions"></datalist>
+              </details>
+
+              <div id="commDynamicFields" class="comm-dynamic-fields"></div>
+              <div id="commDocumentsSection" class="comm-documents-section hidden">
+                <div class="section-mini-heading"><div><strong>Documents</strong><span>Select one or more from the Excel document library.</span></div><button id="clearCommDocuments" class="text-btn" type="button">Clear</button></div>
+                <div id="commDocumentOptions" class="document-option-grid"></div>
+              </div>
+
+              <div class="comm-output-card">
+                <div class="comm-output-toolbar">
+                  <div><strong>Generated message</strong><span id="commMissingStatus">Ready</span><span class="draft-state" id="commDraftState">Generated</span></div>
+                  <div class="comm-output-actions"><button class="ghost-btn compact" id="regenerateCommDraft" type="button">Regenerate</button><button class="ghost-btn compact" id="resetCommDraft" type="button">Reset message</button><button class="ghost-btn compact new-student-btn" id="clearStudentCase" type="button">New student</button><button class="secondary-btn compact" id="copyCommBody" type="button">Copy body</button><button class="primary-btn compact" id="copyCommAll" type="button">Copy all</button></div>
+                </div>
+                <label id="commSubjectWrap" class="output-field"><span>Subject</span><input id="commSubject" /></label>
+                <div class="signature-control-row">
+                  <label class="signature-select-group">
+                    <span>Signature</span>
+                    <select id="commSignatureSelect" aria-label="Select signature"></select>
+                  </label>
+                  <button class="secondary-btn compact" id="manageSignatures" type="button">Manage signatures</button>
+                  <span class="signature-memory-note" id="signatureMemoryNote">Most recently used signature is remembered.</span>
+                </div>
+                <label class="output-field"><span>Message</span><textarea id="commBody" rows="16"></textarea></label>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="workspaceDocuments" class="workspace-pane workspace-page">
+        <div class="workspace-page-heading"><div><div class="hero-eyebrow">STUDENT DOCUMENTS</div><h1>Create the student folder and letter file.</h1><p>The folder workflow uses the same student number and name stored in the current case.</p></div></div>
+        <div class="document-workspace-grid">
+          <article class="workspace-feature-card"><div class="feature-icon">📁</div><h2>Create student folder</h2><p>Creates <strong>Number + Name</strong> as the folder and copies the selected Word template as <strong>Letter_Name.docx</strong>.</p><button class="primary-btn" id="documentsCreateFolder" type="button">Create Folder</button></article>
+          <article class="workspace-feature-card"><div class="feature-icon">📄</div><h2>Available Word types</h2><div class="template-pill-grid"><span>Bachelor Degree No IEN</span><span>Bachelor Degree</span><span>Current No IEN</span><span>Exchange Bachelor</span><span>Master Degree</span></div></article>
+          <article class="workspace-feature-card case-summary-card"><div class="feature-icon">👤</div><h2>Current case</h2><div id="documentCaseSummary" class="case-summary">No student case entered yet.</div><button class="secondary-btn" id="documentsGoCommunication" type="button">Edit case in Communication</button></article>
+        </div>
+      </section>
+
+      <section id="workspaceData" class="workspace-pane workspace-page">
+        <div class="workspace-page-heading"><div><div class="hero-eyebrow">DATA</div><h1>Excel remains the master database.</h1><p>Countries, programs, embassies, communication topics, document options and generated templates all come from the workbook.</p></div></div>
+        <div class="data-workspace-grid">
+          <article class="workspace-feature-card"><div class="feature-icon">📊</div><h2>Reference_Data.xlsx</h2><p>Download the current master workbook, edit it, then load the updated workbook back into the site.</p><div class="feature-actions"><a class="primary-btn link-btn" href="data/Reference_Data.xlsx" download>Download Excel master</a><button class="secondary-btn" id="dataPageLoadExcel" type="button">Load updated Excel</button></div></article>
+          <article class="workspace-feature-card"><div class="feature-icon">✉</div><h2>Communication library</h2><div class="data-kpi-row"><div><strong id="dataEmailCount">55</strong><span>Email topics</span></div><div><strong id="dataChatCount">30</strong><span>Chat topics</span></div><div><strong id="dataDocCount">21</strong><span>Document options</span></div></div></article>
+          <article class="workspace-feature-card"><div class="feature-icon">⚙</div><h2>Data status</h2><p>Review record counts, source status and workbook loading information.</p><button class="secondary-btn" id="dataPageStatus" type="button">Open Data Status</button></article>
+          <article class="workspace-feature-card import-history-card"><div class="feature-icon">↶</div><h2>Previous Excel imports</h2><p>The previous successful workbook imports are kept in this browser so you can restore one if needed.</p><div id="dataImportHistory" class="import-history-list"></div></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <aside id="dataDrawer" class="drawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close-drawer></div>
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <div><div class="drawer-kicker">DATA CONTROL</div><h2>Excel data status</h2></div>
+        <button class="icon-btn" data-close-drawer type="button" aria-label="Close">×</button>
+      </div>
+      <div class="drawer-body">
+        <div class="data-source-card">
+          <span class="status-dot large" id="drawerStatusDot"></span>
+          <div><strong id="drawerSourceTitle">Bundled data</strong><p id="drawerSourceDetail">Current workbook snapshot included with this website.</p></div>
+        </div>
+
+        <button class="excel-drop" id="excelDropZone" type="button">
+          <strong>Drop Reference_Data.xlsx here</strong>
+          <span>or click to choose an Excel workbook</span>
+        </button>
+
+        <div class="drawer-actions">
+          <button class="secondary-btn full" id="resetDataBtn" type="button">Reset to bundled data</button>
+        </div>
+
+        <div class="drawer-section">
+          <h3>Current dataset</h3>
+          <div id="drawerMetrics" class="metric-list"></div>
+        </div>
+        <div class="drawer-section">
+          <h3>Import validation</h3>
+          <div id="dataValidationSummary" class="validation-summary">Bundled workbook loaded.</div>
+        </div>
+        <div class="drawer-section">
+          <h3>Previous imports</h3>
+          <div id="drawerImportHistory" class="import-history-list"></div>
+        </div>
+        <div class="drawer-section note-box">
+          <h3>How updating works</h3>
+          <p>Edit <strong>Reference_Data.xlsx</strong>, save it, then load the workbook here. The website validates the required sheets, reads the data, and stores that version in this browser.</p>
+          <p>Bundled search data works without a server. Loading a newly edited Excel workbook may require an internet connection for the browser Excel reader.</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div id="letterModal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-letter></div>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="letterTitle">
+      <div class="modal-header">
+        <div>
+          <div class="drawer-kicker">LETTER WORKFLOW</div>
+          <h2 id="letterTitle">Create student folder</h2>
+        </div>
+        <button class="icon-btn" data-close-letter type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="letter-form-grid">
+          <label class="field-group">
+            <span>Number</span>
+            <input id="studentNumber" type="text" autocomplete="off" placeholder="3408" />
+          </label>
+          <label class="field-group">
+            <span>Name</span>
+            <input id="studentName" type="text" autocomplete="off" placeholder="Miss ABC" />
+          </label>
+          <label class="field-group field-wide">
+            <span>Word type</span>
+            <select id="letterType">
+              <option value="bachelor_no_ien">Bachelor Degree No IEN</option>
+              <option value="bachelor">Bachelor Degree</option>
+              <option value="current_no_ien">Current No IEN</option>
+              <option value="exchange">Exchange Bachelor</option>
+              <option value="master">Master Degree</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="folder-preview-card">
+          <div class="preview-row"><span>Folder</span><strong id="folderPreview">3408 Miss ABC</strong></div>
+          <div class="preview-row"><span>Word file</span><strong id="filePreview">Letter_Miss ABC.docx</strong></div>
+        </div>
+
+        <div class="destination-card">
+          <div>
+            <span class="destination-label">Destination</span>
+            <strong id="destinationName">Not selected</strong>
+            <p id="destinationHelp">Choose the parent folder where the student folder should be created.</p>
+          </div>
+          <button class="secondary-btn" id="chooseDestination" type="button">Choose destination</button>
+        </div>
+
+        <div class="letter-note">
+          The selected Word template is copied into the new folder without changing its document content. Only the folder and Word filename are generated from the Number and Name fields.
+        </div>
+
+        <div class="modal-actions">
+          <button class="secondary-btn" data-close-letter type="button">Cancel</button>
+          <button class="primary-btn" id="createLetterFolder" type="button">Create folder & Word</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+
+  <div id="signatureModal" class="modal signature-modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-signature></div>
+    <section class="modal-card signature-modal-card" role="dialog" aria-modal="true" aria-labelledby="signatureTitle">
+      <div class="modal-header">
+        <div>
+          <div class="drawer-kicker">PERSONAL WORKSPACE</div>
+          <h2 id="signatureTitle">Signature library</h2>
+          <p class="signature-modal-subtitle">Signatures are stored only in this browser and are separate from the Excel templates.</p>
+        </div>
+        <button class="icon-btn" data-close-signature type="button" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body signature-manager-body">
+        <div class="signature-manager-toolbar">
+          <div>
+            <strong>Your signatures</strong>
+            <span id="signatureCountLabel"></span>
+          </div>
+          <button class="primary-btn compact" id="addSignature" type="button">+ Add signature</button>
+        </div>
+        <div id="signatureList" class="signature-library-list"></div>
+
+        <section id="signatureEditor" class="signature-editor hidden">
+          <div class="section-mini-heading">
+            <div><strong id="signatureEditorTitle">Add signature</strong><span>Create a reusable signature for Email, Chat, or both.</span></div>
+          </div>
+          <div class="signature-editor-grid">
+            <label class="field-group"><span>Signature name</span><input id="signatureName" autocomplete="off" placeholder="Panachai" /></label>
+            <label class="field-group"><span>Use for</span><select id="signatureType"><option value="email">Email</option><option value="chat">Chat</option><option value="both">Email & Chat</option></select></label>
+            <label class="field-group field-wide"><span>Signature content</span><textarea id="signatureContent" rows="6" placeholder="Best regards,&#10;International Center&#10;Bangkok University"></textarea></label>
+          </div>
+          <div class="modal-actions signature-editor-actions">
+            <button class="secondary-btn" id="cancelSignatureEdit" type="button">Cancel</button>
+            <button class="primary-btn" id="saveSignature" type="button">Save signature</button>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="data/reference-snapshot.js"></script>
+  <script src="data/letter-templates.js"></script>
+  <script src="app.js"></script>
+<script>
+setTimeout(()=>{
+ const q=document.getElementById('searchInput'); q.value='Logistics and Supply Chain Management'; q.dispatchEvent(new Event('input',{bubbles:true}));
+ setTimeout(()=>{ const t=document.querySelector('button[data-tab="faculty"]'); if(t)t.click(); setTimeout(()=>{ const b=document.querySelector('.faculty-card .card-head-main'); if(b)b.click(); },300); },300);
+},500);
+</script>
+</body>
+</html>

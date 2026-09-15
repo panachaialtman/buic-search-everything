@@ -1,0 +1,38 @@
+BU International Center Workspace V4.6.5
+========================================
+Date: 2026-08-31
+
+Faculty / Major second-pass source audit
+----------------------------------------
+- Re-checked all 82 active Faculty/Major records against official Bangkok University sources, prioritizing current BU faculty/program pages, 2026/2569 tuition/admission material, official degree plans, and BU quality-assurance records.
+- Corrected the source metadata that had caused false red AI dots in V4.6.4.
+- FM008 Entrepreneurship: exact Thai wording confirmed in an official BU degree plan.
+- FM009 Innovative Media Production: exact Thai wording confirmed in an official BU quality-assurance source.
+- FM010 Culinary Arts and Design: exact Thai wording confirmed in an official BU degree plan.
+- FM021 Communications and New Media: English wording confirmed on current BU program pages and Thai wording confirmed in official BU curriculum/degree-plan material.
+- FM037 Business Administration (Bilingual Program): removed the previous AI-normalized Thai label and replaced it with the exact official BU wording:
+  บริหารธุรกิจบัณฑิต สาขาวิชาบริหารธุรกิจ (หลักสูตรสองภาษา)
+
+AI notification rule
+--------------------
+- The small red dot is now specifically an AI-provenance warning.
+- It is NOT a generic "source uncertain" or "not certified" warning anymore.
+- No red dot for official/source-backed wording.
+- No red dot for official historical/legacy, source-specific, intake-specific, or user-sourced values merely because they require audit context.
+- A red dot appears only when the field status explicitly identifies AI/generated/translated/inferred/synthetic content.
+- As of this V4.6.5 audit, none of the 82 active Faculty/Major displayed Faculty, Major, or Credit fields are marked as AI-created context.
+- The mechanism remains active for future imported/edited records if an AI-origin field is introduced.
+
+Existing UI behavior preserved
+------------------------------
+- PROGRAM / DEGREE remains hidden from inside the expanded Faculty/Major panel.
+- Program type and degree remain visible beneath the card title.
+- Copy all output remains unchanged, including the Program line.
+
+Primary official sources used in the second pass include:
+https://www.bu.ac.th/en/course-faculty
+https://www.bu.ac.th/en/tuition-fees/bachelor-degree/2026
+https://www.bu.ac.th/en/tuition-fees/master-degree/2026
+https://www.bu.ac.th/en/international-programs/courses
+https://eqs.bu.ac.th/qa-2567/
+https://degreeplan.bu.ac.th/

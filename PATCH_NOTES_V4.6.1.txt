@@ -1,0 +1,10 @@
+BU International Center Workspace - V4.6.1 patch
+
+Changes in this package:
+1. Replaced templates/Letter_Bachelor_Degree.docx with the newly supplied Bachelor Degree Word template.
+2. Updated the embedded "Bachelor Degree" Base64 copy in data/letter-templates.js to the exact same DOCX bytes.
+3. Added Update Word Template.bat + tools/TemplateManager.ps1 for future template replacement on Windows.
+4. Added automatic timestamped backups and post-update byte verification to the Template Manager.
+5. Added Template Manager instructions to README.txt.
+
+No application workflow, reference data, communication templates, or other Word templates were changed in this patch.

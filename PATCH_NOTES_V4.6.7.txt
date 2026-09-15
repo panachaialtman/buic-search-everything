@@ -1,0 +1,22 @@
+BU International Center Workspace V4.6.7
+
+Faculty/Major Excel import authority fix
+
+Problem fixed
+- Faculty/Major cards previously preferred the legacy helper columns "Faculty EN Copy" and "Major EN Copy" over the editable primary Excel columns "Faculty EN" and "Major EN".
+- As a result, a user could edit Major EN in Excel, successfully import the workbook, and still see the old title on the website.
+
+New rule
+- Faculty EN and Major EN are now the authoritative editable fields.
+- Faculty EN Copy and Major EN Copy are fallback-only for legacy rows where the primary field is blank.
+- The rule is applied consistently to search result titles, expanded cards, floating cards, search suggestions, Copy all output, width/layout calculations, and Communication program datalists.
+
+Bundled data update
+The following four Major EN display values are included in the bundled workbook and snapshot:
+- Entrepreneurship (International Program)
+- Innovative Media Production (International Program)
+- Culinary Arts and Design (International Program)
+- Film, Series and Global Content Production and Business (International Program)
+
+Compatibility
+- The V4.6.6 browser-storage keys are intentionally retained so a workbook already imported by the user can continue to load. Once V4.6.7 code reads it, edits in the primary Faculty EN / Major EN columns take precedence automatically.

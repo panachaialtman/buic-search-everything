@@ -1,0 +1,18 @@
+BU International Center Workspace V4.6.12
+
+Source priority hierarchy
+1. Original Excel / Word supplied by the user
+2. Main official directories: https://www.bu.ac.th/en/course-faculty/ and https://www.thaiembassy.org/?language=en
+3. Other official websites / documents
+
+Changes
+- Rebased display wording against the original source workbook: สาขา 20260121(1).xlsx.
+- Preserved exact source naming where present, with whitespace cleanup only.
+- Explicit user rule remains: every Thai Major display begins with สาขาวิชา.
+- Restored original International Program suffixes for Entrepreneurship, Innovative Media Production, Culinary Arts and Design, and Film, Series and Global Content Production and Business.
+- Restored original master-source wording from the ถูกแล้ว sheet for six source-backed master's records.
+- Doctor Global Communication follows the original Doctor Degree Word template.
+- Fields absent from original sources use the main BU course/faculty directory; Master of Engineering in Electrical & Computer Engineering (International Program) is updated accordingly.
+- Embassy Information_2(2).docx is Priority 1 for mission wording/address; thaiembassy.org remains Priority 2 for current status and missing records.
+- Added Source Priority setting and exact original master import sheet.
+- Bumped browser storage keys to V4.6.12 so older cached datasets cannot override bundled data.

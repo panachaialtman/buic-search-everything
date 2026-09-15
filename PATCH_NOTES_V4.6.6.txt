@@ -1,0 +1,46 @@
+BU International Center Workspace V4.6.6
+========================================
+
+THAI MISSION DIRECTORY RECONCILIATION — 2026-09-01
+
+Canonical source:
+https://www.thaiembassy.org/en/index
+
+Official directory coverage now bundled:
+- 65 Royal Thai Embassies
+- 29 Royal Thai Consulates-General
+- 3 Permanent Missions
+- 1 Thailand Trade and Economic Office
+- 98 active directory entries total
+
+Added to normal search:
+- Permanent Mission of Thailand to ASEAN — Jakarta
+- Permanent Mission of Thailand to the United Nations (Geneva)
+- Permanent Mission of Thailand to the United Nations (New York)
+
+Directory-aligned naming/search improvements include:
+- Brunei
+- Republic of Korea
+- Russian Federation
+- Turkey
+- United States of America
+- Washington
+- China / Hong Kong
+- Ho Chi Minh
+- Thailand Trade and Economic Office (Taipei)
+
+Preserved but hidden from normal search because they are not listed in the main directory:
+- Former/source Essen/Düsseldorf entry
+- Bishkek honorary consulate
+- Belgrade honorary consulate
+- Thimphu honorary consulate
+
+The records remain in Excel for history/audit purposes rather than being deleted.
+
+Source behavior:
+- Existing row-specific official mission URLs are retained.
+- Rows without a specific mission URL now point to the official Thai Embassy and Consulates directory.
+- The directory confirms office type, country/jurisdiction, and city. Older preserved address text remains the fallback unless separately verified from an office site.
+
+Browser data migration:
+- V4.6.6 uses a new local browser-storage key so previously imported/saved V4.6.x data does not silently replace this new bundled directory dataset on first launch.

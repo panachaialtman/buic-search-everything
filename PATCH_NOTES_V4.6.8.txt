@@ -1,0 +1,11 @@
+BU International Center Workspace V4.6.8
+
+Faculty/Major Excel helper-column cleanup
+
+- Renamed the two legacy fallback/helper columns:
+  - Faculty EN Copy -> (auto) Faculty EN Copy
+  - Major EN Copy -> (auto) Major EN Copy
+- The two (auto) columns are collapsed to zero width in the bundled Reference_Data.xlsx so normal users do not see or edit them during routine maintenance.
+- Faculty EN and Major EN remain the authoritative editable fields.
+- Website import logic supports both the new (auto) headers and the old legacy headers, so previously saved/imported workbooks remain compatible.
+- Bundled Reference_Data.xlsx, data/Reference_Data.xlsx, reference-snapshot.json, and reference-snapshot.js are synchronized.

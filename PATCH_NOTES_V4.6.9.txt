@@ -1,0 +1,9 @@
+BU International Center Workspace V4.6.9
+
+1. Added a fifth Student Documents Word template: Current No IEN.
+2. Added templates/Letter_Current_No_IEN.docx based on the supplied Current no IEN document content.
+3. Added Current No IEN to the Create student folder Word type dropdown and Available Word types list.
+4. Added Current No IEN to Update Word Template.bat / TemplateManager.ps1 so it can be replaced later without manual Base64 editing.
+5. Embedded the new DOCX in data/letter-templates.js for local/offline generation.
+
+No reference-data or communication-template content was changed.

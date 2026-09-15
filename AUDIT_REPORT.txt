@@ -1,0 +1,117 @@
+BU International Center Workspace V4.6 — Implementation Audit
+=============================================================
+Audit / build date: 2026-08-24
+
+PURPOSE
+V4.6 applies the V4.5 Faculty/Major official-source audit to the working website and addresses the reliability/UX issues identified during the V4.5 review. The build intentionally avoids claiming that every Faculty/Major row is official-exact when the available source did not prove exact wording.
+
+SOURCE-INTEGRITY WORK APPLIED
+- All 83 Faculty_Major rows carry V4.6 source/audit metadata in columns AC:AL:
+  EN Source Status
+  TH Source Status
+  Record Status
+  Audit Status
+  Audit Source Type
+  Audit Source URL
+  Audit Context
+  Source-Backed EN
+  Source-Backed TH
+  Audit Notes
+- 10 confirmed/recommended Thai corrections from the official-source audit were applied.
+- FM032 is inactive because it is a faculty-only/incomplete row rather than a valid Faculty+Major search record.
+- FM037 remains searchable but its unproven Thai wording is classified as AI Translate / review required.
+- Legacy, transition and intake-specific programs are kept for historical student lookup rather than silently deleted.
+- Rows supported by official BU material but not proven as exact wording are classified Source wording review instead of Verified = YES.
+- Active Faculty/Major count is now 82; 61 active Faculty/Major rows remain review-flagged for exact-source confirmation.
+
+REFERENCE / UX FIXES
+PASS  Recent Searches can be hidden while search results are active despite the older history-panel !important rule.
+PASS  Empty Recent Searches does not consume homepage space.
+PASS  Search ranking order is preserved in the DOM; responsive CSS controls card spans without re-sorting records.
+PASS  Overview KPI cards can browse each reference dataset.
+PASS  Review KPI opens review-only browse mode and displays category breakdown.
+PASS  Search suggestions sit below topic tabs and no longer intercept tab clicks.
+PASS  Header has no brand/nav/action overlap at 1600, 1366, 1024 or 390 px in smoke tests.
+PASS  Faculty card displays source status and source-backed wording when relevant.
+PASS  FM078 renders the audited Thai official wording:
+      หลักสูตรสถาปัตยกรรมศาสตรมหาบัณฑิต สาขาวิชาเอกนวัตกรรมและการบริหารจัดการงานออกแบบ (Innovative Design and Management) (หลักสูตร 2 ภาษา)
+
+COMMUNICATION FIXES
+PASS  Communication workspace opens normally.
+PASS  Generated draft auto-updates from case fields before manual editing.
+PASS  Manual body edit changes draft state to Modified and protects the edited body from later field changes.
+PASS  Regenerate deliberately replaces the manual draft with the current generated content.
+PASS  Reset message retains current student information.
+PASS  New student clears student information and message fields after confirmation.
+PASS  Missing placeholder chips render and target their associated inputs.
+PASS  Mobile Communication topic panel computes as position: static and max-height: 300px at 390 px.
+
+DATA / EXCEL FIXES
+PASS  Required sheet validation implemented.
+PASS  Required key-column validation implemented for reference, alias, communication and document sheets.
+PASS  Blank/duplicate key-ID validation implemented.
+PASS  YES/NO value warnings implemented.
+PASS  Orphan alias-reference warnings implemented.
+PASS  V4.6 Faculty source-status column warnings implemented for older imported workbooks.
+PASS  Invalid workbook imports are rejected before setRows().
+PASS  Warning-only imports request confirmation.
+PASS  Previous successful Excel imports can be restored from browser local storage (maximum two history entries).
+PASS  V4.6 uses new workbook local-storage keys, preventing a previously saved V4.x workbook from silently replacing the audited bundled dataset.
+PASS  Root and data/ copies of Reference_Data.xlsx are synchronized.
+PASS  data/reference-snapshot.js and data/reference-snapshot.json contain identical snapshot objects.
+
+STATIC CHECKS
+PASS  JavaScript syntax: node --check app.js
+PASS  CSS parse: tinycss2 reports 0 parse errors
+PASS  HTML duplicate IDs: none
+PASS  Local HTML asset references: all present
+PASS  Countries: 250 IDs, no blank IDs, no duplicate IDs
+PASS  Faculty_Major: 83 IDs, no blank IDs, no duplicate IDs
+PASS  Embassy: 102 IDs, no blank IDs, no duplicate IDs
+PASS  Bundled Faculty active count: 82
+PASS  Bundled Faculty review-flagged count: 62 total / 61 active
+
+BROWSER-LEVEL SMOKE TEST
+The environment blocks direct localhost/file navigation, so the build was assembled self-contained in a headless Chromium page using the same index.html, styles.css, vendor flags, bundled snapshots, letter templates and app.js.
+
+Viewport 1600 × 1000
+PASS  No runtime page errors
+PASS  Header elements do not overlap
+PASS  Search results render
+PASS  Recent Searches hidden during search
+PASS  Faculty tab remains clickable while suggestions are open
+PASS  FM078 is the strongest Faculty result for its exact display-name query
+PASS  Audited FM078 Thai wording is present
+PASS  Communication and Data workspaces open
+
+Viewport 1366 × 768
+PASS  No runtime page errors
+PASS  Header elements do not overlap
+PASS  Search / Faculty / Communication / Data navigation passes
+
+Viewport 1024 × 800
+PASS  No runtime page errors
+PASS  Two-row header layout activates cleanly
+PASS  Search / Faculty / Communication / Data navigation passes
+
+Viewport 390 × 844
+PASS  No runtime page errors
+PASS  Mobile header has no overlap
+PASS  Communication topic panel uses static positioning and 300px max-height
+PASS  Data cards collapse to one column
+
+ADDITIONAL REGRESSION TEST
+PASS  Review overview browse returned the current active review dataset.
+PASS  Communication manual-edit protection retained a custom manual line after a student field changed.
+PASS  Regenerate removed the manual line and rebuilt the message.
+PASS  Reset message preserved the student name.
+PASS  New student cleared the student name.
+
+KNOWN / NON-BLOCKING LIMITATIONS
+1. The Faculty/Major audit is intentionally conservative. A Source wording review flag means the row was not contradicted by checked BU sources, but the exact EN/TH label was not proven from an exact current official program/curriculum source. Do not convert those rows to Official automatically.
+2. Some official BU pages use source-specific or intake-specific naming. Preserve source context and academic year rather than forcing one normalized name across all historical students.
+3. Excel import still loads SheetJS from a CDN and can fail offline. Bundled data remains offline-capable.
+4. Excel rollback history uses browser localStorage. Large imported workbooks may reach the browser storage quota; the app handles this by warning and continuing without another backup.
+5. Create Folder still relies on Chromium File System Access API and user-granted write permission.
+6. styles.css still contains older version override sections. V4.6 adds final reliability overrides, but a future module/stylesheet consolidation remains worthwhile.
+7. app.js remains a single large application file. Feature modules would improve maintainability in a later engineering refactor.

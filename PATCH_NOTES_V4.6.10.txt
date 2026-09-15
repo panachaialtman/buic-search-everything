@@ -1,0 +1,10 @@
+BU International Center Workspace V4.6.10
+
+- Uses Reference_Data fix 123(1).xlsx as the new authoritative dataset base.
+- Normalized every nonblank Faculty_Major Major TH value to begin with 'สาขาวิชา'.
+- Shortened Master's Thai major display values from full degree-title wording to major-only wording; source titles remain preserved in hidden audit fields.
+- Added four current Doctoral Degree programs from official Bangkok University sources and a Doctor degree filter.
+- Added Doctor Degree to Student Documents and the Word Template Manager.
+- Added templates/Letter_Doctor_Degree.docx and synchronized its embedded Base64 copy.
+- Embassy display now prioritizes the original Embassy Information_2 source fields and only falls back to later reconciled current-directory fields.
+- Bumped browser storage keys to V4.6.10.
