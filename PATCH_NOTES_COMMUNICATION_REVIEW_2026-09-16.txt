@@ -1,0 +1,18 @@
+BU International Center Workspace — Communication library review 2026-09-16
+
+Reviewed:
+- 55 email templates
+- 30 chat reply templates
+- document checklist structure and communication categories
+
+Result:
+- 41 active email templates across 11 practical categories
+- 29 active chat templates across 10 practical categories
+- repetitive document-specific messages were consolidated into a single "Additional supporting documents required" workflow using [Selected Documents]
+- document-quality and incorrect-document cases remain separate because they require different wording
+- obsolete duplicates are retained as inactive Archive records so they can be reviewed/restored without cluttering normal selection
+- Thai Embassy/Consulate name is no longer treated as a supporting-document checkbox; it remains a case field
+- wording was tightened for professional BU International Center use and the prohibited phrase "subject to Immigration approval" is not used
+- category display order is standardized in the website and remains two-column on desktop
+
+A reviewed Reference_Data workbook was also generated from the latest staff workbook for replacement/export when needed. The website migration applies the same reviewed communication structure to the bundled browser data and to existing saved browser data once, without repeatedly overwriting later staff edits.

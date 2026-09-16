@@ -1,0 +1,31 @@
+/* Communication V4 — reviewed library category order */
+#workspaceCommunication #commCategoryList{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+#workspaceCommunication #commCategoryList .comm-category-item{min-width:0}
+#commV3Topics{display:flex;flex-direction:column}
+#workspaceCommunication #commCategoryList [data-comm-category="Documents"]{order:1}
+#commV3Topics [data-v3-topic="Documents"]{order:1}
+#workspaceCommunication #commCategoryList [data-comm-category="Process"]{order:2}
+#commV3Topics [data-v3-topic="Process"]{order:2}
+#workspaceCommunication #commCategoryList [data-comm-category="Academic & Registration"]{order:3}
+#commV3Topics [data-v3-topic="Academic & Registration"]{order:3}
+#workspaceCommunication #commCategoryList [data-comm-category="Visa Extension"]{order:4}
+#commV3Topics [data-v3-topic="Visa Extension"]{order:4}
+#workspaceCommunication #commCategoryList [data-comm-category="Passport"]{order:5}
+#commV3Topics [data-v3-topic="Passport"]{order:5}
+#workspaceCommunication #commCategoryList [data-comm-category="New Visa"]{order:6}
+#commV3Topics [data-v3-topic="New Visa"]{order:6}
+#workspaceCommunication #commCategoryList [data-comm-category="NON-ED Plus"]{order:7}
+#commV3Topics [data-v3-topic="NON-ED Plus"]{order:7}
+#workspaceCommunication #commCategoryList [data-comm-category="Cancellation & Status"]{order:8}
+#commV3Topics [data-v3-topic="Cancellation & Status"]{order:8}
+#workspaceCommunication #commCategoryList [data-comm-category="90-Day & Accommodation"]{order:9}
+#commV3Topics [data-v3-topic="90-Day & Accommodation"]{order:9}
+#workspaceCommunication #commCategoryList [data-comm-category="Travel & Entry"]{order:10}
+#commV3Topics [data-v3-topic="Travel & Entry"]{order:10}
+#workspaceCommunication #commCategoryList [data-comm-category="Office & Follow-up"]{order:11}
+#commV3Topics [data-v3-topic="Office & Follow-up"]{order:11}
+#workspaceCommunication #commCategoryList [data-comm-category="Activities"]{order:12}
+#commV3Topics [data-v3-topic="Activities"]{order:12}
+#workspaceCommunication #commCategoryList [data-comm-category="Archive"]{order:99}
+#commV3Topics [data-v3-topic="Archive"]{order:99}
+@media(max-width:560px){#workspaceCommunication #commCategoryList{grid-template-columns:1fr}}

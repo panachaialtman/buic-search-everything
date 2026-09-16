@@ -1,8 +1,7 @@
 (() => {
   'use strict';
 
-  // 2026-09-15 data sync from Reference_Data abc.xlsx.
-  // Keep the existing V4.6.12 app intact in app-core.js and apply only the staff-edited data delta here.
+  // Base staff-data sync from Reference_Data abc.xlsx.
   const PATCHES = {"Countries":{"idColumn":"Record ID","ops":[{"id":"C180","values":{"Country TH":"คองโก","Full Country Name TH":"คองโก"}},{"id":"C237","values":{"Country TH":"ประเทษสหรัฐอเมริกา","Full Country Name TH":"ประเทศสหรัฐอเมริกา"}}]},"Country_Aliases":{"idColumn":"Alias ID","ops":[{"id":"CA2131","values":{"Alias":"คองโก (ไม่มีสาธารณรัฐ)"}},{"id":"CA2796","values":{"Alias":"ประเทษสหรัฐอเมริกา"}}]},"Embassy":{"idColumn":"Record ID","ops":[{"id":"E057","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานเอกอัครราชทูต ณ กรุงวอชิงตัน ประเทศสหรัฐอเมริกา"}},{"id":"E091","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครชิคาโก ประเทศสหรัฐอเมริกา"}},{"id":"E092","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครลอสแอนเจลิส ประเทศสหรัฐอเมริกา"}},{"id":"E093","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครนิวยอร์ก ประเทศสหรัฐอเมริกา"}},{"id":"E098","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครแอตแลนตา ประเทศสหรัฐอเมริกา"}},{"id":"E105","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา"}}]},"Embassy_Aliases":{"idColumn":"Alias ID","ops":[{"id":"EA0462","values":{"Alias":"สถานเอกอัครราชทูต ณ กรุงวอชิงตัน ประเทศสหรัฐอเมริกา"}},{"id":"EA0464","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},{"id":"EA0747","values":{"Alias":"สถานกงสุลใหญ่ ณ นครชิคาโก ประเทศสหรัฐอเมริกา"}},{"id":"EA0749","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},{"id":"EA0755","values":{"Alias":"สถานกงสุลใหญ่ ณ นครลอสแอนเจลิส ประเทศสหรัฐอเมริกา"}},{"id":"EA0757","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},{"id":"EA0763","values":{"Alias":"สถานกงสุลใหญ่ ณ นครนิวยอร์ก ประเทศสหรัฐอเมริกา"}},{"id":"EA0765","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},{"id":"EA0803","values":{"Alias":"สถานกงสุลใหญ่ ณ นครแอตแลนตา ประเทศสหรัฐอเมริกา"}},{"id":"EA0805","values":{"Alias":"ประเทศสหรัฐอเมริกา"}}]}};
 
   function apply(rows) {
@@ -35,36 +34,43 @@
     if (saved && apply(saved)) localStorage.setItem(key, JSON.stringify(saved));
   } catch (_) {}
 
-  // Communication enhancements are layered on top of the stable core.
-  if (!document.querySelector('link[data-communication-v2]')) {
-    const style = document.createElement('link');
-    style.rel = 'stylesheet';
-    style.href = 'communication-v2.css';
-    style.setAttribute('data-communication-v2', '');
-    document.head.appendChild(style);
-  }
-  if (!document.querySelector('link[data-communication-v3]')) {
-    const style = document.createElement('link');
-    style.rel = 'stylesheet';
-    style.href = 'communication-v3.css';
-    style.setAttribute('data-communication-v3', '');
-    document.head.appendChild(style);
+  for (const [version, href] of [
+    ['v2','communication-v2.css'],
+    ['v3','communication-v3.css'],
+    ['v4','communication-v4.css']
+  ]) {
+    if (!document.querySelector(`link[data-communication-${version}]`)) {
+      const style = document.createElement('link');
+      style.rel = 'stylesheet';
+      style.href = href;
+      style.setAttribute(`data-communication-${version}`, '');
+      document.head.appendChild(style);
+    }
   }
 
-  const core = document.createElement('script');
-  core.src = 'app-core.js';
-  core.async = false;
-  core.onload = () => {
-    const enhancement = document.createElement('script');
-    enhancement.src = 'communication-v2.js';
-    enhancement.async = false;
-    enhancement.onload = () => {
-      const v3 = document.createElement('script');
-      v3.src = 'communication-v3.js';
-      v3.async = false;
-      document.head.appendChild(v3);
+  function loadCore() {
+    const core = document.createElement('script');
+    core.src = 'app-core.js';
+    core.async = false;
+    core.onload = () => {
+      const enhancement = document.createElement('script');
+      enhancement.src = 'communication-v2.js';
+      enhancement.async = false;
+      enhancement.onload = () => {
+        const v3 = document.createElement('script');
+        v3.src = 'communication-v3.js';
+        v3.async = false;
+        document.head.appendChild(v3);
+      };
+      document.head.appendChild(enhancement);
     };
-    document.head.appendChild(enhancement);
-  };
-  document.head.appendChild(core);
+    document.head.appendChild(core);
+  }
+
+  const review = document.createElement('script');
+  review.src = 'communication-v4.js';
+  review.async = false;
+  review.onload = loadCore;
+  review.onerror = loadCore;
+  document.head.appendChild(review);
 })();
