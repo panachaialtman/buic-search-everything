@@ -1,0 +1,17 @@
+BU International Center Workspace — Communication V2
+
+Changes
+- Added global Communication search across all Email or Chat templates, including topic, subject/context and template wording.
+- Added keyboard shortcut Ctrl/Cmd + K to focus Communication search.
+- Added recent-template memory and local favorites for frequently used communication templates.
+- Added quick New student and Copy message actions above the workspace.
+- Redesigned the desktop drafting workspace so student/template fields remain on the left while the generated message stays visible in a sticky panel on the right.
+- Simplified the topic/category chooser into a more compact template-library layout.
+- Preserved existing Communication template generation, signatures, Excel-backed data, missing-field handling, manual-edit protection and copy actions.
+- Communication enhancements read the latest browser-loaded Excel dataset when one is present, otherwise the bundled snapshot.
+
+Implementation
+- app-core.js remains unchanged.
+- communication-v2.js contains the additive interaction layer.
+- communication-v2.css contains the additive Communication-only visual/layout layer.
+- app.js loads the stable core first and then the Communication V2 enhancement.

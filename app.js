@@ -35,8 +35,24 @@
     if (saved && apply(saved)) localStorage.setItem(key, JSON.stringify(saved));
   } catch (_) {}
 
+  // Communication V2 is layered on top of the stable core so the data sync and
+  // original workspace behaviour remain isolated and easy to maintain.
+  if (!document.querySelector('link[data-communication-v2]')) {
+    const style = document.createElement('link');
+    style.rel = 'stylesheet';
+    style.href = 'communication-v2.css';
+    style.setAttribute('data-communication-v2', '');
+    document.head.appendChild(style);
+  }
+
   const core = document.createElement('script');
   core.src = 'app-core.js';
   core.async = false;
+  core.onload = () => {
+    const enhancement = document.createElement('script');
+    enhancement.src = 'communication-v2.js';
+    enhancement.async = false;
+    document.head.appendChild(enhancement);
+  };
   document.head.appendChild(core);
 })();
