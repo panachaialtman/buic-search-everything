@@ -1,0 +1,13 @@
+Communication V3 — 2026-09-16
+
+- Main topic selector now uses a two-column layout.
+- The old Step 2 option list is hidden from the left panel.
+- Sub-topic selection now sits at the top of the message builder, where staff can switch the exact message without scrolling to the bottom of the topic panel.
+- Added Manage library for Email and Chat Reply templates.
+- Library manager supports adding a topic with its first message, adding messages, editing/moving messages, duplicating messages, renaming topics, removing/restoring messages, and removing/restoring entire topics.
+- Remove is non-destructive: records are marked inactive and can be restored with Show removed.
+- Template editor includes quick placeholder insertion for common student-case fields.
+- Communication edits are saved into the browser working dataset and automatically survive reloads.
+- Student case fields are preserved across the reload required after library edits.
+- Added Export updated Excel so browser-side communication edits can be saved as a portable Reference_Data workbook.
+- Existing Communication V2 search, recent templates, favorites, signatures, generated-draft behavior, and current source data remain in place.
