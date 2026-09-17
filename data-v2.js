@@ -12,6 +12,19 @@
     return window.REFERENCE_SNAPSHOT || {};
   }
 
+  function activeSheetCount(sheetName) {
+    const table = currentRows()[sheetName];
+    if (!Array.isArray(table) || table.length < 2 || !Array.isArray(table[0])) return 0;
+    const header = table[0].map(v => String(v ?? '').trim());
+    const activeIndex = header.indexOf('Active');
+    return table.slice(1).filter(row => {
+      if (!Array.isArray(row) || row.every(v => String(v ?? '').trim() === '')) return false;
+      if (activeIndex < 0) return true;
+      const value = String(row[activeIndex] ?? 'YES').trim().toUpperCase();
+      return !value || value === 'YES';
+    }).length;
+  }
+
   function ensureSheetJS() {
     if (window.XLSX) return Promise.resolve(window.XLSX);
     return new Promise((resolve, reject) => {
@@ -59,6 +72,48 @@
     }
   }
 
+  function openReferenceBrowse(type) {
+    const referenceTab = document.querySelector('.workspace-tab[data-workspace="reference"]');
+    if (referenceTab) referenceTab.click();
+    requestAnimationFrame(() => {
+      const sourceButton = document.querySelector(`#overview [data-browse-type="${type}"]`);
+      if (sourceButton) sourceButton.click();
+    });
+  }
+
+  function referenceSummaryMarkup() {
+    const countryCount = activeSheetCount('Countries');
+    const facultyCount = activeSheetCount('Faculty_Major');
+    const embassyCount = activeSheetCount('Embassy');
+    return `
+      <section class="data-reference-summary" aria-labelledby="dataReferenceSummaryTitle">
+        <div class="data-reference-summary-head">
+          <div>
+            <span class="data-reference-summary-kicker">REFERENCE COVERAGE</span>
+            <h2 id="dataReferenceSummaryTitle">Current searchable records</h2>
+            <p>A quick view of the reference data included in the current master database.</p>
+          </div>
+        </div>
+        <div class="data-reference-metrics">
+          <button class="data-reference-metric" data-data-browse-type="countries" type="button">
+            <strong>${countryCount}</strong>
+            <span>Country / territory records</span>
+            <small>Browse records →</small>
+          </button>
+          <button class="data-reference-metric" data-data-browse-type="faculty" type="button">
+            <strong>${facultyCount}</strong>
+            <span>Faculty / major records</span>
+            <small>Browse records →</small>
+          </button>
+          <button class="data-reference-metric" data-data-browse-type="embassy" type="button">
+            <strong>${embassyCount}</strong>
+            <span>Embassy / consular records</span>
+            <small>Browse records →</small>
+          </button>
+        </div>
+      </section>`;
+  }
+
   function simplifyDataWorkspace() {
     const workspace = $('#workspaceData');
     if (!workspace || workspace.dataset.exportOnly === '1') return;
@@ -80,8 +135,12 @@
           <div class="data-export-meta"><span>Vercel deployment</span><span>•</span><span>No manual upload required</span><span>•</span><span>Alias sheets hidden by default</span></div>
         </div>
         <button class="primary-btn data-export-btn" data-export-master type="button">Export data</button>
-      </section>`;
+      </section>
+      ${referenceSummaryMarkup()}`;
     $('[data-export-master]')?.addEventListener('click', exportCurrentData);
+    workspace.querySelectorAll('[data-data-browse-type]').forEach(button => {
+      button.addEventListener('click', () => openReferenceBrowse(button.dataset.dataBrowseType));
+    });
   }
 
   function openDatabasePage() {
@@ -120,12 +179,34 @@
     }
   }
 
+  function setupReferenceIdleState() {
+    const body = document.body;
+    const reference = $('#workspaceReference');
+    const searchInput = $('#searchInput');
+    const results = $('#resultsSection');
+    if (!body || !reference || !searchInput || !results) return;
+
+    const update = () => {
+      const isReference = reference.classList.contains('active');
+      const hasQuery = Boolean(searchInput.value.trim());
+      const hasResults = !results.classList.contains('hidden');
+      body.classList.toggle('reference-idle', isReference && !hasQuery && !hasResults);
+    };
+
+    searchInput.addEventListener('input', update);
+    document.querySelectorAll('.workspace-tab').forEach(tab => tab.addEventListener('click', () => requestAnimationFrame(update)));
+    new MutationObserver(update).observe(reference, {attributes:true, attributeFilter:['class']});
+    new MutationObserver(update).observe(results, {attributes:true, attributeFilter:['class']});
+    update();
+  }
+
   function start() {
     simplifyDataWorkspace();
     replaceTopDataControl();
     cleanReferenceSearch();
     cleanStudentDocuments();
     hideDataHeaderTab();
+    setupReferenceIdleState();
     const drawer = $('#dataDrawer');
     if (drawer) {
       drawer.classList.remove('open');
