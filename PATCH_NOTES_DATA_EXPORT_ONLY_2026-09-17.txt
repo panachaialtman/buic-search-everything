@@ -1,0 +1,19 @@
+BU International Center Workspace — Data workflow update 2026-09-17
+
+Changes:
+- The Data/Database page is now export-only.
+- Removed the normal workflow for uploading/importing an Excel workbook from the website.
+- Removed the visible data-status/import drawer from the staff workflow.
+- The top-right data control is now an Export data action.
+- Export generates a fresh Reference_Data_YYYY-MM-DD.xlsx from the website's current working dataset, so approved runtime corrections and Communication library changes are included.
+- Vercel is treated as the deployed application; no manual Excel upload is required for routine use.
+- Going forward, data changes made in this ChatGPT project should update both the website data and the Excel-exported master together.
+
+Latest Thai nationality corrections included in the runtime/export:
+- Germany -> เยอรมนี
+- Hong Kong -> ฮ่องกง
+- Macao -> มาเก๊า
+- Netherlands -> เนเธอร์แลนด์
+- United Kingdom -> อังกฤษ
+- United States -> อเมริกา
+- United States Thai country-name typo corrected to ประเทศสหรัฐอเมริกา

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // Base staff-data sync from Reference_Data abc.xlsx plus reviewed country/nationality corrections.
+  // Base staff-data sync from Reference_Data.xlsx plus reviewed country/nationality corrections.
   const PATCHES = {
     "Countries": {
       "idColumn": "Record ID",
@@ -99,6 +99,20 @@
       document.head.appendChild(style);
     }
   }
+  if (!document.querySelector('link[data-data-v2]')) {
+    const style = document.createElement('link');
+    style.rel = 'stylesheet';
+    style.href = 'data-v2.css';
+    style.setAttribute('data-data-v2', '');
+    document.head.appendChild(style);
+  }
+
+  function loadDataV2() {
+    const script = document.createElement('script');
+    script.src = 'data-v2.js';
+    script.async = false;
+    document.head.appendChild(script);
+  }
 
   function loadCore() {
     const core = document.createElement('script');
@@ -112,8 +126,11 @@
         const v3 = document.createElement('script');
         v3.src = 'communication-v3.js';
         v3.async = false;
+        v3.onload = loadDataV2;
+        v3.onerror = loadDataV2;
         document.head.appendChild(v3);
       };
+      enhancement.onerror = loadDataV2;
       document.head.appendChild(enhancement);
     };
     document.head.appendChild(core);
