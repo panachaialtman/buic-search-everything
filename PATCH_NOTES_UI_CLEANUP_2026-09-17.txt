@@ -1,0 +1,12 @@
+BU International Center Workspace — UI/data export cleanup 2026-09-17
+
+Changes:
+- Removed the Data tab from the main header.
+- Top-right Export data button now opens the DATABASE page; actual export is performed from the DATABASE page.
+- Excel exports keep Alias sheets in the workbook but hide them by default (Country_Aliases, Faculty_Aliases, Embassy_Aliases, and any future sheet containing "Aliases").
+- Removed the Reference Search "Records flagged for review" summary card from the user-facing dashboard.
+- Removed the "Review flagged only" result filter from the user-facing Reference Search UI.
+- Removed the Student Documents "Current case" card.
+- Student Documents now uses a cleaner two-column layout for Create student folder and Available Word types.
+
+Internal review metadata remains in the database; only the user-facing review controls were removed.
