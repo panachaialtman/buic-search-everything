@@ -4,6 +4,7 @@
 #results .flag-tinted-head,
 #results .faculty-card.degree-bachelor .card-head,
 #results .faculty-card.degree-master .card-head,
+#results .faculty-card.degree-doctor .card-head,
 #results .faculty-card.degree-other .card-head {
   background: var(--surface-2) !important;
   border-bottom-color: var(--line) !important;
@@ -11,6 +12,7 @@
 #results .flag-tinted-head::after { display:none !important; }
 #results .faculty-card.degree-bachelor .faculty-body,
 #results .faculty-card.degree-master .faculty-body,
+#results .faculty-card.degree-doctor .faculty-body,
 #results .faculty-card.degree-other .faculty-body {
   background: var(--surface) !important;
 }
@@ -27,6 +29,48 @@
   grid-column:auto !important;
   width:auto !important;
   min-width:0 !important;
+}
+
+/* Degree markers: keep panels neutral, identify only postgraduate levels.
+   Master's = green, Doctor = red. Bachelor's has no marker. */
+#results .faculty-card {
+  position:relative;
+  overflow:hidden;
+}
+#results .faculty-card .degree-side-label {
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:25px;
+  z-index:5;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  font-size:8px;
+  line-height:1;
+  font-weight:900;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  writing-mode:vertical-rl;
+  transform:rotate(180deg);
+  user-select:none;
+  pointer-events:none;
+}
+#results .faculty-card.degree-master .degree-side-label {
+  background:#3f8a5b;
+}
+#results .faculty-card.degree-doctor .degree-side-label {
+  background:#b84a4a;
+}
+#results .faculty-card.degree-master > .card-head,
+#results .faculty-card.degree-doctor > .card-head {
+  padding-left:39px;
+}
+#results .faculty-card.degree-master > .card-collapsible,
+#results .faculty-card.degree-doctor > .card-collapsible {
+  margin-left:25px;
 }
 
 /* Embassy: always two equal cards across on desktop. */
@@ -139,15 +183,23 @@
 html[data-theme-mode="dark"] #results .flag-tinted-head,
 html[data-theme-mode="dark"] #results .faculty-card.degree-bachelor .card-head,
 html[data-theme-mode="dark"] #results .faculty-card.degree-master .card-head,
+html[data-theme-mode="dark"] #results .faculty-card.degree-doctor .card-head,
 html[data-theme-mode="dark"] #results .faculty-card.degree-other .card-head {
   background:var(--surface-2) !important;
   border-bottom-color:var(--line) !important;
 }
 html[data-theme-mode="dark"] #results .faculty-card.degree-bachelor .faculty-body,
 html[data-theme-mode="dark"] #results .faculty-card.degree-master .faculty-body,
+html[data-theme-mode="dark"] #results .faculty-card.degree-doctor .faculty-body,
 html[data-theme-mode="dark"] #results .faculty-card.degree-other .faculty-body,
 html[data-theme-mode="dark"] #results .reference-detail-actions {
   background:var(--surface) !important;
+}
+html[data-theme-mode="dark"] #results .faculty-card.degree-master .degree-side-label {
+  background:#32764c;
+}
+html[data-theme-mode="dark"] #results .faculty-card.degree-doctor .degree-side-label {
+  background:#a33f45;
 }
 html[data-theme-mode="dark"] #results .reference-detail-actions .source-link,
 html[data-theme-mode="dark"] #results .reference-detail-actions .copy-all-btn {
