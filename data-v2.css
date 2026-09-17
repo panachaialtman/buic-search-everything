@@ -1,8 +1,12 @@
 /* Data V2 — deployed database is export-only. */
 #excelInput,#dataDrawer{display:none!important}
+.workspace-nav .workspace-tab[data-workspace="data"]{display:none!important}
+#overview.overview-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+#workspaceDocuments .document-workspace-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 #workspaceData .data-export-heading{margin-bottom:18px}
 #workspaceData .data-export-heading h1{max-width:760px}
 .data-export-only-card{max-width:920px;border:1px solid var(--line);background:var(--surface);border-radius:18px;padding:24px;display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:18px;align-items:center;box-shadow:var(--shadow-soft)}
 .data-export-icon{width:54px;height:54px;border-radius:15px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-size:27px;font-weight:800}
 .data-export-copy{min-width:0}.data-export-kicker{display:block;font-size:10px;font-weight:850;letter-spacing:.08em;color:var(--muted);margin-bottom:4px}.data-export-copy h2{font-size:20px;margin:0 0 6px}.data-export-copy p{margin:0;color:var(--muted);font-size:12px;line-height:1.55;max-width:650px}.data-export-meta{display:flex;gap:7px;align-items:center;margin-top:10px;color:var(--muted);font-size:10px;flex-wrap:wrap}.data-export-btn{min-width:132px;height:44px}.data-export-top{cursor:pointer}.data-export-top-icon{font-size:14px;font-weight:900}
-@media(max-width:760px){.data-export-only-card{grid-template-columns:48px 1fr}.data-export-icon{width:46px;height:46px}.data-export-btn{grid-column:1/-1;width:100%}}
+@media(max-width:980px){#overview.overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#workspaceDocuments .document-workspace-grid{grid-template-columns:1fr}}
+@media(max-width:760px){#overview.overview-grid{grid-template-columns:1fr}.data-export-only-card{grid-template-columns:48px 1fr}.data-export-icon{width:46px;height:46px}.data-export-btn{grid-column:1/-1;width:100%}}
