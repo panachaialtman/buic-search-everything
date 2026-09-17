@@ -1,8 +1,60 @@
 (() => {
   'use strict';
 
-  // Base staff-data sync from Reference_Data abc.xlsx.
-  const PATCHES = {"Countries":{"idColumn":"Record ID","ops":[{"id":"C180","values":{"Country TH":"คองโก","Full Country Name TH":"คองโก"}},{"id":"C237","values":{"Country TH":"ประเทษสหรัฐอเมริกา","Full Country Name TH":"ประเทศสหรัฐอเมริกา"}}]},"Country_Aliases":{"idColumn":"Alias ID","ops":[{"id":"CA2131","values":{"Alias":"คองโก (ไม่มีสาธารณรัฐ)"}},{"id":"CA2796","values":{"Alias":"ประเทษสหรัฐอเมริกา"}}]},"Embassy":{"idColumn":"Record ID","ops":[{"id":"E057","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานเอกอัครราชทูต ณ กรุงวอชิงตัน ประเทศสหรัฐอเมริกา"}},{"id":"E091","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครชิคาโก ประเทศสหรัฐอเมริกา"}},{"id":"E092","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครลอสแอนเจลิส ประเทศสหรัฐอเมริกา"}},{"id":"E093","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครนิวยอร์ก ประเทศสหรัฐอเมริกา"}},{"id":"E098","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครแอตแลนตา ประเทศสหรัฐอเมริกา"}},{"id":"E105","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา"}}]},"Embassy_Aliases":{"idColumn":"Alias ID","ops":[{"id":"EA0462","values":{"Alias":"สถานเอกอัครราชทูต ณ กรุงวอชิงตัน ประเทศสหรัฐอเมริกา"}},{"id":"EA0464","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},{"id":"EA0747","values":{"Alias":"สถานกงสุลใหญ่ ณ นครชิคาโก ประเทศสหรัฐอเมริกา"}},{"id":"EA0749","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},{"id":"EA0755","values":{"Alias":"สถานกงสุลใหญ่ ณ นครลอสแอนเจลิส ประเทศสหรัฐอเมริกา"}},{"id":"EA0757","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},{"id":"EA0763","values":{"Alias":"สถานกงสุลใหญ่ ณ นครนิวยอร์ก ประเทศสหรัฐอเมริกา"}},{"id":"EA0765","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},{"id":"EA0803","values":{"Alias":"สถานกงสุลใหญ่ ณ นครแอตแลนตา ประเทศสหรัฐอเมริกา"}},{"id":"EA0805","values":{"Alias":"ประเทศสหรัฐอเมริกา"}}]}};
+  // Base staff-data sync from Reference_Data abc.xlsx plus reviewed country/nationality corrections.
+  const PATCHES = {
+    "Countries": {
+      "idColumn": "Record ID",
+      "ops": [
+        {"id":"C083","values":{"Nationality TH":"เยอรมนี"}},
+        {"id":"C099","values":{"Nationality TH":"ฮ่องกง"}},
+        {"id":"C129","values":{"Nationality TH":"มาเก๊า"}},
+        {"id":"C154","values":{"Nationality TH":"เนเธอร์แลนด์"}},
+        {"id":"C180","values":{"Country TH":"คองโก","Full Country Name TH":"คองโก"}},
+        {"id":"C236","values":{"Nationality TH":"อังกฤษ"}},
+        {"id":"C237","values":{"Country TH":"ประเทศสหรัฐอเมริกา","Full Country Name TH":"ประเทศสหรัฐอเมริกา","Nationality TH":"อเมริกา"}}
+      ]
+    },
+    "Country_Aliases": {
+      "idColumn": "Alias ID",
+      "ops": [
+        {"id":"CA0984","values":{"Alias":"เยอรมนี"}},
+        {"id":"CA1154","values":{"Alias":"ฮ่องกง"}},
+        {"id":"CA1519","values":{"Alias":"มาเก๊า"}},
+        {"id":"CA1815","values":{"Alias":"เนเธอร์แลนด์"}},
+        {"id":"CA2131","values":{"Alias":"คองโก (ไม่มีสาธารณรัฐ)"}},
+        {"id":"CA2785","values":{"Alias":"อังกฤษ"}},
+        {"id":"CA2796","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},
+        {"id":"CA2801","values":{"Alias":"อเมริกา"}}
+      ]
+    },
+    "Embassy": {
+      "idColumn": "Record ID",
+      "ops": [
+        {"id":"E057","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานเอกอัครราชทูต ณ กรุงวอชิงตัน ประเทศสหรัฐอเมริกา"}},
+        {"id":"E091","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครชิคาโก ประเทศสหรัฐอเมริกา"}},
+        {"id":"E092","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครลอสแอนเจลิส ประเทศสหรัฐอเมริกา"}},
+        {"id":"E093","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครนิวยอร์ก ประเทศสหรัฐอเมริกา"}},
+        {"id":"E098","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครแอตแลนตา ประเทศสหรัฐอเมริกา"}},
+        {"id":"E105","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา"}}
+      ]
+    },
+    "Embassy_Aliases": {
+      "idColumn": "Alias ID",
+      "ops": [
+        {"id":"EA0462","values":{"Alias":"สถานเอกอัครราชทูต ณ กรุงวอชิงตัน ประเทศสหรัฐอเมริกา"}},
+        {"id":"EA0464","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},
+        {"id":"EA0747","values":{"Alias":"สถานกงสุลใหญ่ ณ นครชิคาโก ประเทศสหรัฐอเมริกา"}},
+        {"id":"EA0749","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},
+        {"id":"EA0755","values":{"Alias":"สถานกงสุลใหญ่ ณ นครลอสแอนเจลิส ประเทศสหรัฐอเมริกา"}},
+        {"id":"EA0757","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},
+        {"id":"EA0763","values":{"Alias":"สถานกงสุลใหญ่ ณ นครนิวยอร์ก ประเทศสหรัฐอเมริกา"}},
+        {"id":"EA0765","values":{"Alias":"ประเทศสหรัฐอเมริกา"}},
+        {"id":"EA0803","values":{"Alias":"สถานกงสุลใหญ่ ณ นครแอตแลนตา ประเทศสหรัฐอเมริกา"}},
+        {"id":"EA0805","values":{"Alias":"ประเทศสหรัฐอเมริกา"}}
+      ]
+    }
+  };
 
   function apply(rows) {
     if (!rows || typeof rows !== 'object') return false;
