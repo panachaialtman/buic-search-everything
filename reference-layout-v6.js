@@ -45,10 +45,40 @@
     if (!footer.children.length) footer.remove();
   }
 
+  function ensureDegreeMarker(card) {
+    if (!card.classList.contains('faculty-card')) return;
+
+    const subtitle = card.querySelector(':scope > .card-head .card-subtitle');
+    const degreeText = `${subtitle?.textContent || ''} ${card.className}`.toLowerCase();
+
+    let degree = '';
+    if (/doctor|doctoral|ph\.?d/.test(degreeText)) degree = 'doctor';
+    else if (/master/.test(degreeText)) degree = 'master';
+
+    card.classList.toggle('degree-doctor', degree === 'doctor');
+    if (degree === 'doctor') card.classList.remove('degree-other', 'degree-master');
+
+    let marker = card.querySelector(':scope > .degree-side-label');
+    if (!degree) {
+      if (marker) marker.remove();
+      return;
+    }
+
+    if (!marker) {
+      marker = document.createElement('div');
+      marker.className = 'degree-side-label';
+      card.prepend(marker);
+    }
+    marker.textContent = degree === 'doctor' ? 'Doctor' : 'Master';
+    marker.setAttribute('aria-label', degree === 'doctor' ? "Doctor's Degree" : "Master's Degree");
+    marker.title = degree === 'doctor' ? "Doctor's Degree" : "Master's Degree";
+  }
+
   function normalizeCard(card) {
     if (card.classList.contains('faculty-card') || card.classList.contains('embassy-card')) {
       card.classList.remove('card-span-2');
     }
+    ensureDegreeMarker(card);
     ensureActionFooter(card);
   }
 
