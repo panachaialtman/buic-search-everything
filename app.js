@@ -120,6 +120,20 @@
     layout.setAttribute('data-reference-layout-v6', '');
     document.head.appendChild(layout);
   }
+  if (!document.querySelector('link[data-reference-breathing-v1]')) {
+    const style = document.createElement('link');
+    style.rel = 'stylesheet';
+    style.href = 'reference-breathing-v1.css';
+    style.setAttribute('data-reference-breathing-v1', '');
+    document.head.appendChild(style);
+  }
+  if (!document.querySelector('script[data-reference-breathing-v1]')) {
+    const breathing = document.createElement('script');
+    breathing.src = 'reference-breathing-v1.js';
+    breathing.async = false;
+    breathing.setAttribute('data-reference-breathing-v1', '');
+    document.head.appendChild(breathing);
+  }
 
   function loadDataV2() {
     const script = document.createElement('script');
