@@ -1,6 +1,6 @@
-/* Reference breathing V1 — independent, theme-aware ambient blobs. */
+/* Reference breathing V1.1 — independent, seamless theme-aware gradient layers. */
 
-/* Keep the underlying idle background calm. The living colour comes from separate blobs. */
+/* Keep the underlying idle background calm. The living colour comes from full-screen gradient layers. */
 body.reference-idle .app-shell::before{
   background:linear-gradient(145deg,var(--idle-base) 0%,color-mix(in srgb,var(--idle-base) 86%,rgb(var(--idle-b))) 48%,var(--idle-base) 100%) !important;
   background-size:100% 100% !important;
@@ -19,91 +19,123 @@ body.reference-idle .app-shell::before{
 }
 body.reference-idle .reference-ambient-blobs{display:block}
 
+/* Each colour is a viewport-sized gradient field, not a circular DOM blob.
+   Breathing changes gradient size / position / opacity so edges never read as circles. */
 .reference-ambient-blob{
   position:absolute;
-  border-radius:50%;
-  transform-origin:center;
-  will-change:transform,opacity;
+  inset:-12%;
+  background-repeat:no-repeat;
+  pointer-events:none;
   backface-visibility:hidden;
-  contain:layout paint style;
+  will-change:background-size,background-position,opacity;
 }
 
 .reference-ambient-blob.blob-a{
-  width:55vw;height:66vh;left:-19vw;top:-13vh;
-  background:radial-gradient(circle at 54% 48%,rgb(var(--idle-a)/.70) 0%,rgb(var(--idle-a)/.34) 38%,rgb(var(--idle-a)/.08) 60%,transparent 73%);
-  animation:referenceBreatheA 10.8s cubic-bezier(.45,.05,.55,.95) -2.7s infinite;
+  background-image:radial-gradient(ellipse at center,
+    rgb(var(--idle-a)/.58) 0%,
+    rgb(var(--idle-a)/.34) 24%,
+    rgb(var(--idle-a)/.17) 45%,
+    rgb(var(--idle-a)/.06) 61%,
+    transparent 78%);
+  background-position:-18% -18%;
+  background-size:76% 88%;
+  animation:referenceGradientA 11.2s cubic-bezier(.45,.05,.55,.95) -2.9s infinite;
 }
 .reference-ambient-blob.blob-b{
-  width:56vw;height:64vh;right:-18vw;top:-16vh;
-  background:radial-gradient(circle at 46% 52%,rgb(var(--idle-b)/.66) 0%,rgb(var(--idle-b)/.30) 40%,rgb(var(--idle-b)/.08) 61%,transparent 74%);
-  animation:referenceBreatheB 15.6s cubic-bezier(.42,0,.58,1) -8.1s infinite;
+  background-image:radial-gradient(ellipse at center,
+    rgb(var(--idle-b)/.56) 0%,
+    rgb(var(--idle-b)/.31) 25%,
+    rgb(var(--idle-b)/.15) 46%,
+    rgb(var(--idle-b)/.05) 63%,
+    transparent 80%);
+  background-position:118% -20%;
+  background-size:79% 84%;
+  animation:referenceGradientB 15.8s cubic-bezier(.42,0,.58,1) -8.4s infinite;
 }
 .reference-ambient-blob.blob-c{
-  width:48vw;height:55vh;right:-9vw;bottom:-20vh;
-  background:radial-gradient(circle at 47% 48%,rgb(var(--idle-c)/.57) 0%,rgb(var(--idle-c)/.25) 40%,rgb(var(--idle-c)/.07) 62%,transparent 75%);
-  animation:referenceBreatheC 12.9s cubic-bezier(.46,.03,.54,.97) -4.4s infinite;
+  background-image:radial-gradient(ellipse at center,
+    rgb(var(--idle-c)/.45) 0%,
+    rgb(var(--idle-c)/.25) 26%,
+    rgb(var(--idle-c)/.12) 47%,
+    rgb(var(--idle-c)/.04) 64%,
+    transparent 80%);
+  background-position:108% 118%;
+  background-size:70% 72%;
+  animation:referenceGradientC 13.1s cubic-bezier(.46,.03,.54,.97) -4.7s infinite;
 }
 .reference-ambient-blob.blob-d{
-  width:46vw;height:53vh;left:-10vw;bottom:-19vh;
-  background:radial-gradient(circle at 52% 46%,rgb(var(--idle-d)/.52) 0%,rgb(var(--idle-d)/.22) 41%,rgb(var(--idle-d)/.06) 62%,transparent 74%);
-  animation:referenceBreatheD 18.2s cubic-bezier(.4,0,.6,1) -12.3s infinite;
+  background-image:radial-gradient(ellipse at center,
+    rgb(var(--idle-d)/.42) 0%,
+    rgb(var(--idle-d)/.23) 27%,
+    rgb(var(--idle-d)/.11) 49%,
+    rgb(var(--idle-d)/.035) 66%,
+    transparent 82%);
+  background-position:-12% 116%;
+  background-size:69% 69%;
+  animation:referenceGradientD 18.4s cubic-bezier(.4,0,.6,1) -12.6s infinite;
 }
 .reference-ambient-blob.blob-e{
-  width:39vw;height:44vh;left:31vw;top:18vh;
-  background:radial-gradient(circle at 50% 50%,rgb(var(--idle-e)/.42) 0%,rgb(var(--idle-e)/.16) 42%,transparent 72%);
-  animation:referenceBreatheE 9.4s cubic-bezier(.44,.04,.56,.96) -1.1s infinite;
+  background-image:radial-gradient(ellipse at center,
+    rgb(var(--idle-e)/.29) 0%,
+    rgb(var(--idle-e)/.16) 28%,
+    rgb(var(--idle-e)/.07) 50%,
+    transparent 77%);
+  background-position:50% 43%;
+  background-size:61% 62%;
+  animation:referenceGradientE 9.8s cubic-bezier(.44,.04,.56,.96) -1.3s infinite;
 }
 
-@keyframes referenceBreatheA{
-  0%,100%{transform:translate3d(-1.3%,1.1%,0) scale(.86);opacity:.72}
-  28%{transform:translate3d(.6%,-.4%,0) scale(1.03);opacity:.92}
-  58%{transform:translate3d(1.8%,-1.3%,0) scale(1.12);opacity:1}
-  79%{transform:translate3d(.2%,.8%,0) scale(.94);opacity:.80}
+@keyframes referenceGradientA{
+  0%,100%{background-size:68% 78%;background-position:-15% -13%;opacity:.72}
+  30%{background-size:82% 94%;background-position:-10% -17%;opacity:.90}
+  58%{background-size:91% 104%;background-position:-6% -10%;opacity:1}
+  80%{background-size:75% 86%;background-position:-13% -7%;opacity:.81}
 }
-@keyframes referenceBreatheB{
-  0%,100%{transform:translate3d(1.2%,-.6%,0) scale(.93);opacity:.75}
-  22%{transform:translate3d(.1%,.7%,0) scale(1.04);opacity:.90}
-  51%{transform:translate3d(-1.7%,1.5%,0) scale(1.10);opacity:.98}
-  76%{transform:translate3d(-.5%,-.5%,0) scale(.88);opacity:.70}
+@keyframes referenceGradientB{
+  0%,100%{background-size:72% 77%;background-position:113% -15%;opacity:.72}
+  23%{background-size:84% 89%;background-position:108% -10%;opacity:.88}
+  52%{background-size:94% 101%;background-position:104% -4%;opacity:.98}
+  77%{background-size:76% 82%;background-position:116% -7%;opacity:.70}
 }
-@keyframes referenceBreatheC{
-  0%,100%{transform:translate3d(.5%,1.4%,0) scale(.84);opacity:.68}
-  34%{transform:translate3d(-1.2%,-.6%,0) scale(1.08);opacity:.94}
-  63%{transform:translate3d(.8%,-1.2%,0) scale(.97);opacity:.82}
-  84%{transform:translate3d(1.4%,.3%,0) scale(1.13);opacity:.96}
+@keyframes referenceGradientC{
+  0%,100%{background-size:62% 64%;background-position:106% 114%;opacity:.64}
+  34%{background-size:78% 82%;background-position:101% 106%;opacity:.91}
+  63%{background-size:69% 72%;background-position:110% 103%;opacity:.78}
+  84%{background-size:83% 87%;background-position:105% 109%;opacity:.92}
 }
-@keyframes referenceBreatheD{
-  0%,100%{transform:translate3d(-.8%,.5%,0) scale(.90);opacity:.67}
-  19%{transform:translate3d(.8%,-1%,0) scale(.99);opacity:.80}
-  48%{transform:translate3d(1.5%,-.2%,0) scale(1.11);opacity:.91}
-  72%{transform:translate3d(-.2%,1.2%,0) scale(1.02);opacity:.84}
+@keyframes referenceGradientD{
+  0%,100%{background-size:61% 62%;background-position:-9% 112%;opacity:.61}
+  19%{background-size:68% 70%;background-position:-4% 106%;opacity:.74}
+  49%{background-size:82% 84%;background-position:1% 101%;opacity:.88}
+  73%{background-size:73% 75%;background-position:-5% 108%;opacity:.80}
 }
-@keyframes referenceBreatheE{
-  0%,100%{transform:translate3d(-.5%,.4%,0) scale(.82);opacity:.48}
-  31%{transform:translate3d(.8%,-.9%,0) scale(1.06);opacity:.70}
-  56%{transform:translate3d(-.7%,.2%,0) scale(.94);opacity:.58}
-  82%{transform:translate3d(.4%,1%,0) scale(1.14);opacity:.75}
+@keyframes referenceGradientE{
+  0%,100%{background-size:53% 54%;background-position:48% 45%;opacity:.38}
+  31%{background-size:66% 68%;background-position:51% 40%;opacity:.61}
+  57%{background-size:58% 60%;background-position:47% 44%;opacity:.48}
+  82%{background-size:72% 73%;background-position:52% 47%;opacity:.66}
 }
 
-/* Dark themes need slightly softer compositing so the blobs stay premium rather than neon. */
-html[data-theme-mode="dark"] .reference-ambient-blob{filter:saturate(.92)}
-html[data-theme="purple-night"] .reference-ambient-blob{filter:saturate(1.06)}
-html[data-theme="graphite"] .reference-ambient-blob{filter:saturate(.72)}
+/* Dark themes stay subdued; Purple Night can carry slightly richer colour. */
+html[data-theme-mode="dark"] .reference-ambient-blob{filter:saturate(.90)}
+html[data-theme="purple-night"] .reference-ambient-blob{filter:saturate(1.05)}
+html[data-theme="graphite"] .reference-ambient-blob{filter:saturate(.70)}
 
 @media(max-width:760px){
   .reference-ambient-blobs{inset:108px 0 0}
-  .reference-ambient-blob.blob-a{width:82vw;height:52vh;left:-34vw;top:-7vh}
-  .reference-ambient-blob.blob-b{width:82vw;height:50vh;right:-36vw;top:-8vh}
-  .reference-ambient-blob.blob-c{width:76vw;height:42vh;right:-28vw;bottom:-10vh}
-  .reference-ambient-blob.blob-d{width:72vw;height:40vh;left:-26vw;bottom:-11vh}
-  .reference-ambient-blob.blob-e{width:66vw;height:36vh;left:17vw;top:29vh}
+  .reference-ambient-blob{inset:-18%}
+  .reference-ambient-blob.blob-a{background-position:-28% -8%;background-size:102% 76%}
+  .reference-ambient-blob.blob-b{background-position:128% -9%;background-size:100% 74%}
+  .reference-ambient-blob.blob-c{background-position:120% 112%;background-size:94% 61%}
+  .reference-ambient-blob.blob-d{background-position:-23% 114%;background-size:92% 60%}
+  .reference-ambient-blob.blob-e{background-position:50% 49%;background-size:82% 57%}
 }
 
 @media(prefers-reduced-motion:reduce){
-  .reference-ambient-blob{animation:none !important;transform:none !important;will-change:auto}
-  .reference-ambient-blob.blob-a{opacity:.86}
-  .reference-ambient-blob.blob-b{opacity:.82}
-  .reference-ambient-blob.blob-c{opacity:.72}
-  .reference-ambient-blob.blob-d{opacity:.68}
-  .reference-ambient-blob.blob-e{opacity:.55}
+  .reference-ambient-blob{animation:none !important;will-change:auto}
+  .reference-ambient-blob.blob-a{opacity:.82}
+  .reference-ambient-blob.blob-b{opacity:.78}
+  .reference-ambient-blob.blob-c{opacity:.66}
+  .reference-ambient-blob.blob-d{opacity:.62}
+  .reference-ambient-blob.blob-e{opacity:.48}
 }
