@@ -106,6 +106,20 @@
     style.setAttribute('data-data-v2', '');
     document.head.appendChild(style);
   }
+  if (!document.querySelector('link[data-reference-layout-v6]')) {
+    const style = document.createElement('link');
+    style.rel = 'stylesheet';
+    style.href = 'reference-layout-v6.css';
+    style.setAttribute('data-reference-layout-v6', '');
+    document.head.appendChild(style);
+  }
+  if (!document.querySelector('script[data-reference-layout-v6]')) {
+    const layout = document.createElement('script');
+    layout.src = 'reference-layout-v6.js';
+    layout.async = false;
+    layout.setAttribute('data-reference-layout-v6', '');
+    document.head.appendChild(layout);
+  }
 
   function loadDataV2() {
     const script = document.createElement('script');
