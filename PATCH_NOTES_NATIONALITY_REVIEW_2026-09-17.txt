@@ -1,0 +1,21 @@
+BU International Center Workspace — Thai nationality review 2026-09-17
+
+Reviewed all 250 country / territory records in the Countries sheet.
+
+Rule used for the Thai nationality display:
+- keep the English nationality/demonym unchanged;
+- use the common Thai country/territory label for the Thai nationality field, rather than transliterating the English demonym;
+- keep People TH as a demonym/people label because it serves a different purpose.
+
+Corrections:
+- Germany: German | เยอรมนี
+- Hong Kong: Chinese | ฮ่องกง
+- Macao: Chinese | มาเก๊า
+- Netherlands: Dutch | เนเธอร์แลนด์
+- United Kingdom: British | อังกฤษ
+- United States: American | อเมริกา
+- DR Congo remains Congolese | คองโก
+
+Also corrected the United States Country TH typo from "ประเทษสหรัฐอเมริกา" to "ประเทศสหรัฐอเมริกา" and synchronized the related country/nationality aliases.
+
+The website runtime patch in app.js applies these corrections to both bundled data and existing browser-saved V4.6.12 datasets.
