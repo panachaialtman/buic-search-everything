@@ -43,6 +43,12 @@
         const sheet = XLSX.utils.aoa_to_sheet(table);
         XLSX.utils.book_append_sheet(book, sheet, String(name).slice(0, 31));
       }
+
+      // Keep alias/reference-helper sheets in the workbook, but hide them by default.
+      // Staff can unhide them in Excel whenever they need to maintain search aliases.
+      book.Workbook = book.Workbook || {};
+      book.Workbook.Sheets = book.SheetNames.map(name => ({ Hidden: /aliases/i.test(name) ? 1 : 0 }));
+
       const stamp = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(book, `Reference_Data_${stamp}.xlsx`);
     } catch (err) {
@@ -62,7 +68,7 @@
         <div>
           <div class="hero-eyebrow">DATABASE</div>
           <h1>Export the current master database.</h1>
-          <p>The Vercel deployment already uses the maintained project data. Manual Excel upload/import is no longer part of the workflow.</p>
+          <p>The deployed website already uses the maintained project data. Use this page only when you need an Excel copy of the current database.</p>
         </div>
       </div>
       <section class="data-export-only-card">
@@ -71,30 +77,55 @@
           <span class="data-export-kicker">CURRENT MASTER DATA</span>
           <h2>Reference_Data.xlsx</h2>
           <p>The export is generated from the same working data currently used by the website, including the latest approved corrections and Communication library changes.</p>
-          <div class="data-export-meta"><span>Vercel deployment</span><span>•</span><span>No manual upload required</span><span>•</span><span>Excel kept in sync with chat changes</span></div>
+          <div class="data-export-meta"><span>Vercel deployment</span><span>•</span><span>No manual upload required</span><span>•</span><span>Alias sheets hidden by default</span></div>
         </div>
         <button class="primary-btn data-export-btn" data-export-master type="button">Export data</button>
       </section>`;
     $('[data-export-master]')?.addEventListener('click', exportCurrentData);
   }
 
+  function openDatabasePage() {
+    const dataTab = document.querySelector('.workspace-tab[data-workspace="data"]');
+    if (dataTab) dataTab.click();
+    requestAnimationFrame(() => $('#workspaceData')?.scrollIntoView({block:'start'}));
+  }
+
   function replaceTopDataControl() {
     const old = $('#dataStatusBtn');
-    if (!old || old.dataset.exportOnly === '1') return;
+    if (!old || old.dataset.databaseLauncher === '1') return;
     const btn = old.cloneNode(false);
     btn.id = 'dataStatusBtn';
-    btn.dataset.exportOnly = '1';
-    btn.dataset.exportMaster = '';
+    btn.dataset.databaseLauncher = '1';
     btn.className = 'ghost-btn data-status-compact data-export-top';
-    btn.title = 'Export current Excel database';
+    btn.title = 'Open database export page';
     btn.innerHTML = '<span class="data-export-top-icon">⇩</span><span>Export data</span>';
     old.replaceWith(btn);
-    btn.addEventListener('click', exportCurrentData);
+    btn.addEventListener('click', openDatabasePage);
+  }
+
+  function cleanReferenceSearch() {
+    document.querySelector('#overview .review-card')?.remove();
+    document.querySelector('#reviewOnly')?.closest('.toggle-label')?.remove();
+  }
+
+  function cleanStudentDocuments() {
+    document.querySelector('#workspaceDocuments .case-summary-card')?.remove();
+  }
+
+  function hideDataHeaderTab() {
+    const tab = document.querySelector('.workspace-tab[data-workspace="data"]');
+    if (tab) {
+      tab.setAttribute('aria-hidden', 'true');
+      tab.tabIndex = -1;
+    }
   }
 
   function start() {
     simplifyDataWorkspace();
     replaceTopDataControl();
+    cleanReferenceSearch();
+    cleanStudentDocuments();
+    hideDataHeaderTab();
     const drawer = $('#dataDrawer');
     if (drawer) {
       drawer.classList.remove('open');
