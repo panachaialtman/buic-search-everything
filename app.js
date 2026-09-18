@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // Base staff-data sync from Reference_Data.xlsx plus reviewed country/nationality corrections.
+  // Base staff-data sync from Reference_Data.xlsx plus reviewed country/nationality and faculty-name cleanup.
   const PATCHES = {
     "Countries": {
       "idColumn": "Record ID",
