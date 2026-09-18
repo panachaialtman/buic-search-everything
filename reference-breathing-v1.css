@@ -1,4 +1,4 @@
-/* Reference breathing V1.1 — independent, seamless theme-aware gradient layers. */
+/* Reference breathing V1.2 — theme-aware gradient layers with user performance controls. */
 
 /* Keep the underlying idle background calm. The living colour comes from full-screen gradient layers. */
 body.reference-idle .app-shell::before{
@@ -115,6 +115,77 @@ body.reference-idle .reference-ambient-blobs{display:block}
   57%{background-size:58% 60%;background-position:47% 44%;opacity:.48}
   82%{background-size:72% 73%;background-position:52% 47%;opacity:.66}
 }
+
+/* Performance controls in Theme settings. */
+html[data-reference-breathing="off"] .reference-ambient-blob{
+  animation:none !important;
+  will-change:auto !important;
+}
+html[data-reference-gradient="off"] body.reference-idle .reference-ambient-blobs{
+  display:none !important;
+}
+html[data-reference-gradient="off"] .reference-ambient-blob{
+  animation:none !important;
+  will-change:auto !important;
+}
+html[data-reference-gradient="off"] body.reference-idle .app-shell::before{
+  background:var(--idle-base,var(--bg)) !important;
+}
+html[data-reference-gradient="off"][data-theme="red-blue"] body{
+  background:var(--bg) !important;
+}
+
+.theme-effect-settings{
+  margin-top:6px;
+  padding:9px 7px 4px;
+  border-top:1px solid var(--line);
+}
+.theme-effect-title{
+  padding:0 3px 6px;
+  color:var(--muted);
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.theme-effect-row{
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:6px 4px;
+  border-radius:9px;
+  cursor:pointer;
+}
+.theme-effect-row:hover{background:var(--surface-2)}
+.theme-effect-row>span:first-child{display:grid;gap:1px;min-width:0}
+.theme-effect-row strong{font-size:11px;font-weight:700;color:var(--text)}
+.theme-effect-row small{font-size:9px;color:var(--muted);line-height:1.25}
+.theme-effect-switch{position:relative;width:32px;height:18px;flex:0 0 32px}
+.theme-effect-switch input{position:absolute;opacity:0;pointer-events:none}
+.theme-effect-switch i{
+  position:absolute;
+  inset:0;
+  border-radius:999px;
+  background:var(--line-strong);
+  transition:background .16s ease;
+}
+.theme-effect-switch i::after{
+  content:"";
+  position:absolute;
+  width:14px;
+  height:14px;
+  left:2px;
+  top:2px;
+  border-radius:50%;
+  background:var(--surface);
+  box-shadow:0 1px 3px rgba(0,0,0,.25);
+  transition:transform .16s ease;
+}
+.theme-effect-switch input:checked+i{background:var(--accent)}
+.theme-effect-switch input:checked+i::after{transform:translateX(14px)}
+.theme-effect-switch input:focus-visible+i{outline:2px solid var(--accent);outline-offset:2px}
 
 /* Dark themes stay subdued; Purple Night can carry slightly richer colour. */
 html[data-theme-mode="dark"] .reference-ambient-blob{filter:saturate(.90)}
