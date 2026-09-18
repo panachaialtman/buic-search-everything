@@ -71,6 +71,45 @@
     }
   };
 
+  function normalizeFacultyNames(rows) {
+    const table = rows && rows['Faculty_Major'];
+    if (!Array.isArray(table) || !Array.isArray(table[0])) return false;
+    const header = table[0];
+    const col = Object.fromEntries(header.map((name, i) => [String(name ?? ''), i]));
+    const facultyIndex = col['Faculty EN'];
+    const autoIndex = col['(auto) Faculty EN Copy'];
+    const legacyAutoIndex = col['Faculty EN Copy'];
+    if (facultyIndex === undefined) return false;
+
+    const canonical = value => {
+      const v = String(value ?? '').trim();
+      if (!v) return v;
+      if (v === 'Bangkok University International College') return 'BU International';
+      if (v === 'Bangkok University Chinese International') return 'BU Chinese International';
+      if (/^School of\s+/i.test(v)) return v.replace(/^School of\s+/i, '');
+      return v;
+    };
+
+    let changed = false;
+    for (const row of table.slice(1)) {
+      if (!Array.isArray(row)) continue;
+      const nextFaculty = canonical(row[facultyIndex]);
+      if (row[facultyIndex] !== nextFaculty) {
+        row[facultyIndex] = nextFaculty;
+        changed = true;
+      }
+      for (const i of [autoIndex, legacyAutoIndex]) {
+        if (i === undefined) continue;
+        const nextAuto = canonical(row[i]);
+        if (row[i] !== nextAuto) {
+          row[i] = nextAuto;
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
   function apply(rows) {
     if (!rows || typeof rows !== 'object') return false;
     let changed = false;
@@ -95,10 +134,11 @@
   }
 
   apply(window.REFERENCE_SNAPSHOT);
+  normalizeFacultyNames(window.REFERENCE_SNAPSHOT);
   try {
     const key = 'bu-international-workspace-data-v4_6_12';
     const saved = JSON.parse(localStorage.getItem(key) || 'null');
-    if (saved && apply(saved)) localStorage.setItem(key, JSON.stringify(saved));
+    if (saved) { const changed = apply(saved) || normalizeFacultyNames(saved); if (changed) localStorage.setItem(key, JSON.stringify(saved)); }
   } catch (_) {}
 
   for (const [version, href] of [
