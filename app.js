@@ -28,6 +28,21 @@
         {"id":"CA2801","values":{"Alias":"อเมริกา"}}
       ]
     },
+    "Faculty_Major": {
+      "idColumn": "Record ID",
+      "ops": [
+        {"id":"FM001","values":{"(auto) Faculty EN Copy":"BU International"}},
+        {"id":"FM002","values":{"(auto) Faculty EN Copy":"BU International"}},
+        {"id":"FM003","values":{"(auto) Faculty EN Copy":"BU International"}},
+        {"id":"FM004","values":{"(auto) Faculty EN Copy":"BU International"}},
+        {"id":"FM005","values":{"(auto) Faculty EN Copy":"BU International"}},
+        {"id":"FM006","values":{"(auto) Faculty EN Copy":"BU International"}},
+        {"id":"FM007","values":{"(auto) Faculty EN Copy":"BU International"}},
+        {"id":"FM033","values":{"Faculty EN":"BU International","(auto) Faculty EN Copy":"BU International","Reconciliation Notes":"Faculty name normalized to BU International to match the staff master naming; previous expanded wording remains available only as a search alias."}},
+        {"id":"FM034","values":{"Faculty EN":"BU International","(auto) Faculty EN Copy":"BU International","Reconciliation Notes":"Faculty name normalized to BU International to match the staff master naming; previous expanded wording remains available only as a search alias."}},
+        {"id":"FM035","values":{"(auto) Faculty EN Copy":"BU International"}}
+      ]
+    },
     "Embassy": {
       "idColumn": "Record ID",
       "ops": [

@@ -1,0 +1,7 @@
+BU International faculty-name cleanup — 2026-09-18
+
+- Removed "Bangkok University International College" as a primary Faculty EN value.
+- FM033 and FM034 now use "BU International", consistent with the other BUI records in the staff master.
+- Hidden (auto) Faculty EN Copy values for FM001–FM007 and FM033–FM035 were synchronized to "BU International".
+- "Bangkok University International College" is intentionally retained only in Faculty_Aliases so staff can still find the records using that older/expanded wording.
+- Existing browser-saved datasets are patched on load, so the next Excel export will also use the cleaned faculty name.
