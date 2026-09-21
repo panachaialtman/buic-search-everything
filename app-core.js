@@ -1099,7 +1099,7 @@
   function changeTab(tab){activeTab=tab;$$('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));const degreeEl=$('#facultyDegreeFilter');if(degreeEl)degreeEl.classList.toggle('hidden',tab!=='faculty');const ph={all:'Search everything — e.g. British, BUI, Yangon...',countries:'Search country, nationality, capital, ISO, Thai name...',faculty:'Search faculty or major — then choose Bachelor / Master / Doctor...',embassy:'Search embassy by country, city, Thai or English name...'};$('#searchInput').placeholder=ph[tab]||ph.all;expandedGroups.clear();expandedCards.clear();search();renderSearchSuggestions();}
 
   function initEvents(){
-    $('.workspace-tab').forEach(b=>b.addEventListener('click',()=>setWorkspace(b.dataset.workspace)));
+    $$('.workspace-tab').forEach(b=>b.addEventListener('click',()=>setWorkspace(b.dataset.workspace)));
     $('#letterType')?.addEventListener('change',showNoIenTemplateState);
     $('#letterNoIenImport')?.addEventListener('change',async e=>{
       const input=e.target;
