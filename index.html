@@ -285,6 +285,13 @@
               <option value="doctor">Doctor Degree</option>
             </select>
           </label>
+          <div class="field-group field-wide" id="noIenTemplateTools">
+            <label for="letterNoIenImport">Bachelor Degree No IEN — Word template</label>
+            <input id="letterNoIenImport" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-describedby="letterNoIenStatus" />
+            <small id="letterNoIenStatus">Using the website's shared Word template.</small>
+            <button id="letterNoIenReset" class="secondary-btn" type="button" hidden>Restore shared template</button>
+            <small>This upload replaces the No IEN Word template in this browser only. To update the shared template for everyone, replace the project template and redeploy.</small>
+          </div>
         </div>
 
         <div class="folder-preview-card">
