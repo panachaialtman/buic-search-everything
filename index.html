@@ -202,10 +202,10 @@
       <section id="workspaceData" class="workspace-pane workspace-page">
         <div class="workspace-page-heading"><div><div class="hero-eyebrow">DATA</div><h1>Excel remains the master database.</h1><p>Countries, programs, embassies, communication topics, document options and generated templates all come from the workbook.</p></div></div>
         <div class="data-workspace-grid">
-          <article class="workspace-feature-card"><div class="feature-icon">📊</div><h2>Reference_Data.xlsx</h2><p>Download the current master workbook, edit it, then load the updated workbook back into the site.</p><div class="feature-actions"><a class="primary-btn link-btn" href="data/Reference_Data.xlsx" download>Download Excel master</a><button class="secondary-btn" id="dataPageLoadExcel" type="button">Load updated Excel</button></div></article>
+          <article class="workspace-feature-card"><div class="feature-icon">📊</div><h2>Reference_Data.xlsx</h2><p>Download the current master workbook, edit it, then load the updated workbook back into the site.</p><div class="feature-actions"><a class="primary-btn link-btn" href="data/Reference_Data.xlsx" download>Download Excel master</a><button class="secondary-btn" id="dataPageLoadExcel" type="button">Load updated Excel</button><button class="secondary-btn" id="dataPageRefreshHubBtn" type="button" title="Retrieve only published country, nationality and program references">↻ Refresh from Central Hub</button></div></article>
           <article class="workspace-feature-card"><div class="feature-icon">✉</div><h2>Communication library</h2><div class="data-kpi-row"><div><strong id="dataEmailCount">55</strong><span>Email topics</span></div><div><strong id="dataChatCount">30</strong><span>Chat topics</span></div><div><strong id="dataDocCount">21</strong><span>Document options</span></div></div></article>
           <article class="workspace-feature-card"><div class="feature-icon">⚙</div><h2>Data status</h2><p>Review record counts, source status and workbook loading information.</p><button class="secondary-btn" id="dataPageStatus" type="button">Open Data Status</button></article>
-          <article class="workspace-feature-card import-history-card"><div class="feature-icon">↶</div><h2>Previous Excel imports</h2><p>The previous successful workbook imports are kept in this browser so you can restore one if needed.</p><div id="dataImportHistory" class="import-history-list"></div></article>
+          <article class="workspace-feature-card import-history-card"><div class="feature-icon">↶</div><h2>Previous Excel imports</h2><p>The previous successful workbook imports are kept in this browser so you can restore one if needed.</p><div id="dataImportHistory" class="import-history-list"></div></article><article class="workspace-feature-card"><div class="feature-icon">↻</div><h2>Central reference data</h2><p>Only countries, nationalities, programs and aliases sync from the Hub. The local Excel override and other workbook worksheets remain independent.</p><p id="hubDataStatus" role="status" aria-live="polite">Bundled references · checking Hub…</p></article>
         </div>
       </section>
     </main>
@@ -231,6 +231,7 @@
 
         <div class="drawer-actions">
           <button class="secondary-btn full" id="resetDataBtn" type="button">Reset to bundled data</button>
+          <button class="secondary-btn full" id="drawerRefreshHubBtn" type="button">↻ Refresh public data from Central Hub</button>
         </div>
 
         <div class="drawer-section">
@@ -363,6 +364,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="data/reference-snapshot.js"></script>
+  <script src="hub-reference.js?v=1"></script>
   <script src="data/letter-templates.js"></script>
   <script src="app.js"></script>
 </body>
