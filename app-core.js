@@ -992,7 +992,7 @@
   }
   async function importNoIenTemplate(file){
     if(!file)return;
-    if(!/\\.docx$/i.test(file.name))throw new Error('Please select a .docx Word file.');
+    if(!/\.docx$/i.test(file.name))throw new Error('Please select a .docx Word file.');
     if(file.size<1024||file.size>3*1024*1024)throw new Error('The DOCX must be between 1 KB and 3 MB.');
     const bytes=new Uint8Array(await file.arrayBuffer());
     if(bytes[0]!==0x50 || bytes[1]!==0x4b)throw new Error('This file is not a valid DOCX/ZIP document.');
