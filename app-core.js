@@ -970,8 +970,43 @@
     $('#folderPreview').textContent=`${num} ${name}`;
     $('#filePreview').textContent=`Letter_${name}.docx`;
   }
+  const NO_IEN_OVERRIDE_KEY = 'bu-ic-bachelor-no-ien-template-override-v1';
+  function customNoIenTemplate(){
+    try {
+      const entry=JSON.parse(localStorage.getItem(NO_IEN_OVERRIDE_KEY)||'null');
+      if(entry && typeof entry.base64==='string' && entry.base64.length>100 && entry.filename) return entry;
+    } catch(err) { console.warn('Could not read the personal No IEN template.',err); }
+    return null;
+  }
+  function showNoIenTemplateState(){
+    const tools=$('#noIenTemplateTools');
+    if(!tools)return;
+    tools.hidden=$('#letterType').value!=='bachelor_no_ien';
+    const custom=customNoIenTemplate();
+    const status=$('#letterNoIenStatus');
+    if(status)status.textContent=custom
+      ? `Using your imported template: ${custom.filename} (saved in this browser)`
+      : "Using the website's shared Word template.";
+    const reset=$('#letterNoIenReset');
+    if(reset)reset.hidden=!custom;
+  }
+  async function importNoIenTemplate(file){
+    if(!file)return;
+    if(!/\\.docx$/i.test(file.name))throw new Error('Please select a .docx Word file.');
+    if(file.size<1024||file.size>3*1024*1024)throw new Error('The DOCX must be between 1 KB and 3 MB.');
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    if(bytes[0]!==0x50 || bytes[1]!==0x4b)throw new Error('This file is not a valid DOCX/ZIP document.');
+    const blocks=[];
+    for(let i=0;i<bytes.length;i+=0x8000)blocks.push(String.fromCharCode(...bytes.subarray(i,i+0x8000)));
+    const entry={filename:file.name,base64:btoa(blocks.join('')),updatedAt:new Date().toISOString()};
+    try{localStorage.setItem(NO_IEN_OVERRIDE_KEY,JSON.stringify(entry));}
+    catch(err){throw new Error('Could not save the Word template in this browser. Check available browser storage.');}
+    showNoIenTemplateState();
+    toast('Bachelor Degree No IEN template imported for this browser.');
+  }
   function templateBlob(key){
-    const t=window.LETTER_TEMPLATES?.[key];if(!t)throw new Error('Letter template is missing.');
+    const t=(key==='bachelor_no_ien'?customNoIenTemplate():null)||window.LETTER_TEMPLATES?.[key];
+    if(!t)throw new Error('Letter template is missing.');
     const binary=atob(t.base64);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
     return new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
   }
@@ -1022,7 +1057,21 @@
   function changeTab(tab){activeTab=tab;$$('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));const degreeEl=$('#facultyDegreeFilter');if(degreeEl)degreeEl.classList.toggle('hidden',tab!=='faculty');const ph={all:'Search everything — e.g. British, BUI, Yangon...',countries:'Search country, nationality, capital, ISO, Thai name...',faculty:'Search faculty or major — then choose Bachelor / Master / Doctor...',embassy:'Search embassy by country, city, Thai or English name...'};$('#searchInput').placeholder=ph[tab]||ph.all;expandedGroups.clear();expandedCards.clear();search();renderSearchSuggestions();}
 
   function initEvents(){
-    $$('.workspace-tab').forEach(b=>b.addEventListener('click',()=>setWorkspace(b.dataset.workspace)));
+    $('.workspace-tab').forEach(b=>b.addEventListener('click',()=>setWorkspace(b.dataset.workspace)));
+    $('#letterType')?.addEventListener('change',showNoIenTemplateState);
+    $('#letterNoIenImport')?.addEventListener('change',async e=>{
+      const input=e.target;
+      try {await importNoIenTemplate(input.files?.[0]);}
+      catch(err){console.error(err);toast(err.message||'Could not import the Word template.');}
+      finally {input.value='';}
+    });
+    $('#letterNoIenReset')?.addEventListener('click',()=>{
+      if(!window.confirm('Restore the website\'s shared Bachelor Degree No IEN template for this browser?'))return;
+      localStorage.removeItem(NO_IEN_OVERRIDE_KEY);
+      showNoIenTemplateState();
+      toast('Restored the shared Bachelor Degree No IEN template.');
+    });
+    showNoIenTemplateState();
     $$('.comm-channel').forEach(b=>b.addEventListener('click',()=>setCommChannel(b.dataset.channel)));
     $('#commSignatureSelect').addEventListener('change',e=>applySignatureSelection(e.target.value));
     $('#manageSignatures').addEventListener('click',openSignatureManager);
