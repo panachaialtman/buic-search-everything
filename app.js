@@ -133,8 +133,8 @@
     return changed;
   }
 
-  apply(window.REFERENCE_SNAPSHOT);
-  normalizeFacultyNames(window.REFERENCE_SNAPSHOT);
+  window.applyBUICReferencePatches = rows => { apply(rows); normalizeFacultyNames(rows); };
+  window.applyBUICReferencePatches(window.REFERENCE_SNAPSHOT);
   try {
     const key = 'bu-international-workspace-data-v4_6_12';
     const saved = JSON.parse(localStorage.getItem(key) || 'null');
