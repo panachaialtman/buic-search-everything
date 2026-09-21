@@ -57,6 +57,7 @@
     const language = headers.indexOf('Language');
     if (parent < 0 || alias < 0 || idCol < 0) throw new Error('Invalid alias sheet: ' + label);
     const existing = new Set(table.slice(1).map(row => String(row[parent] ?? '') + '\u0000' + normalized(row[alias])));
+    const usedIds = new Set(table.slice(1).map(row => String(row[idCol] ?? '')));
     let added = 0;
     for (const remote of remoteRows) {
       for (const value of (remote.aliases || [])) {
@@ -66,7 +67,10 @@
         const newRow = Array(headers.length).fill('');
         newRow[parent] = remote.recordId;
         newRow[alias] = text;
-        newRow[idCol] = 'HUB_' + label.replace(/\W/g, '') + '_' + remote.recordId + '_' + (++added);
+        let newId;
+        do { newId = 'HUB_' + label.replace(/\W/g, '') + '_' + remote.recordId + '_' + (++added); } while (usedIds.has(newId));
+        newRow[idCol] = newId;
+        usedIds.add(newId);
         if (active >= 0) newRow[active] = 'YES';
         if (language >= 0) newRow[language] = /[\u0e00-\u0e7f]/.test(text) ? 'TH' : 'EN';
         table.push(newRow);
