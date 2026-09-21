@@ -55,21 +55,15 @@
         if (!Array.isArray(table) || !table.length || !Array.isArray(table[0])) continue;
         const sheet = XLSX.utils.aoa_to_sheet(table);
 
-        // Keep internal helper columns out of the normal staff view.
-        // They remain in the workbook for compatibility, but are hidden by default.
-        if (Array.isArray(table[0])) {
-          sheet['!cols'] = table[0].map(header => ({
-            hidden: /^\(auto\)\s*/i.test(String(header ?? '').trim()) ||
-                    /^(Faculty EN Copy|Major EN Copy)$/i.test(String(header ?? '').trim())
-          }));
-        }
+        // Staff exports show EVERY column, including internal and (auto) helper
+        // columns. Only designated alias/reference-helper SHEETS are hidden.
+        // Do not add !cols.hidden here; Excel users need the complete table.
 
         XLSX.utils.book_append_sheet(book, sheet, String(name).slice(0, 31));
       }
 
-      // Keep alias/reference-helper sheets in the workbook, but hide them by default.
-      // Also hide internal auto columns on each sheet.
-      // Staff can unhide them in Excel whenever they need to maintain search aliases.
+      // Hide only alias/reference-helper SHEETS. Every column in all sheets
+      // remains visible, including (auto) helper fields in Faculty_Major.
       book.Workbook = book.Workbook || {};
       book.Workbook.Sheets = book.SheetNames.map(name => ({ Hidden: /aliases/i.test(name) ? 1 : 0 }));
 
