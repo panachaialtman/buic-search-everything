@@ -637,7 +637,7 @@
     renderImportHistory();
   }
   function updateSourceUI(){
-    $('#dataSourceLabel').textContent=sourceMeta.type==='excel'?'Excel loaded':'Bundled data';$('#drawerSourceTitle').textContent=sourceMeta.title;$('#drawerSourceDetail').textContent=sourceMeta.detail;
+    $('#dataSourceLabel').textContent=sourceMeta.type==='hub'?'Central Hub':sourceMeta.type==='excel'?'Excel loaded':'Bundled data';$('#drawerSourceTitle').textContent=sourceMeta.title;$('#drawerSourceDetail').textContent=sourceMeta.detail;
     [$('#statusDot'),$('#drawerStatusDot')].forEach(el=>{el.classList.toggle('excel',sourceMeta.type==='excel');el.classList.toggle('warn',sourceMeta.type==='warning');});
   }
   function getImportHistory(){try{const h=JSON.parse(localStorage.getItem(IMPORT_HISTORY_KEY)||'[]');return Array.isArray(h)?h:[];}catch{return[];}}
@@ -669,6 +669,48 @@
     el.innerHTML=`<strong>${errors?`${errors} error${errors===1?'':'s'}`:warnings?`0 errors · ${warnings} warning${warnings===1?'':'s'}`:'Validated'}</strong><span>${esc(r.label||'Workbook structure checked.')}</span>${warnings?`<small>${esc(r.warnings.slice(0,3).join(' · '))}${warnings>3?' · …':''}</small>`:''}`;
   }
   function setRows(rows,meta,persist=false){sourceRows=rows;data=buildData(rows);countryCodeCache.clear();flagColorCache.clear();floatingWindows.clear();sourceMeta=meta;if(persist){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(rows));localStorage.setItem(STORAGE_META_KEY,JSON.stringify(meta));}catch(e){toast('Excel loaded, but browser storage is full.');}}updateOverview();updateSourceUI();refreshCommunicationData();renderValidationSummary();search();renderFloatingWindows();}
+
+  let hubSyncInFlight = false;
+  function hubStatus(message, error = false) {
+    const node = $('#hubDataStatus');
+    if (node) {
+      node.textContent = message;
+      node.title = message;
+      node.style.color = error ? '#b45309' : '';
+    }
+  }
+  async function syncHubReferences(force = false) {
+    if (hubSyncInFlight || !sourceRows || !window.BUICHubReference) return;
+    if (sourceMeta.type === 'excel') {
+      if (!force) {
+        hubStatus('Local Excel override active · Hub will not replace it automatically');
+        return;
+      }
+      if (!window.confirm('You have an imported Excel workbook. Apply published Hub fields to this page temporarily? Your saved workbook will not be overwritten; reload to restore it.')) return;
+    }
+    hubSyncInFlight = true;
+    const buttons = ['#dataPageRefreshHubBtn', '#drawerRefreshHubBtn'].map(selector => $(selector)).filter(Boolean);
+    buttons.forEach(button => button.disabled = true);
+    try {
+      const result = await window.BUICHubReference.update(sourceRows, force);
+      if (result.status === 'updated') {
+        lastValidationReport = {errors:[], warnings:[], label:'Published Hub reference v' + result.version + ' loaded. Non-reference workbook sheets were preserved.'};
+        setRows(result.rows, {type:'hub', title:'BUIC Central Hub v' + result.version,
+          detail:'Published reference data · version ' + result.version + ' · other workbook sheets preserved'}, false);
+        hubStatus('Central Hub v' + result.version + ' · references updated');
+      } else if (result.status === 'unchanged') {
+        hubStatus('Central Hub v' + result.version + ' · up to date');
+      } else {
+        hubStatus('No published Hub dataset · existing workbook retained');
+      }
+    } catch (error) {
+      console.warn('Central Hub reference refresh failed; existing workbook preserved', error);
+      hubStatus('Hub not applied · ' + (error.message || 'current workbook preserved'), true);
+    } finally {
+      hubSyncInFlight = false;
+      buttons.forEach(button => button.disabled = false);
+    }
+  }
 
   function validateRows(rows){
     const errors=[],warnings=[];
@@ -1132,6 +1174,8 @@
     $('#excelDropZone').addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';$('#excelDropZone').classList.add('dragover');});
     $('#excelDropZone').addEventListener('dragleave',()=>$('#excelDropZone').classList.remove('dragover'));
     $('#excelDropZone').addEventListener('drop',e=>{e.preventDefault();$('#excelDropZone').classList.remove('dragover');const file=e.dataTransfer.files?.[0];if(file)loadExcelFile(file);});
+    $('#dataPageRefreshHubBtn')?.addEventListener('click', () => { void syncHubReferences(true); });
+    $('#drawerRefreshHubBtn')?.addEventListener('click', () => { void syncHubReferences(true); });
     $('#dataStatusBtn').addEventListener('click',openDrawer);$$('[data-close-drawer]').forEach(el=>el.addEventListener('click',closeDrawer));$('#resetDataBtn').addEventListener('click',resetBundled);
     document.addEventListener('click',e=>{if(!e.target.closest('.theme-picker-wrap'))toggleThemeMenu(false);if(!e.target.closest('.search-shell'))closeSearchSuggestions();const missing=e.target.closest('[data-missing-field]');if(missing){focusMissingField(missing.getAttribute('data-missing-field'));return;}const browse=e.target.closest('[data-browse-type]');if(browse){browseType(browse.getAttribute('data-browse-type'));return;}const restore=e.target.closest('[data-restore-import]');if(restore){restoreImportVersion(Number(restore.getAttribute('data-restore-import')));return;}const copy=e.target.closest('[data-copy]');if(copy){copyText(copy.getAttribute('data-copy'));return;}const floatBtn=e.target.closest('[data-float-ref]');if(floatBtn){openFloatingByKey(floatBtn.getAttribute('data-float-ref'));return;}const winAction=e.target.closest('[data-window-action]');if(winAction){const id=winAction.getAttribute('data-id');const action=winAction.getAttribute('data-window-action');if(action==='minimize')toggleFloatingMinimize(id);else if(action==='close')closeFloating(id);return;}const expand=e.target.closest('[data-expand-group]');if(expand){const key=expand.getAttribute('data-expand-group');expandedGroups.has(key)?expandedGroups.delete(key):expandedGroups.add(key);renderResults(lastGroups);return;}const cardToggle=e.target.closest('[data-toggle-card]');if(cardToggle){const key=cardToggle.getAttribute('data-toggle-card');expandedCards.has(key)?expandedCards.delete(key):expandedCards.add(key);renderResults(lastGroups);return;}});
     document.addEventListener('keydown',e=>{const toggle=e.target.closest && e.target.closest('[data-toggle-card]');if(toggle && toggle.tagName!=='BUTTON' && (e.key==='Enter' || e.key===' ')){e.preventDefault();const key=toggle.getAttribute('data-toggle-card');expandedCards.has(key)?expandedCards.delete(key):expandedCards.add(key);renderResults(lastGroups);}});
@@ -1149,4 +1193,12 @@
     setTimeout(()=>$('#searchInput').focus(),120);
   }
   init();
+  // Sync only public references; browser-local Excel imports have priority.
+  void syncHubReferences();
+  setInterval(() => {
+    if (document.visibilityState === 'visible') void syncHubReferences();
+  }, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void syncHubReferences();
+  });
 })();
