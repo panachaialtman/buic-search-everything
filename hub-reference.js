@@ -79,6 +79,8 @@
     }
   }
   function applyRemote(local, countries, nationalities, programs) {
+    // Apply legacy workbook corrections first. Published Hub fields must take precedence.
+    window.applyBUICReferencePatches?.(local);
     const sheetCountry = tableIndex(local.Countries, 'Countries');
     const sheetProgram = tableIndex(local.Faculty_Major, 'Faculty_Major');
     const matchSet = (table, remote, label) => {
@@ -116,8 +118,6 @@
     }
     insertAliases(local.Country_Aliases, 'Country Record ID', countries, 'Country_Aliases');
     insertAliases(local.Faculty_Aliases, 'Faculty/Major Record ID', programs, 'Faculty_Aliases');
-    // Reapply the original website's reviewed corrections after the source fields.
-    window.applyBUICReferencePatches?.(local);
     return local;
   }
 
