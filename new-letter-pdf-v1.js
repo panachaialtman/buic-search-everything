@@ -844,7 +844,7 @@ function setupPageContainer(el){
   });
   el.addEventListener('dragend',e=>{
     e.target.closest('[data-page-id]')?.classList.remove('dragging');
-    $('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));
+    $$('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));
     state.dragId='';
   });
   el.addEventListener('dragover',e=>{
@@ -852,7 +852,7 @@ function setupPageContainer(el){
     if(!state.dragId&&!types.includes('application/x-buic-page'))return;
     e.preventDefault();e.stopPropagation();
     if(e.dataTransfer)e.dataTransfer.dropEffect='move';
-    $('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));
+    $$('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));
     const card=e.target.closest('[data-page-id],[data-stack]');
     if(card)card.classList.add('drag-target');
     if(el.id==='nlpdfFilmstrip'){
