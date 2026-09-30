@@ -77,7 +77,7 @@ function workspaceMarkup(){
       '<div class="nlpdf-side-scroll">'+
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default assets</strong><span>Shown as one<br>stack each</span></div>'+
           assetRow('front','Front document',p.front)+assetRow('back','Back document',p.back)+assetRow('signature','Signature',p.signature,true)+
-          '<div class="nlpdf-signature-controls"><label class="nlpdf-field"><span>Apply signature</span><select id="nlpdfSigScope"><option value="last">Last document page</option><option value="all">All document pages</option></select></label><div class="nlpdf-field"><span>Drag signature directly on A4</span><button class="nlpdf-btn" id="nlpdfResetSignature" type="button">Reset position</button></div><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div>'+
+          '<div class="nlpdf-signature-controls"><label class="nlpdf-field"><span>Apply signature</span><select id="nlpdfSigScope"><option value="last">Last document page</option><option value="all">All document pages</option></select></label><div class="nlpdf-field"><span>Drag signature directly on A4</span><button class="nlpdf-btn" id="nlpdfResetSignature" type="button">Reset position</button></div><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div><div class="nlpdf-note" id="nlpdfSigHint">Enable the signature to place it on the A4.</div>'+
         '</section>'+
         '<section class="nlpdf-panel" id="nlpdfCropPanel"><div class="nlpdf-panel-title"><strong>Crop tool</strong><span id="nlpdfActiveLabel">Select a page</span></div>'+
           '<div class="nlpdf-note">Drag the edges or corners of the crop boundary directly on the A4 sheet.</div>'+
@@ -330,6 +330,7 @@ function renderSignature(show){
   img.title=activePage()&&!signatureApplies(activePage())
     ? 'Placement preview (export applies to last document page)'
     : 'Drag signature to reposition';
+  const hint=$('#nlpdfSigHint');if(hint)hint.textContent=activePage()&&!signatureApplies(activePage())?'Placement preview only: the exported signature goes on the last document page.':'Drag the signature on A4 to position it for export.';
 }
 function syncPageControls(){
   const p=activePage(),disabled=!p;
