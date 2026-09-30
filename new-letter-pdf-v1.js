@@ -140,6 +140,87 @@ function exportModalMarkup(){
   '</section></div>';
 }
 
+
+/* Unified editor history: snapshots contain edits/settings but not PDF binary buffers. */
+function snapshot(){
+  return {
+    pages:state.pages.map(p=>({...p,crop:{...p.crop},transform:{...p.transform}})),
+    selected:[...state.selected],activeId:state.activeId,anchorIndex:state.anchorIndex,
+    sig:{...state.sig},signaturePageId:state.signaturePageId,
+    safeArea:state.safeArea,
+    toggles:{
+      front:Boolean($('#nlpdfUseFront')?.checked),
+      back:Boolean($('#nlpdfUseBack')?.checked),
+      signature:Boolean($('#nlpdfUseSignature')?.checked),
+      scope:$('#nlpdfSigScope')?.value||'all'
+    },
+    assets:{...state.assets}
+  };
+}
+function snapshotFingerprint(s){
+  const names={};
+  for(const k of ['front','back','signature'])names[k]=s.assets[k]?.updatedAt||s.assets[k]?.name||null;
+  return JSON.stringify({...s,assets:names,selected:undefined,activeId:undefined,anchorIndex:undefined});
+}
+function resetHistory(){
+  state.history.undo.length=0;state.history.redo.length=0;
+  state.history.current=snapshot();updateHistoryButtons();
+}
+function recordEdit(){
+  if(state.history.restoring)return;
+  const next=snapshot(),hist=state.history;
+  if(!hist.current){hist.current=next;updateHistoryButtons();return;}
+  if(snapshotFingerprint(hist.current)===snapshotFingerprint(next)){
+    hist.current=next;updateHistoryButtons();return;
+  }
+  hist.undo.push(hist.current);if(hist.undo.length>90)hist.undo.shift();
+  hist.redo.length=0;hist.current=next;
+  updateHistoryButtons();
+}
+function updateHistoryButtons(){
+  const hist=state.history;
+  const u=$('#nlpdfUndo'),r=$('#nlpdfRedo');
+  if(u)u.disabled=!hist.undo.length||hist.restoring;
+  if(r)r.disabled=!hist.redo.length||hist.restoring;
+}
+async function restoreSnapshot(next){
+  const hist=state.history;hist.restoring=true;updateHistoryButtons();
+  const before={...state.assets};
+  state.pages=next.pages.map(p=>({...p,crop:{...p.crop},transform:{...p.transform}}));
+  state.selected=new Set(next.selected);state.activeId=next.activeId;
+  state.anchorIndex=next.anchorIndex;state.sig={...next.sig};
+  state.signaturePageId=next.signaturePageId;state.safeArea=next.safeArea;
+  state.assets={...next.assets};
+  $('#nlpdfUseFront').checked=next.toggles.front;
+  $('#nlpdfUseBack').checked=next.toggles.back;
+  $('#nlpdfUseSignature').checked=next.toggles.signature;
+  $('#nlpdfSigScope').value=next.toggles.scope;
+  $('#nlpdfSafeArea').checked=state.safeArea;
+  $('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);
+  $('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
+  state.cropMode=false;state.cropDraft=null;state.cropBounds=null;
+  try{
+    for(const id of ['front','back','signature']){
+      if(before[id]!==state.assets[id]){
+        if(state.assets[id])await dbPut(state.assets[id]);
+        else await dbDelete(id);
+      }
+    }
+    renderAssets();refreshSignatureUrl();savePrefs();
+    await updateAssetInfo();await renderAll();updateControls();
+  }finally{hist.restoring=false;updateHistoryButtons();}
+}
+async function undoEdit(){
+  const h=state.history;if(!h.undo.length||h.restoring)return;
+  const previous=h.undo.pop();h.redo.push(h.current);h.current=previous;
+  await restoreSnapshot(previous);
+}
+async function redoEdit(){
+  const h=state.history;if(!h.redo.length||h.restoring)return;
+  const next=h.redo.pop();h.undo.push(h.current);h.current=next;
+  await restoreSnapshot(next);
+}
+
 /* Assets */
 async function loadAssets(){
   for(const id of ['front','back','signature']){try{state.assets[id]=await dbGet(id);}catch(err){console.warn(err);}}
