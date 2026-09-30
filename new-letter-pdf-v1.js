@@ -831,10 +831,42 @@ function setupDrop(el){
 function setupPageContainer(el){
   el.addEventListener('click',e=>{const card=e.target.closest('[data-page-id]');if(card)selectPage(card.dataset.pageId,e);});
   el.addEventListener('dblclick',e=>{const card=e.target.closest('[data-page-id]');if(card){selectPage(card.dataset.pageId,e);setView('single');}});
-  el.addEventListener('dragstart',e=>{const card=e.target.closest('[data-page-id]');if(!card)return;state.dragId=card.dataset.pageId;card.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',state.dragId);});
-  el.addEventListener('dragend',e=>{e.target.closest('[data-page-id]')?.classList.remove('dragging');$$('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));state.dragId='';});
-  el.addEventListener('dragover',e=>{if(!state.dragId)return;e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';$$('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));const card=e.target.closest('[data-page-id],[data-stack]');if(card)card.classList.add('drag-target');if(el.id==='nlpdfFilmstrip'){const r=el.getBoundingClientRect();if(e.clientY<r.top+55)el.scrollTop-=28;else if(e.clientY>r.bottom-55)el.scrollTop+=28;}});
-  el.addEventListener('drop',e=>{if(!state.dragId)return;e.preventDefault();e.stopPropagation();const card=e.target.closest('[data-page-id],[data-stack]'),dragged=state.dragId;if(card?.dataset.stack)moveToEdge(card.dataset.stack==='front'?'first':'last',dragged);else if(card?.dataset.pageId)reorder(dragged,card.dataset.pageId);else moveToEdge('last',dragged);state.dragId='';});
+  el.addEventListener('dragstart',e=>{
+    const card=e.target.closest('[data-page-id]');if(!card||!e.dataTransfer)return;
+    state.dragId=card.dataset.pageId;card.classList.add('dragging');
+    e.dataTransfer.effectAllowed='move';
+    e.dataTransfer.setData('application/x-buic-page',state.dragId);
+    e.dataTransfer.setData('text/plain',state.dragId);
+  });
+  el.addEventListener('dragend',e=>{
+    e.target.closest('[data-page-id]')?.classList.remove('dragging');
+    $('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));
+    state.dragId='';
+  });
+  el.addEventListener('dragover',e=>{
+    const types=[...(e.dataTransfer?.types||[])];
+    if(!state.dragId&&!types.includes('application/x-buic-page'))return;
+    e.preventDefault();e.stopPropagation();
+    if(e.dataTransfer)e.dataTransfer.dropEffect='move';
+    $('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));
+    const card=e.target.closest('[data-page-id],[data-stack]');
+    if(card)card.classList.add('drag-target');
+    if(el.id==='nlpdfFilmstrip'){
+      const r=el.getBoundingClientRect();
+      if(e.clientY<r.top+45)el.scrollTop-=18;
+      else if(e.clientY>r.bottom-45)el.scrollTop+=18;
+    }
+  });
+  el.addEventListener('drop',e=>{
+    const dragged=state.dragId||e.dataTransfer?.getData('application/x-buic-page')||e.dataTransfer?.getData('text/plain');
+    if(!dragged||!state.pages.some(p=>p.id===dragged))return;
+    e.preventDefault();e.stopPropagation();
+    const card=e.target.closest('[data-page-id],[data-stack]');
+    state.dragId='';
+    if(card?.dataset.stack)moveToEdge(card.dataset.stack==='front'?'first':'last',dragged);
+    else if(card?.dataset.pageId)reorder(dragged,card.dataset.pageId);
+    else moveToEdge('last',dragged);
+  });
 }
 function setupContentDrag(){
   const paper=$('#nlpdfPaper'),canvas=$('#nlpdfCanvas');
