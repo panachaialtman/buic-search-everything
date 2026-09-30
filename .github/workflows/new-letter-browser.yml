@@ -18,6 +18,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Check out the embedded visa workspace for integrated settings tests
+        uses: actions/checkout@v4
+        with:
+          repository: panachaialtman/new-student-local
+          path: new-student-local
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
