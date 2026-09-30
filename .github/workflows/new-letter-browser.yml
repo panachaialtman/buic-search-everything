@@ -1,0 +1,43 @@
+name: New Letter PDF browser regression
+on:
+  push:
+    paths:
+      - 'new-letter-pdf-v1.js'
+      - 'new-letter-pdf-v1.css'
+      - 'index.html'
+      - 'tests/new-letter-browser.mjs'
+      - '.github/workflows/new-letter-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save playwright@1.55.1
+          npx playwright install --with-deps chromium
+      - name: Start local app
+        run: |
+          python3 -m http.server 8123 --bind 127.0.0.1 > /tmp/new-letter-http.log 2>&1 &
+          sleep 2
+          curl -fsS http://127.0.0.1:8123/ >/dev/null
+      - name: Exercise New Letter in Chromium
+        run: node tests/new-letter-browser.mjs
+      - name: Upload browser screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-letter-browser-artifacts
+          path: |
+            test-results/
+            /tmp/new-letter-http.log
+          if-no-files-found: ignore
