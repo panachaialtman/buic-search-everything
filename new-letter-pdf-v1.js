@@ -691,7 +691,7 @@ function setupToolRail(){
     state.toolOpen='';
     flyout.classList.add('hidden');
     for(const panel of Object.values(map))panel?.classList.add('hidden');
-    $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.remove('active'));
+    $$('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.remove('active'));
   }
   function open(key){
     if(key==='rotate')return;
@@ -700,9 +700,9 @@ function setupToolRail(){
     flyout.classList.remove('hidden');
     $('#nlpdfToolFlyoutTitle').textContent=label[key]||'Tools';
     for(const [id,panel] of Object.entries(map))panel?.classList.toggle('hidden',id!==key);
-    $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool===key));
+    $$('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool===key));
   }
-  $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.addEventListener('click',()=>open(b.dataset.tool)));
+  $$('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.addEventListener('click',()=>open(b.dataset.tool)));
   $('#nlpdfToolFlyoutClose').addEventListener('click',close);
   window.addEventListener('pointerdown',e=>{
     if(state.toolOpen&&!e.target.closest('#nlpdfToolRail,#nlpdfToolFlyout'))close();
