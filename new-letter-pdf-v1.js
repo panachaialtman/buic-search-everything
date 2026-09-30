@@ -881,8 +881,19 @@ function setupDrop(el){
   el.addEventListener('drop',e=>addFiles(e.dataTransfer.files));
 }
 function setupPageContainer(el){
-  el.addEventListener('click',e=>{const card=e.target.closest('[data-page-id]');if(card)selectPage(card.dataset.pageId,e);});
-  el.addEventListener('dblclick',e=>{const card=e.target.closest('[data-page-id]');if(card){selectPage(card.dataset.pageId,e);setView('single');}});
+  const lastTap={id:'',at:0};
+  el.addEventListener('click',e=>{
+    const card=e.target.closest('[data-page-id]');if(!card)return;
+    const id=card.dataset.pageId,now=Date.now();
+    const doubleTap=(el.id==='nlpdfGrid'&&lastTap.id===id&&now-lastTap.at<550);
+    lastTap.id=id;lastTap.at=now;
+    selectPage(id,e);
+    if(doubleTap)setView('single');
+  });
+  el.addEventListener('dblclick',e=>{
+    const card=e.target.closest('[data-page-id]');
+    if(card&&state.viewMode==='grid'){selectPage(card.dataset.pageId,e);setView('single');}
+  });
   el.addEventListener('dragstart',e=>{
     const card=e.target.closest('[data-page-id]');if(!card||!e.dataTransfer)return;
     state.dragId=card.dataset.pageId;card.classList.add('dragging');
