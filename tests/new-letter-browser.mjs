@@ -207,6 +207,8 @@ try{
     const first=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
     const last=await page.locator('#nlpdfFilmstrip [data-page-id]').last().getAttribute('data-page-id');
     assert.notEqual(first,last);
+    await page.locator('#nlpdfFilmstrip [data-page-id]').first().click();
+    console.log('SELECTED BEFORE DRAG:',JSON.stringify(await page.locator('#nlpdfFilmstrip .nlpdf-page-card.selected').evaluateAll(nodes=>nodes.map(n=>n.dataset.pageId))));
     await page.evaluate(()=>{
       window.__dragTrace=[];
       const el=document.querySelector('#nlpdfFilmstrip');
