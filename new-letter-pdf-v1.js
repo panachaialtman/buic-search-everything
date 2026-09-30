@@ -239,7 +239,7 @@ async function sourceRaster(p){
   state.previewCache.set(key,canvas);return canvas;
 }
 function cropRotateRaster(src,p){
-  const c=p.crop||defaultCrop(),l=clamp(c.left,0,40)/100,r=clamp(c.right,0,40)/100,t=clamp(c.top,0,40)/100,b=clamp(c.bottom,0,40)/100;
+  const c=p.crop||defaultCrop(),l=clamp(c.left,0,95)/100,r=clamp(c.right,0,95)/100,t=clamp(c.top,0,95)/100,b=clamp(c.bottom,0,95)/100;
   const sx=Math.floor(src.width*l),sy=Math.floor(src.height*t),sw=Math.max(1,Math.floor(src.width*(1-l-r))),sh=Math.max(1,Math.floor(src.height*(1-t-b)));
   const rot=((p.rotation||0)%360+360)%360, out=document.createElement('canvas');if(rot===90||rot===270){out.width=sh;out.height=sw;}else{out.width=sw;out.height=sh;}
   const x=out.getContext('2d');x.save();if(rot===90){x.translate(out.width,0);x.rotate(Math.PI/2);}else if(rot===180){x.translate(out.width,out.height);x.rotate(Math.PI);}else if(rot===270){x.translate(0,out.height);x.rotate(-Math.PI/2);}x.drawImage(src,sx,sy,sw,sh,0,0,sw,sh);x.restore();return out;
@@ -464,7 +464,7 @@ async function renderGrid(){
 async function renderAll(){updateControls();await Promise.allSettled([renderActive(),renderFilmstrip(),renderGrid()]);}
 
 /* View switching */
-function setView(mode){state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSingleView').classList.toggle('active',state.viewMode==='single');$('#nlpdfGridView').classList.toggle('active',state.viewMode==='grid');$('#nlpdfStage').classList.toggle('hidden',state.viewMode==='grid');$('#nlpdfGridStage').classList.toggle('hidden',state.viewMode!=='grid');$('#nlpdfFilmstripWrap').classList.toggle('hidden',state.viewMode==='grid');if(state.viewMode==='grid')renderGrid();else renderActive();}
+function setView(mode){state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSingleView').classList.toggle('active',state.viewMode==='single');$('#nlpdfGridView').classList.toggle('active',state.viewMode==='grid');$('#nlpdfStage').classList.toggle('hidden',state.viewMode==='grid');$('#nlpdfGridStage').classList.toggle('hidden',state.viewMode!=='grid');$('#nlpdfFilmstripWrap').classList.toggle('hidden',state.viewMode==='grid');if(state.viewMode==='grid')renderGrid();else{renderActive();requestAnimationFrame(fitPaper);}}
 
 /* Export */
 async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice());state.pdfLibDocs.set(k,d);return d;}
@@ -601,7 +601,7 @@ async function build(){
   const docs=$('#workspaceDocuments'),legacy=docs?.querySelector('.document-workspace-grid');if(!docs||!legacy)return;
   docs.classList.add('nlpdf-primary');if(!$('#newLetterPdfWorkspace'))legacy.insertAdjacentHTML('afterend',workspaceMarkup());
   await ensurePdfLibs();await loadAssets();
-  const p=prefs();$('#nlpdfSigScope').value=p.sigScope;$('#nlpdfSpace').value=p.spaceMM;$('#nlpdfSpaceValue').textContent=p.spaceMM+' mm';$('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);$('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
+  const p=prefs();state.safeArea=Boolean(p.safeArea);$('#nlpdfSafeArea').checked=state.safeArea;$('#nlpdfSigScope').value=p.sigScope;$('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);$('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
 
   $('#nlpdfCreateFolderOnly').addEventListener('click',()=>$('#documentsCreateFolder')?.click());
   $('#nlpdfAddFiles').addEventListener('click',()=>$('#nlpdfFileInput').click());$('#nlpdfFileInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
@@ -613,22 +613,41 @@ async function build(){
   $('#nlpdfSigSize').addEventListener('input',e=>{state.sig.widthPct=Number(e.target.value)/100;$('#nlpdfSigSizeValue').textContent=e.target.value+'%';state.sig.xPct=clamp(state.sig.xPct,0,1-state.sig.widthPct);savePrefs();renderSignature(signatureApplies(activePage()));});
   $('#nlpdfResetSignature').addEventListener('click',()=>{state.sig.xPct=.72;state.sig.yPct=.80;state.sig.widthPct=.22;$('#nlpdfSigSize').value=22;$('#nlpdfSigSizeValue').textContent='22%';savePrefs();renderSignature(signatureApplies(activePage()));});
 
-  $('#nlpdfRotateLeft').addEventListener('click',()=>rotateSelected(-90));$('#nlpdfRotateRight').addEventListener('click',()=>rotateSelected(90));$('#nlpdfMoveUp').addEventListener('click',()=>moveActive(-1));$('#nlpdfMoveDown').addEventListener('click',()=>moveActive(1));$('#nlpdfDuplicate').addEventListener('click',duplicateSelected);$('#nlpdfDelete').addEventListener('click',deleteSelected);
-  for(const [prop,id] of [['top','nlpdfCropTop'],['right','nlpdfCropRight'],['bottom','nlpdfCropBottom'],['left','nlpdfCropLeft']])$('#'+id).addEventListener('input',e=>{const p=activePage();if(!p)return;p.crop[prop]=Number(e.target.value);$('#'+id+'Value').textContent=e.target.value+'%';renderActive();});
-  $('#nlpdfResetCrop').addEventListener('click',()=>{const p=activePage();if(!p)return;p.crop=defaultCrop();renderAll();});
-  $('#nlpdfContentScale').addEventListener('input',e=>{const p=activePage();if(!p)return;p.transform.scale=Number(e.target.value)/100;$('#nlpdfContentScaleValue').textContent=e.target.value+'%';renderActive();});
-  $('#nlpdfCenterContent').addEventListener('click',centerContent);$('#nlpdfResetTransform').addEventListener('click',resetTransform);
-  $('#nlpdfSpace').addEventListener('input',e=>{$('#nlpdfSpaceValue').textContent=e.target.value+' mm';savePrefs();});$('#nlpdfApplySpace').addEventListener('click',()=>applySpace(false));$('#nlpdfClearSpace').addEventListener('click',()=>applySpace(true));
+  $('#nlpdfRotateLeft').addEventListener('click',()=>rotateSelected(-90));$('#nlpdfRotateRight').addEventListener('click',()=>rotateSelected(90));$('#nlpdfMoveUp').addEventListener('click',()=>moveActive(-1));$('#nlpdfMoveDown').addEventListener('click',()=>moveActive(1));$('#nlpdfMoveFirst').addEventListener('click',()=>moveToEdge('first'));$('#nlpdfMoveLast').addEventListener('click',()=>moveToEdge('last'));$('#nlpdfDuplicate').addEventListener('click',duplicateSelected);$('#nlpdfDelete').addEventListener('click',deleteSelected);
+  $('#nlpdfStartCrop').addEventListener('click',startCrop);
+  $('#nlpdfApplyCrop').addEventListener('click',applyCrop);
+  $('#nlpdfCancelCrop').addEventListener('click',cancelCrop);
+  $('#nlpdfResetCrop').addEventListener('click',resetCrop);
+  $('#nlpdfContentScale').addEventListener('input',e=>{
+    const pg=activePage();if(!pg||state.cropMode)return;
+    pg.transform.scale=Number(e.target.value)/100;
+    $('#nlpdfContentScaleValue').textContent=e.target.value+'%';
+    renderActive();
+  });
+  $('#nlpdfCenterContent').addEventListener('click',centerContent);
+  $('#nlpdfResetTransform').addEventListener('click',resetTransform);
+  $('#nlpdfSafeArea').addEventListener('change',e=>{
+    state.safeArea=e.target.checked;savePrefs();renderAll();
+  });
+  $('#nlpdfApplySpace').addEventListener('click',()=>applySpace(false));
+  $('#nlpdfClearSpace').addEventListener('click',()=>applySpace(true));
+  $('#nlpdfZoomOut').addEventListener('click',()=>setZoom(state.zoom-.1));
+  $('#nlpdfZoomIn').addEventListener('click',()=>setZoom(state.zoom+.1));
+  $('#nlpdfZoomFit').addEventListener('click',()=>setZoom(1));
+  setupCropInteraction();
+
   $('#nlpdfSingleView').addEventListener('click',()=>setView('single'));$('#nlpdfGridView').addEventListener('click',()=>setView('grid'));
 
   setupDrop($('#nlpdfStage'));setupDrop($('#nlpdfGridStage'));setupPageContainer($('#nlpdfFilmstrip'));setupPageContainer($('#nlpdfGrid'));setupContentDrag();setupSignatureDrag();
+  if(window.ResizeObserver)new ResizeObserver(()=>fitPaper()).observe($('#nlpdfStage'));
+  window.addEventListener('resize',fitPaper);
   document.addEventListener('keydown',e=>{if((e.key==='Backspace'||e.key==='Delete')&&!ignoreDeleteKey(e)&&state.selected.size){e.preventDefault();deleteSelected();}});
   $('#nlpdfCreate').addEventListener('click',openExport);
   $$('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
   ['nlpdfExportNumber','nlpdfExportName'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(id==='nlpdfExportName')$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();}));
   $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutputMode"]').forEach(x=>x.addEventListener('change',syncExportPreview));
 
-  renderAssets();await updateAssetInfo();await renderAll();updateControls();
+  renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();
 }
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>build().catch(console.error),{once:true});else build().catch(console.error);
