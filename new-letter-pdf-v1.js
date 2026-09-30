@@ -276,7 +276,7 @@ async function drawPageToCanvas(p,canvas,w=840,h=1188){
   ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
   const L=layoutOnSheet(p,img.width,img.height,w,h);
   ctx.drawImage(img,L.x,L.y,L.w,L.h);
-  if(editing)state.cropBounds={...L,pageId:p.id};
+  if(editing&&w===840&&h===1188)state.cropBounds={...L,pageId:p.id};
   return L;
 }
 
