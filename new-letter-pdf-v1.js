@@ -73,12 +73,12 @@ function workspaceMarkup(){
   return '<section class="new-letter-pdf-workspace" id="newLetterPdfWorkspace">'+
   '<div class="nlpdf-shell">'+
     '<aside class="nlpdf-sidebar">'+
-      '<div class="nlpdf-side-head"><div class="nlpdf-side-title"><span class="eyebrow">NEW LETTER</span><strong>PDF Builder</strong></div><button class="nlpdf-create-folder" id="nlpdfCreateFolderOnly" type="button">Create Folder</button></div>'+
+      '<div class="nlpdf-side-head"><div class="nlpdf-side-title"><span class="eyebrow">NEW LETTER</span><strong>PDF Builder</strong></div></div>'+
       '<div class="nlpdf-side-scroll">'+
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default asset · Front / Back</strong><span>Locked paper stacks</span></div>'+
           assetRow('front','Front document',p.front)+assetRow('back','Back document',p.back)+'</section>'+ 
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default asset · Signature</strong><span>Saved locally</span></div>'+assetRow('signature','Signature',p.signature,true)+
-          '<div class="nlpdf-signature-controls"><label class="nlpdf-field"><span>Apply signature</span><select id="nlpdfSigScope"><option value="all">All document pages</option><option value="page">Only this page</option></select></label><div class="nlpdf-field nlpdf-signature-hint"><span>Position</span><strong>Drag directly on the A4</strong></div><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div><div class="nlpdf-note" id="nlpdfSigHint">Enable the signature to place it on the A4.</div>'+
+          '<div class="nlpdf-signature-controls"><select id="nlpdfSigScope" hidden aria-label="Signature scope"><option value="all">All document pages</option></select><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div>'+
         '</section>'+
         '<section class="nlpdf-panel" id="nlpdfCropPanel"><div class="nlpdf-panel-title"><strong>Crop tool</strong><span id="nlpdfActiveLabel">Select a page</span></div>'+
           '<div class="nlpdf-note">Drag the edges or corners of the crop boundary directly on the A4 sheet.</div>'+
@@ -105,7 +105,6 @@ function workspaceMarkup(){
     '<main class="nlpdf-editor">'+
       '<nav class="nlpdf-toolrail" id="nlpdfToolRail" aria-label="Document editing tools">'+
           '<button type="button" data-tool="crop" title="Crop page" aria-label="Crop page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v13a2 2 0 0 0 2 2h13M18 21V8a2 2 0 0 0-2-2H3"/></svg></button>'+
-          '<button type="button" data-tool="safe" title="Toggle safe area (1-inch margins)" aria-label="Toggle safe area"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><rect x="7" y="7" width="10" height="10" rx="1.5" stroke-dasharray="2 2"/></svg></button>'+
           '<button type="button" data-tool="space" title="Automatic Make Space" aria-label="Automatic Make Space"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v9H5zM5 21h14M9 16l3 3 3-3M12 13v6"/></svg></button>'+
           '<button id="nlpdfRotateRight" type="button" data-tool="rotate" title="Rotate clockwise 90°" aria-label="Rotate clockwise 90°" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.5 6.2M3 4v7h7"/></svg></button>'+
         '</nav><div class="nlpdf-tool-flyout hidden" id="nlpdfToolFlyout"><div class="nlpdf-tool-flyout-head"><strong id="nlpdfToolFlyoutTitle">Tools</strong><button type="button" id="nlpdfToolFlyoutClose" aria-label="Close tools">×</button></div><div id="nlpdfToolFlyoutContent"></div></div>'+ 
@@ -124,7 +123,7 @@ function workspaceMarkup(){
       '<aside class="nlpdf-filmstrip-wrap" id="nlpdfFilmstripWrap"><div class="nlpdf-filmstrip-head"><strong>Pages</strong><span>Front/Back are shown as stacks, not every default page</span></div><div class="nlpdf-filmstrip" id="nlpdfFilmstrip"></div></aside>'+
       '<button class="nlpdf-zoom-add" id="nlpdfAddFiles" type="button" aria-label="Add PDF, images or ZIP" title="Add PDF, images or ZIP">+</button>'+
       '<div class="nlpdf-zoom" id="nlpdfZoomControls"><button id="nlpdfZoomOut" type="button" aria-label="Zoom out">−</button><strong id="nlpdfZoomValue">100%</strong><button id="nlpdfZoomIn" type="button" aria-label="Zoom in">+</button><button id="nlpdfZoomFit" type="button">Fit A4</button></div>'+
-      '<footer class="nlpdf-footer"><div class="nlpdf-footer-stats"><div class="nlpdf-footer-stat"><strong id="nlpdfPageCount">0</strong><span>Document pages</span></div><div class="nlpdf-footer-stat"><strong id="nlpdfFileCount">0</strong><span>Source files</span></div></div><div class="nlpdf-footer-center" id="nlpdfStatus">Ready · Files stay in this browser</div><button class="nlpdf-create" id="nlpdfCreate" type="button" disabled>Create PDF</button></footer>'+
+      '<footer class="nlpdf-footer"><div class="nlpdf-footer-stats"><div class="nlpdf-footer-stat"><strong id="nlpdfPageCount">0</strong><span>Document pages</span></div><div class="nlpdf-footer-stat"><strong id="nlpdfFileCount">0</strong><span>Source files</span></div></div><div class="nlpdf-footer-center" id="nlpdfStatus">Ready · Files stay in this browser</div><div class="nlpdf-footer-actions"><button class="nlpdf-create-folder" id="nlpdfCreateFolderOnly" type="button">Create Folder</button><button class="nlpdf-create" id="nlpdfCreate" type="button" disabled>Create PDF</button></div></footer>'+
     '</main>'+
   '</div></section>'+
   exportModalMarkup();
@@ -987,7 +986,7 @@ async function build(){
   const docs=$('#workspaceDocuments'),legacy=docs?.querySelector('.document-workspace-grid');if(!docs||!legacy)return;
   docs.classList.add('nlpdf-primary');if(!$('#newLetterPdfWorkspace'))legacy.insertAdjacentHTML('afterend',workspaceMarkup());
   await ensurePdfLibs();await loadAssets();
-  const p=prefs();state.safeArea=Boolean(p.safeArea);$('#nlpdfSafeArea').checked=state.safeArea;$('#nlpdfSigScope').value=p.sigScope==='page'?'page':'all';$('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);$('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
+  const p=prefs();state.safeArea=Boolean(p.safeArea);$('#nlpdfSafeArea').checked=state.safeArea;$('#nlpdfSigScope').value='all';$('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);$('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
 
   $('#nlpdfCreateFolderOnly').addEventListener('click',()=>$('#documentsCreateFolder')?.click());
   $('#nlpdfAddFiles').addEventListener('click',()=>$('#nlpdfFileInput').click());$('#nlpdfFileInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
