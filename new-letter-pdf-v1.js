@@ -776,17 +776,53 @@ function setupPageContainer(el){
   el.addEventListener('drop',e=>{if(!state.dragId)return;e.preventDefault();e.stopPropagation();const card=e.target.closest('[data-page-id],[data-stack]'),dragged=state.dragId;if(card?.dataset.stack)moveToEdge(card.dataset.stack==='front'?'first':'last',dragged);else if(card?.dataset.pageId)reorder(dragged,card.dataset.pageId);else moveToEdge('last',dragged);state.dragId='';});
 }
 function setupContentDrag(){
-  const paper=$('#nlpdfPaper'),canvas=$('#nlpdfCanvas');let drag=null;
-  canvas.addEventListener('pointerdown',e=>{const p=activePage();if(!p||state.cropMode||e.button!==0)return;drag={x:e.clientX,y:e.clientY,startX:p.transform.xMM,startY:p.transform.yMM};canvas.setPointerCapture(e.pointerId);e.preventDefault();});
-  canvas.addEventListener('pointermove',e=>{if(!drag)return;const p=activePage(),r=paper.getBoundingClientRect();p.transform.xMM=drag.startX+(e.clientX-drag.x)/r.width*A4.wMM;p.transform.yMM=drag.startY+(e.clientY-drag.y)/r.height*A4.hMM;renderActive();});
-  const end=e=>{if(drag){drag=null;renderFilmstrip();renderGrid();}};
-  canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
+  const paper=$('#nlpdfPaper'),canvas=$('#nlpdfCanvas');
+  let drag=null;
+  canvas.addEventListener('pointerdown',e=>{
+    const p=activePage();if(!p||state.cropMode||e.button!==0)return;
+    const L=state.contentBounds;
+    const beforeCenter=L?{
+      x:(L.x+L.w/2)/840*A4.wMM,
+      y:(L.y+L.h/2)/1188*A4.hMM
+    }:{x:A4.wMM/2,y:A4.hMM/2};
+    drag={
+      x:e.clientX,y:e.clientY,startX:p.transform.xMM,startY:p.transform.yMM,
+      center:beforeCenter,moved:false
+    };
+    canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  canvas.addEventListener('pointermove',e=>{
+    if(!drag)return;
+    const p=activePage();if(!p)return;
+    const r=paper.getBoundingClientRect();
+    const dx=(e.clientX-drag.x)/Math.max(1,r.width)*A4.wMM;
+    const dy=(e.clientY-drag.y)/Math.max(1,r.height)*A4.hMM;
+    let newX=drag.startX+dx,newY=drag.startY+dy;
+    const centerX=drag.center.x+dx,centerY=drag.center.y+dy;
+    const snapX=Math.abs(centerX-A4.wMM/2)<3;
+    const snapY=Math.abs(centerY-A4.hMM/2)<3;
+    if(snapX)newX+=A4.wMM/2-centerX;
+    if(snapY)newY+=A4.hMM/2-centerY;
+    p.transform.xMM=newX;p.transform.yMM=newY;
+    drag.moved=true;
+    showSnapGuides(snapX,snapY);
+    renderActive();
+  });
+  const finish=()=>{
+    if(!drag)return;
+    const edited=drag.moved;drag=null;
+    showSnapGuides(false,false);
+    if(edited){recordEdit();renderFilmstrip();if(state.viewMode==='grid')renderGrid();}
+  };
+  canvas.addEventListener('pointerup',finish);
+  canvas.addEventListener('pointercancel',finish);
 }
 function setupSignatureDrag(){
   const img=$('#nlpdfSignaturePreview'),paper=$('#nlpdfPaper');let d=null;
   img.addEventListener('pointerdown',e=>{if(img.classList.contains('hidden'))return;d={x:e.clientX,y:e.clientY,sx:state.sig.xPct,sy:state.sig.yPct};img.classList.add('dragging');img.setPointerCapture(e.pointerId);e.stopPropagation();e.preventDefault();});
   img.addEventListener('pointermove',e=>{if(!d)return;const r=paper.getBoundingClientRect();state.sig.xPct=clamp(d.sx+(e.clientX-d.x)/r.width,0,1-state.sig.widthPct);state.sig.yPct=clamp(d.sy+(e.clientY-d.y)/r.height,0,Math.max(0,1-state.sig.widthPct*(A4.wMM/A4.hMM)*state.sigAspect));renderSignature(true);if(activePage()?.makeSpace)renderActive();});
-  const end=()=>{if(d){d=null;img.classList.remove('dragging');savePrefs();}};
+  const end=()=>{if(d){d=null;img.classList.remove('dragging');savePrefs();recordEdit();}};
   img.addEventListener('pointerup',end);img.addEventListener('pointercancel',end);
 }
 function ignoreDeleteKey(e){return e.target&&(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)||e.target.isContentEditable);}
