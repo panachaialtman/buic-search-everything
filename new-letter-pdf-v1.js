@@ -251,7 +251,7 @@ function refreshSignatureUrl(){
   const probe=new Image();
   probe.onload=()=>{
     state.sigAspect=probe.naturalHeight/Math.max(1,probe.naturalWidth);
-    renderSignature(Boolean($('#nlpdfUseSignature')?.checked&&!state.cropMode));
+    renderSignature(Boolean($('#nlpdfUseSignature')?.checked&&!state.cropMode&&(!activePage()||signatureApplies(activePage()))));
     if(activePage()?.makeSpace)renderActive();
   };
   probe.src=state.signatureUrl;
@@ -303,7 +303,7 @@ async function addFiles(files){
   try{
     await ensurePdfLibs();let added=0;
     for(const f of list){try{added+=await importFile(f);}catch(err){console.error(err);toast(err.message||('Could not import '+f.name));}}
-    if(!state.activeId&&state.pages[0]){state.activeId=state.pages[0].id;state.selected.add(state.activeId);state.anchorIndex=0;}
+    if(!state.activeId&&state.pages[0]){state.activeId=state.pages[0].id;state.selected.add(state.activeId);state.anchorIndex=0;}if($('#nlpdfSigScope')?.value==='page'&&!state.signaturePageId)state.signaturePageId=state.activeId;
     await renderAll();recordEdit();setStatus('Added '+added+' page'+(added===1?'':'s')+'.');
   }finally{state.busy=false;updateControls();}
 }
@@ -575,7 +575,7 @@ async function renderGrid(){
 async function renderAll(){updateControls();const tasks=[renderActive()];if(state.viewMode==='grid')tasks.push(renderGrid());else tasks.push(renderFilmstrip());await Promise.allSettled(tasks);}
 
 /* View switching */
-function setView(mode){state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSingleView').classList.toggle('active',state.viewMode==='single');$('#nlpdfGridView').classList.toggle('active',state.viewMode==='grid');$('#nlpdfStage').classList.toggle('hidden',state.viewMode==='grid');$('#nlpdfGridStage').classList.toggle('hidden',state.viewMode!=='grid');$('#nlpdfFilmstripWrap').classList.toggle('hidden',state.viewMode==='grid');if(state.viewMode==='grid')renderGrid();else{renderActive();requestAnimationFrame(fitPaper);}}
+function setView(mode){state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSingleView').classList.toggle('active',state.viewMode==='single');$('#nlpdfGridView').classList.toggle('active',state.viewMode==='grid');$('#nlpdfStage').classList.toggle('hidden',state.viewMode==='grid');$('#nlpdfGridStage').classList.toggle('hidden',state.viewMode!=='grid');$('#nlpdfFilmstripWrap').classList.toggle('hidden',state.viewMode==='grid');if(state.viewMode==='grid')renderGrid();else{renderFilmstrip();renderActive();requestAnimationFrame(fitPaper);}}
 
 /* Export */
 async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice());state.pdfLibDocs.set(k,d);return d;}
@@ -838,8 +838,8 @@ async function build(){
   $('#nlpdfAssetInput').addEventListener('change',async e=>{const f=e.target.files?.[0];try{if(f&&state.pendingAsset)await importAsset(state.pendingAsset,f);}catch(err){console.error(err);toast(err.message||'Could not save asset.');}finally{e.target.value='';state.pendingAsset='';}});
   ['nlpdfUseFront','nlpdfUseBack'].forEach(id=>$('#'+id).addEventListener('change',()=>{savePrefs();renderFilmstrip();renderGrid();recordEdit();}));
   ['nlpdfUseSignature','nlpdfSigScope'].forEach(id=>$('#'+id).addEventListener('change',()=>{if(id==='nlpdfSigScope'&&$('#nlpdfSigScope').value==='page')state.signaturePageId=state.activeId||state.pages[0]?.id||'';savePrefs();renderActive();recordEdit();}));
-  $('#nlpdfSigSize').addEventListener('input',e=>{state.sig.widthPct=Number(e.target.value)/100;$('#nlpdfSigSizeValue').textContent=e.target.value+'%';state.sig.xPct=clamp(state.sig.xPct,0,1-state.sig.widthPct);savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked));if(activePage()?.makeSpace)renderActive();});
-  $('#nlpdfResetSignature').addEventListener('click',()=>{state.sig.xPct=.72;state.sig.yPct=.80;state.sig.widthPct=.22;$('#nlpdfSigSize').value=22;$('#nlpdfSigSizeValue').textContent='22%';savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked));if(activePage()?.makeSpace)renderActive();recordEdit();});
+  $('#nlpdfSigSize').addEventListener('input',e=>{state.sig.widthPct=Number(e.target.value)/100;$('#nlpdfSigSizeValue').textContent=e.target.value+'%';state.sig.xPct=clamp(state.sig.xPct,0,1-state.sig.widthPct);savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked&&(!activePage()||signatureApplies(activePage()))));if(activePage()?.makeSpace)renderActive();});
+  $('#nlpdfResetSignature').addEventListener('click',()=>{state.sig.xPct=.72;state.sig.yPct=.80;state.sig.widthPct=.22;$('#nlpdfSigSize').value=22;$('#nlpdfSigSizeValue').textContent='22%';savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked&&(!activePage()||signatureApplies(activePage()))));if(activePage()?.makeSpace)renderActive();recordEdit();});
 
   $('#nlpdfRotateLeft').addEventListener('click',()=>rotateSelected(-90));$('#nlpdfRotateRight').addEventListener('click',()=>rotateSelected(90));$('#nlpdfMoveUp').addEventListener('click',()=>moveActive(-1));$('#nlpdfMoveDown').addEventListener('click',()=>moveActive(1));$('#nlpdfMoveFirst').addEventListener('click',()=>moveToEdge('first'));$('#nlpdfMoveLast').addEventListener('click',()=>moveToEdge('last'));$('#nlpdfDuplicate').addEventListener('click',duplicateSelected);$('#nlpdfDelete').addEventListener('click',deleteSelected);
   $('#nlpdfStartCrop').addEventListener('click',startCrop);
