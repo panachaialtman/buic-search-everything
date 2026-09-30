@@ -207,8 +207,22 @@ try{
     const first=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
     const last=await page.locator('#nlpdfFilmstrip [data-page-id]').last().getAttribute('data-page-id');
     assert.notEqual(first,last);
+    await page.evaluate(()=>{
+      window.__dragTrace=[];
+      const el=document.querySelector('#nlpdfFilmstrip');
+      ['dragstart','dragenter','dragover','drop','dragend'].forEach(type=>{
+        el.addEventListener(type,e=>{
+          if(window.__dragTrace.length<30)window.__dragTrace.push({
+            type,target:e.target?.closest?.('[data-page-id],[data-stack]')?.getAttribute('data-page-id')||e.target?.getAttribute?.('data-stack')||e.target?.tagName,
+            defaultPrevented:e.defaultPrevented,
+            effect:e.dataTransfer?.dropEffect
+          });
+        },true);
+      });
+    });
     await page.locator('#nlpdfFilmstrip [data-page-id]').first().dragTo(page.locator('#nlpdfFilmstrip [data-page-id]').last());
     await page.waitForTimeout(180);
+    console.log('DRAG TRACE:',JSON.stringify(await page.evaluate(()=>window.__dragTrace)));
     const after=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
     assert.notEqual(after,first,'dragging should reorder the page rail');
     await page.keyboard.press('Control+z');
