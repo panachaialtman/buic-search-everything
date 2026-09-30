@@ -1,0 +1,15 @@
+New Letter PDF Builder V7 | 2026-09-30
+
+UI: Right-side vertical page navigator replaces bottom preview filmstrip. A4 editor gets greater vertical space. Fixed footer retained. Tools for Crop, Safe Area, Make Space and clockwise Rotation float beside the left sidebar. Front/Back and Signature defaults are in separate sidebar panels.
+
+Editing: A4 content is directly draggable and resizable by corner handles; center snapping uses two alignment guides. Interactive crop preserves the current visual rotation. Crop coordinates map correctly for 0, 90, 180 and 270 degree vector PDF export.
+
+History: Undo/Redo buttons plus Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z. Covered document edits include file import, page reorder/duplicate/delete/rotate, crop, Make Space, Safe Area, page resize/movement and signature configuration. Asset imports/removals/toggles are also tracked.
+
+Signature: Default applies to all document pages; alternate option assigns to the selected document page only. Deprecated Last Page scope migrates to All Pages. Default Front/Back PDF pages stay excluded from signature/editing.
+
+Preserved: PDF/JPG/PNG/WebP/ZIP import, one stacked-paper marker per Front/Back asset, local processing, A4 zoom, PDF-only or Folder+Letter+PDF export review.
+
+QA: JS syntax checks, unique workspace IDs and selector references, simulated undo/redo for rotation/cropping/reordering, simulated rotated PDF crop mapping and single-page signature export passed. A real browser screenshot and actual exported PDF have not yet been inspected for this deployment.
+
+Deployment: index.html references new-letter-pdf-v1.js?v=7 and new-letter-pdf-v1.css?v=7.
