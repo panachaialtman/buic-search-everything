@@ -1,0 +1,24 @@
+New Letter PDF Builder — V6 follow-up fixes
+Date: 2026-09-30
+
+Requested issues addressed:
+1. Full-height editor and pinned footer under the workspace header, including smaller-height windows and Grid view.
+2. A4-only zoom controls (-, percentage, +, Fit A4), anchored to the editor rather than page/browser zoom.
+3. Drag a page onto the default Front/Back stack to move it to first/last editable position; explicit First and Last buttons; supports selected-page groups.
+4. Replaced percentage crop sliders with on-page crop boundary, corner/edge handles, move, Apply/Cancel and Reset Crop. Each document page stores an independent crop.
+5. One-click Make Space, applies This Page or Every Page. Content is fitted above the saved signature position; removes manual bottom-spacing control. Never edits locked default assets.
+6. Word-style optional Safe Area with 25.4 mm (1 inch) margins, visible guide, and layout bounds enforced in both preview and export.
+7. Signature appears on the A4 preview whenever enabled, including empty page placement preview. Last-page-only vs All-page scope is explained. Position and size continue to be editable on the canvas.
+8. PDF signature embedding uses explicit PNG/JPG image dimensions, clamps to page bounds, and checks that the enabled signature was applied to at least one document page.
+9. Preview and PDF export use one shared A4 placement function for scale, offset, safe margins, crop dimensions and Make Space.
+10. Default Front/Back still appear as single locked paper stacks; all underlying pages are included in export.
+
+Code-level validation:
+- JavaScript parsed and evaluated with DOM boot deferred.
+- Workspace markup ids checked against the controls accessed in code; no unresolved ids.
+- Layout tests confirmed the content remained inside one-inch margins and Make Space kept content above the signature.
+- Simulated PDF writer verified that the document content and signature image are both written to the output page.
+- First/Last multi-selection reorder and Make Space/Undo behavior tests passed.
+- Production browser screenshot and a real exported PDF have not yet been visually inspected in this session. Verify the output using the actual saved signature and representative scanned student PDFs.
+
+Deployment: index.html references new-letter-pdf-v1.css?v=6 and new-letter-pdf-v1.js?v=6.
