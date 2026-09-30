@@ -267,9 +267,9 @@ async function importAsset(id,file){
   if(!sig&&file.type!=='application/pdf'&&!/^image\//.test(file.type)&&!/\.(pdf|png|jpe?g|webp)$/i.test(file.name))throw new Error('Front/Back must be PDF or image.');
   let blob=file,name=file.name,type=file.type||'application/octet-stream';
   if(/^image\//.test(type)&&type!=='image/png'&&type!=='image/jpeg'){blob=await convertImageBlob(file);type='image/png';name=file.name.replace(/\.[^.]+$/,'.png');}
-  const rec={id,name,type,blob,updatedAt:new Date().toISOString()};await dbPut(rec);state.assets[id]=rec;renderAssets();const t=$('#'+(id==='front'?'nlpdfUseFront':id==='back'?'nlpdfUseBack':'nlpdfUseSignature'));t.disabled=false;t.checked=true;savePrefs();refreshSignatureUrl();await updateAssetInfo();renderActive();toast((sig?'Signature':'Default '+id)+' saved.');
+  const rec={id,name,type,blob,updatedAt:new Date().toISOString()};await dbPut(rec);state.assets[id]=rec;renderAssets();const t=$('#'+(id==='front'?'nlpdfUseFront':id==='back'?'nlpdfUseBack':'nlpdfUseSignature'));t.disabled=false;t.checked=true;savePrefs();refreshSignatureUrl();await updateAssetInfo();renderActive();recordEdit();toast((sig?'Signature':'Default '+id)+' saved.');
 }
-async function removeAsset(id){await dbDelete(id);state.assets[id]=null;renderAssets();savePrefs();refreshSignatureUrl();await updateAssetInfo();renderActive();toast('Default '+id+' removed.');}
+async function removeAsset(id){await dbDelete(id);state.assets[id]=null;renderAssets();savePrefs();refreshSignatureUrl();await updateAssetInfo();renderActive();recordEdit();toast('Default '+id+' removed.');}
 
 /* Imports */
 async function normalizeImage(file){
@@ -304,7 +304,7 @@ async function addFiles(files){
     await ensurePdfLibs();let added=0;
     for(const f of list){try{added+=await importFile(f);}catch(err){console.error(err);toast(err.message||('Could not import '+f.name));}}
     if(!state.activeId&&state.pages[0]){state.activeId=state.pages[0].id;state.selected.add(state.activeId);state.anchorIndex=0;}
-    await renderAll();setStatus('Added '+added+' page'+(added===1?'':'s')+'.');
+    await renderAll();recordEdit();setStatus('Added '+added+' page'+(added===1?'':'s')+'.');
   }finally{state.busy=false;updateControls();}
 }
 
@@ -469,10 +469,10 @@ function selectPage(id,event={}){const i=state.pages.findIndex(p=>p.id===id);if(
   else{state.selected.clear();state.selected.add(id);state.anchorIndex=i;}
   renderAll();
 }
-function deleteSelected(){if(!state.selected.size)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}const ids=new Set(state.selected),old=state.pages.findIndex(p=>p.id===state.activeId);state.pages=state.pages.filter(p=>!ids.has(p.id));state.selected.clear();const n=state.pages[Math.min(Math.max(old,0),state.pages.length-1)];state.activeId=n?.id||'';if(n){state.selected.add(n.id);state.anchorIndex=state.pages.indexOf(n);}else state.anchorIndex=-1;renderAll();}
-function rotateSelected(d){if(state.cropMode)return;for(const p of state.pages)if(state.selected.has(p.id))p.rotation=((p.rotation||0)+d+360)%360;renderAll();}
-function duplicateSelected(){const ids=[...state.selected],newIds=[];for(const id of ids){const i=state.pages.findIndex(p=>p.id===id);if(i<0)continue;const p=state.pages[i],cp={...p,id:uid(),crop:{...p.crop},transform:{...p.transform}};state.pages.splice(i+1,0,cp);newIds.push(cp.id);}if(newIds.length){state.selected=new Set(newIds);state.activeId=newIds[newIds.length-1];state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);}renderAll();}
-function moveActive(d){const p=activePage();if(!p)return;const i=state.pages.indexOf(p),j=i+d;if(j<0||j>=state.pages.length)return;[state.pages[i],state.pages[j]]=[state.pages[j],state.pages[i]];state.anchorIndex=j;renderAll();}
+function deleteSelected(){if(!state.selected.size)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}const ids=new Set(state.selected),old=state.pages.findIndex(p=>p.id===state.activeId);state.pages=state.pages.filter(p=>!ids.has(p.id));state.selected.clear();const n=state.pages[Math.min(Math.max(old,0),state.pages.length-1)];state.activeId=n?.id||'';if(n){state.selected.add(n.id);state.anchorIndex=state.pages.indexOf(n);}else state.anchorIndex=-1;renderAll();recordEdit();}
+function rotateSelected(d){if(state.cropMode)return;for(const p of state.pages)if(state.selected.has(p.id))p.rotation=((p.rotation||0)+d+360)%360;renderAll();recordEdit();}
+function duplicateSelected(){const ids=[...state.selected],newIds=[];for(const id of ids){const i=state.pages.findIndex(p=>p.id===id);if(i<0)continue;const p=state.pages[i],cp={...p,id:uid(),crop:{...p.crop},transform:{...p.transform}};state.pages.splice(i+1,0,cp);newIds.push(cp.id);}if(newIds.length){state.selected=new Set(newIds);state.activeId=newIds[newIds.length-1];state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);}renderAll();recordEdit();}
+function moveActive(d){const p=activePage();if(!p)return;const i=state.pages.indexOf(p),j=i+d;if(j<0||j>=state.pages.length)return;[state.pages[i],state.pages[j]]=[state.pages[j],state.pages[i]];state.anchorIndex=j;renderAll();recordEdit();}
 function reorder(a,b){
   if(!a||!b||a===b)return;
   const ids=state.selected.has(a)?new Set(state.selected):new Set([a]);
@@ -480,33 +480,33 @@ function reorder(a,b){
   if(!moving.length||ids.has(b))return;
   const j=rest.findIndex(p=>p.id===b);if(j<0)return;
   rest.splice(j,0,...moving);
-  state.pages=rest;state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);renderAll();
+  state.pages=rest;state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);renderAll();recordEdit();
 }
 function moveToEdge(edge,draggedId=null){
   const ids=draggedId&&!state.selected.has(draggedId)?new Set([draggedId]):new Set(state.selected);
   if(!ids.size)return;
   const moving=state.pages.filter(p=>ids.has(p.id)),rest=state.pages.filter(p=>!ids.has(p.id));
   state.pages=edge==='first'?[...moving,...rest]:[...rest,...moving];
-  state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);renderAll();
+  state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);renderAll();recordEdit();
 }
-function resetTransform(){const p=activePage();if(!p||state.cropMode)return;p.transform=defaultTransform();renderAll();}
-function centerContent(){const p=activePage();if(!p||state.cropMode)return;p.transform.xMM=0;p.transform.yMM=0;renderAll();}
+function resetTransform(){const p=activePage();if(!p||state.cropMode)return;p.transform=defaultTransform();renderAll();recordEdit();}
+function centerContent(){const p=activePage();if(!p||state.cropMode)return;p.transform.xMM=0;p.transform.yMM=0;renderAll();recordEdit();}
 function applySpace(clear=false){
   if(!clear&&(!state.assets.signature||!$('#nlpdfUseSignature')?.checked)){toast('Enable a saved Signature first.');return;}
   const scope=$('input[name="nlpdfSpaceScope"]:checked')?.value||'current';
   const pages=scope==='all'?state.pages:(activePage()?[activePage()]:[]);
   for(const p of pages){p.makeSpace=!clear;p.spaceMM=0;}
-  renderAll();toast((clear?'Cleared':'Applied')+' signature clearance on '+pages.length+' page(s).');
+  renderAll();recordEdit();toast((clear?'Cleared':'Applied')+' signature clearance on '+pages.length+' page(s).');
 }
 function startCrop(){
   const p=activePage();if(!p)return;state.cropMode=true;state.cropDraft={...p.crop};renderActive();
 }
 function applyCrop(){
   const p=activePage();if(!p||!state.cropMode)return;
-  p.crop={...state.cropDraft};state.cropMode=false;state.cropDraft=null;state.cropBounds=null;renderAll();
+  p.crop={...state.cropDraft};state.cropMode=false;state.cropDraft=null;state.cropBounds=null;renderAll();recordEdit();
 }
 function cancelCrop(){state.cropMode=false;state.cropDraft=null;state.cropBounds=null;renderActive();}
-function resetCrop(){const p=activePage();if(!p)return;state.cropMode=false;state.cropDraft=null;p.crop=defaultCrop();renderAll();}
+function resetCrop(){const p=activePage();if(!p)return;state.cropMode=false;state.cropDraft=null;p.crop=defaultCrop();renderAll();recordEdit();}
 function updateCropOverlay(){
   const layer=$('#nlpdfCropLayer'),box=$('#nlpdfCropRegion'),b=state.cropBounds;
   if(!state.cropMode||!b||b.pageId!==state.activeId){layer.classList.add('hidden');return;}
