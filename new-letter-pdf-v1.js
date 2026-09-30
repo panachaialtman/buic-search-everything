@@ -241,11 +241,36 @@ async function sourceRaster(p){
   }
   state.previewCache.set(key,canvas);return canvas;
 }
+function rotateRaster(src,rotation){
+  const rot=((rotation||0)%360+360)%360;
+  if(rot===0)return src;
+  const out=document.createElement('canvas');
+  if(rot===90||rot===270){out.width=src.height;out.height=src.width;}
+  else{out.width=src.width;out.height=src.height;}
+  const ctx=out.getContext('2d');ctx.save();
+  if(rot===90){ctx.translate(out.width,0);ctx.rotate(Math.PI/2);}
+  else if(rot===180){ctx.translate(out.width,out.height);ctx.rotate(Math.PI);}
+  else if(rot===270){ctx.translate(0,out.height);ctx.rotate(-Math.PI/2);}
+  ctx.drawImage(src,0,0);ctx.restore();
+  return out;
+}
 function cropRotateRaster(src,p){
-  const c=p.crop||defaultCrop(),l=clamp(c.left,0,95)/100,r=clamp(c.right,0,95)/100,t=clamp(c.top,0,95)/100,b=clamp(c.bottom,0,95)/100;
-  const sx=Math.floor(src.width*l),sy=Math.floor(src.height*t),sw=Math.max(1,Math.floor(src.width*(1-l-r))),sh=Math.max(1,Math.floor(src.height*(1-t-b)));
-  const rot=((p.rotation||0)%360+360)%360, out=document.createElement('canvas');if(rot===90||rot===270){out.width=sh;out.height=sw;}else{out.width=sw;out.height=sh;}
-  const x=out.getContext('2d');x.save();if(rot===90){x.translate(out.width,0);x.rotate(Math.PI/2);}else if(rot===180){x.translate(out.width,out.height);x.rotate(Math.PI);}else if(rot===270){x.translate(0,out.height);x.rotate(-Math.PI/2);}x.drawImage(src,sx,sy,sw,sh,0,0,sw,sh);x.restore();return out;
+  const rotated=rotateRaster(src,p.rotation||0),c=p.crop||defaultCrop();
+  const l=clamp(c.left||0,0,95)/100,r=clamp(c.right||0,0,95)/100;
+  const t=clamp(c.top||0,0,95)/100,b=clamp(c.bottom||0,0,95)/100;
+  const sx=Math.floor(rotated.width*l),sy=Math.floor(rotated.height*t);
+  const sw=Math.max(1,Math.floor(rotated.width*(1-l-r)));
+  const sh=Math.max(1,Math.floor(rotated.height*(1-t-b)));
+  const out=document.createElement('canvas');out.width=sw;out.height=sh;
+  out.getContext('2d').drawImage(rotated,sx,sy,sw,sh,0,0,sw,sh);
+  return out;
+}
+function sourceCropForRotation(crop,rotation){
+  const c=crop||defaultCrop(),rot=((rotation||0)%360+360)%360;
+  if(rot===90)return {left:c.top,right:c.bottom,top:c.right,bottom:c.left};
+  if(rot===180)return {left:c.right,right:c.left,top:c.bottom,bottom:c.top};
+  if(rot===270)return {left:c.bottom,right:c.top,top:c.left,bottom:c.right};
+  return c;
 }
 function layoutOnSheet(p,imgWidth,imgHeight,w,h){
   const mmX=w/A4.wMM,mmY=h/A4.hMM;
@@ -272,7 +297,7 @@ function layoutOnSheet(p,imgWidth,imgHeight,w,h){
 async function drawPageToCanvas(p,canvas,w=840,h=1188){
   const source=await sourceRaster(p);
   const editing=state.cropMode&&p.id===state.activeId;
-  const drawingPage=editing?{...p,crop:defaultCrop(),rotation:0}:p;
+  const drawingPage=editing?{...p,crop:defaultCrop()}:p;
   const img=cropRotateRaster(source,drawingPage);
   canvas.width=w;canvas.height=h;
   const ctx=canvas.getContext('2d');
@@ -316,7 +341,7 @@ async function renderActive(){
 }
 function signatureApplies(p){
   if(!p||!state.assets.signature||!$('#nlpdfUseSignature')?.checked)return false;
-  return $('#nlpdfSigScope').value==='all'||state.pages[state.pages.length-1]?.id===p.id;
+  return $('#nlpdfSigScope').value==='all'||($('#nlpdfSigScope').value==='page'&&state.signaturePageId===p.id);
 }
 function renderSignature(show){
   const img=$('#nlpdfSignaturePreview');if(!img)return;
@@ -331,9 +356,9 @@ function renderSignature(show){
   img.style.width=(state.sig.widthPct*100)+'%';
   img.style.height='auto';
   img.title=activePage()&&!signatureApplies(activePage())
-    ? 'Placement preview (export applies to last document page)'
+    ? 'Placement preview only: choose this page to apply'
     : 'Drag signature to reposition';
-  const hint=$('#nlpdfSigHint');if(hint)hint.textContent=activePage()&&!signatureApplies(activePage())?'Placement preview only: the exported signature goes on the last document page.':'Drag the signature on A4 to position it for export.';
+  const hint=$('#nlpdfSigHint');if(hint)hint.textContent=activePage()&&!signatureApplies(activePage())?'Placement preview only: signature is assigned to another page.':'Drag the signature on A4 to position it for export.';
 }
 function syncPageControls(){
   const p=activePage(),disabled=!p;
@@ -493,8 +518,8 @@ function drawEmbedded(page,embedded,p){
 async function addDocPage(out,p){
   if(p.kind==='pdf'){
     const src=await sourcePdfDoc(p.sourceKey),sp=src.getPage(p.sourcePage-1),sz=sp.getSize(),c=p.crop;
-    const left=sz.width*c.left/100,right=sz.width*(1-c.right/100);
-    const bottom=sz.height*c.bottom/100,top=sz.height*(1-c.top/100);
+    const sourceCrop=sourceCropForRotation(c,p.rotation);const left=sz.width*sourceCrop.left/100,right=sz.width*(1-sourceCrop.right/100);
+    const bottom=sz.height*sourceCrop.bottom/100,top=sz.height*(1-sourceCrop.top/100);
     const embedded=await out.embedPage(sp,{left,bottom,right,top});
     const page=out.addPage([A4.wPt,A4.hPt]);drawEmbedded(page,embedded,p);return page;
   }
@@ -530,9 +555,9 @@ async function buildPdf(){
   let signed=0;
   for(let i=0;i<state.pages.length;i++){
     const pg=await addDocPage(out,state.pages[i]);
-    if(sig&&(scope==='all'||i===state.pages.length-1))signed+=drawSignature(pg,sig)?1:0;
+    if(sig&&(scope==='all'||(scope==='page'&&state.pages[i].id===state.signaturePageId)))signed+=drawSignature(pg,sig)?1:0;
   }
-  if(sig&&signed===0)throw new Error('The signature could not be applied to any document page.');
+  if(sig&&signed===0)throw new Error('Select a document page for the signature or use All document pages.');
   if($('#nlpdfUseBack').checked&&state.assets.back)await appendAsset(out,state.assets.back);
   out.setCreator('BU International Center Workspace');out.setProducer('New Letter PDF Builder');return new Uint8Array(await out.save());
 }
@@ -604,7 +629,7 @@ async function build(){
   const docs=$('#workspaceDocuments'),legacy=docs?.querySelector('.document-workspace-grid');if(!docs||!legacy)return;
   docs.classList.add('nlpdf-primary');if(!$('#newLetterPdfWorkspace'))legacy.insertAdjacentHTML('afterend',workspaceMarkup());
   await ensurePdfLibs();await loadAssets();
-  const p=prefs();state.safeArea=Boolean(p.safeArea);$('#nlpdfSafeArea').checked=state.safeArea;$('#nlpdfSigScope').value=p.sigScope;$('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);$('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
+  const p=prefs();state.safeArea=Boolean(p.safeArea);$('#nlpdfSafeArea').checked=state.safeArea;$('#nlpdfSigScope').value=p.sigScope==='page'?'page':'all';$('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);$('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
 
   $('#nlpdfCreateFolderOnly').addEventListener('click',()=>$('#documentsCreateFolder')?.click());
   $('#nlpdfAddFiles').addEventListener('click',()=>$('#nlpdfFileInput').click());$('#nlpdfFileInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
@@ -612,7 +637,7 @@ async function build(){
   $$('[data-asset-remove]').forEach(b=>b.addEventListener('click',()=>removeAsset(b.dataset.assetRemove).catch(err=>toast(err.message))));
   $('#nlpdfAssetInput').addEventListener('change',async e=>{const f=e.target.files?.[0];try{if(f&&state.pendingAsset)await importAsset(state.pendingAsset,f);}catch(err){console.error(err);toast(err.message||'Could not save asset.');}finally{e.target.value='';state.pendingAsset='';}});
   ['nlpdfUseFront','nlpdfUseBack'].forEach(id=>$('#'+id).addEventListener('change',()=>{savePrefs();renderFilmstrip();renderGrid();}));
-  ['nlpdfUseSignature','nlpdfSigScope'].forEach(id=>$('#'+id).addEventListener('change',()=>{savePrefs();renderActive();}));
+  ['nlpdfUseSignature','nlpdfSigScope'].forEach(id=>$('#'+id).addEventListener('change',()=>{if(id==='nlpdfSigScope'&&$('#nlpdfSigScope').value==='page')state.signaturePageId=state.activeId||state.pages[0]?.id||'';savePrefs();renderActive();recordEdit();}));
   $('#nlpdfSigSize').addEventListener('input',e=>{state.sig.widthPct=Number(e.target.value)/100;$('#nlpdfSigSizeValue').textContent=e.target.value+'%';state.sig.xPct=clamp(state.sig.xPct,0,1-state.sig.widthPct);savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked));if(activePage()?.makeSpace)renderActive();});
   $('#nlpdfResetSignature').addEventListener('click',()=>{state.sig.xPct=.72;state.sig.yPct=.80;state.sig.widthPct=.22;$('#nlpdfSigSize').value=22;$('#nlpdfSigSizeValue').textContent='22%';savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked));if(activePage()?.makeSpace)renderActive();});
 
