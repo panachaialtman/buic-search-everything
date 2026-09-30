@@ -62,16 +62,16 @@ try{
     assert.equal(await visible('#nlpdfCreate'),true);
     assert.equal(await visible('#nlpdfFilmstripWrap'),true);
   });
-  await run('Floating Crop/Safe Area/Make Space buttons respond',async()=>{
+  await run('Crop and Make Space work without duplicate Safe Area dock button',async()=>{
+    assert.equal(await page.locator('[data-tool="safe"]').count(),0);
     for(const id of ['crop','space']){
       await page.locator('[data-tool="'+id+'"]').click();
       assert.equal(await visible('#nlpdfToolFlyout'),true,id);
       assert.equal(await visible('#nlpdf'+(id==='crop'?'CropPanel':'SpacePanel')),true,id);
     }
-    await page.locator('[data-tool="safe"]').click();
-    assert.equal(await page.locator('#nlpdfSafeArea').isChecked(),true);
+    await page.locator('#nlpdfToolFlyoutClose').click();
     assert.equal(await visible('#nlpdfToolFlyout'),false);
-    assert.equal(await visible('#nlpdfToolFlyout'),false);
+    assert.equal(await visible('#nlpdfSafePanel'),true);
   });
   await run('Only four website themes; first-visit default persists',async()=>{
     const choices=await page.locator('[data-theme-choice]').evaluateAll(nodes=>nodes.map(n=>n.dataset.themeChoice));
@@ -88,6 +88,31 @@ try{
     assert.equal(await page.locator('#nlpdfMoveFirst,#nlpdfMoveUp,#nlpdfMoveDown,#nlpdfMoveLast').count(),0);
     assert.equal(await page.locator('#nlpdfAddFiles').isVisible(),true);
     assert.equal(await page.locator('#nlpdfResetSignature,#nlpdfResetTransform,#nlpdfResetCrop').count(),0);
+  });
+  await run('Signature scope and Position row are gone; signatures default to all pages',async()=>{
+    assert.equal(await page.locator('#nlpdfSigScope').isVisible(),false);
+    assert.equal(await page.locator('#nlpdfSigScope').inputValue(),'all');
+    assert.equal(await page.locator('#nlpdfSigHint').count(),0);
+    assert.equal(await page.locator('#nlpdfSigSize').isVisible(),true);
+    assert.equal(await page.locator('.nlpdf-signature-controls .nlpdf-field').count(),0);
+  });
+  await run('Create Folder and Create PDF are adjacent in the fixed footer',async()=>{
+    assert.deepEqual(await page.locator('.nlpdf-footer-actions > button').evaluateAll(nodes=>nodes.map(n=>n.id)),['nlpdfCreateFolderOnly','nlpdfCreate']);
+    assert.equal(await page.locator('.nlpdf-side-head #nlpdfCreateFolderOnly').count(),0);
+    const folder=await page.locator('#nlpdfCreateFolderOnly').boundingBox();
+    const pdf=await page.locator('#nlpdfCreate').boundingBox();
+    const footer=await page.locator('.nlpdf-footer').boundingBox();
+    assert(folder&&pdf&&footer);
+    assert(pdf.x>folder.x+folder.width-3);
+    assert(folder.y>=footer.y-2&&pdf.y>=footer.y-2);
+    assert(folder.y+folder.height<=footer.y+footer.height+2);
+    assert(pdf.y+pdf.height<=footer.y+footer.height+2);
+  });
+  await run('Footer Create Folder opens the existing folder setup',async()=>{
+    await page.locator('#nlpdfCreateFolderOnly').click();
+    assert.equal(await page.locator('#letterModal').getAttribute('aria-hidden'),'false');
+    await page.locator('#letterModal [data-close-letter]').first().click();
+    assert.equal(await page.locator('#letterModal').getAttribute('aria-hidden'),'true');
   });
   await run('Add Files button imports two images and updates page count',async()=>{
     await page.locator('#nlpdfAddFiles').click();
@@ -355,7 +380,15 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert(bounds.bottom<=bounds.height+2&&bounds.bottom>=bounds.height-2);
     assert(bounds.width>=bounds.viewportWidth-2);
     assert(bounds.frameHeight>=bounds.height-bounds.headerBottom-2);
-    assert.equal(await page.locator('.extend-letter-fallback').isVisible(),true);
+    assert.equal(await page.locator('.extend-letter-fallback').count(),0);
+    const visa=page.frameLocator('#workspaceExtend .extend-letter-frame');
+    await visa.locator('[data-view="settings"]').waitFor({state:'visible',timeout:30000});
+    await visa.locator('[data-view="settings"]').click();
+    await visa.locator('#settingsPanel_general').waitFor({state:'visible',timeout:12000});
+    await visa.locator('#embeddedStandaloneSettingsCard').waitFor({state:'visible',timeout:12000});
+    const link=visa.locator('#embeddedStandaloneSettingsCard .standalone-settings-link');
+    assert.equal(await link.getAttribute('href'),'/new-student-local/');
+    assert.equal(await link.getAttribute('target'),'_blank');
     await page.locator('[data-workspace="documents"]').click();
     assert.equal(await page.locator('#nlpdfAddFiles').isVisible(),true);
   });
