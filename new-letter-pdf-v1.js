@@ -10,7 +10,7 @@ const state={
   sources:new Map(), pdfJsDocs:new Map(), pdfLibDocs:new Map(), previewCache:new Map(),
   assets:{front:null,back:null,signature:null}, assetInfo:{front:null,back:null},
   busy:false, dragId:'', pendingAsset:'', destinationHandle:null,
-  zoom:1, safeArea:false, cropMode:false, cropDraft:null, renderEpoch:0, cropBounds:null, sigAspect:.32,
+  zoom:1, safeArea:false, cropMode:false, cropDraft:null, renderEpoch:0, cropBounds:null, sigAspect:.32, signaturePageId:'', toolOpen:'', guides:{x:false,y:false}, contentBounds:null, history:{undo:[],redo:[],current:null,restoring:false},
   signatureUrl:'', sig:{xPct:.72,yPct:.80,widthPct:.22}
 };
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -48,13 +48,13 @@ async function dbPut(x){const db=await openDb();return new Promise((resolve,reje
 async function dbDelete(id){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>{db.close();reject(tx.error);};});}
 
 function prefs(){
-  try{return Object.assign({front:true,back:true,signature:false,sigScope:'last',sigWidth:.22,sigX:.72,sigY:.80,spaceMM:25,safeArea:false},JSON.parse(localStorage.getItem(PREF_KEY)||'{}'));}
-  catch{return {front:true,back:true,signature:false,sigScope:'last',sigWidth:.22,sigX:.72,sigY:.80,spaceMM:25,safeArea:false};}
+  try{const p=Object.assign({front:true,back:true,signature:false,sigScope:'all',sigWidth:.22,sigX:.72,sigY:.80,safeArea:false},JSON.parse(localStorage.getItem(PREF_KEY)||'{}'));if(p.sigScope==='last')p.sigScope='all';return p;}
+  catch{return {front:true,back:true,signature:false,sigScope:'all',sigWidth:.22,sigX:.72,sigY:.80,spaceMM:25,safeArea:false};}
 }
 function savePrefs(){
   try{localStorage.setItem(PREF_KEY,JSON.stringify({
     front:Boolean($('#nlpdfUseFront')?.checked),back:Boolean($('#nlpdfUseBack')?.checked),signature:Boolean($('#nlpdfUseSignature')?.checked),
-    sigScope:$('#nlpdfSigScope')?.value||'last',sigWidth:state.sig.widthPct,sigX:state.sig.xPct,sigY:state.sig.yPct,
+    sigScope:$('#nlpdfSigScope')?.value||'all',sigWidth:state.sig.widthPct,sigX:state.sig.xPct,sigY:state.sig.yPct,
     safeArea:Boolean($('#nlpdfSafeArea')?.checked)
   }));}catch{}
 }
@@ -75,9 +75,10 @@ function workspaceMarkup(){
     '<aside class="nlpdf-sidebar">'+
       '<div class="nlpdf-side-head"><div class="nlpdf-side-title"><span class="eyebrow">NEW LETTER</span><strong>PDF Builder</strong></div><button class="nlpdf-create-folder" id="nlpdfCreateFolderOnly" type="button">Create Folder</button></div>'+
       '<div class="nlpdf-side-scroll">'+
-        '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default assets</strong><span>Shown as one<br>stack each</span></div>'+
-          assetRow('front','Front document',p.front)+assetRow('back','Back document',p.back)+assetRow('signature','Signature',p.signature,true)+
-          '<div class="nlpdf-signature-controls"><label class="nlpdf-field"><span>Apply signature</span><select id="nlpdfSigScope"><option value="last">Last document page</option><option value="all">All document pages</option></select></label><div class="nlpdf-field"><span>Drag signature directly on A4</span><button class="nlpdf-btn" id="nlpdfResetSignature" type="button">Reset position</button></div><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div><div class="nlpdf-note" id="nlpdfSigHint">Enable the signature to place it on the A4.</div>'+
+        '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default asset · Front / Back</strong><span>Locked paper stacks</span></div>'+
+          assetRow('front','Front document',p.front)+assetRow('back','Back document',p.back)+'</section>'+ 
+        '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default asset · Signature</strong><span>Saved locally</span></div>'+assetRow('signature','Signature',p.signature,true)+
+          '<div class="nlpdf-signature-controls"><label class="nlpdf-field"><span>Apply signature</span><select id="nlpdfSigScope"><option value="all">All document pages</option><option value="page">Only this page</option></select></label><div class="nlpdf-field"><span>Drag signature directly on A4</span><button class="nlpdf-btn" id="nlpdfResetSignature" type="button">Reset position</button></div><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div><div class="nlpdf-note" id="nlpdfSigHint">Enable the signature to place it on the A4.</div>'+
         '</section>'+
         '<section class="nlpdf-panel" id="nlpdfCropPanel"><div class="nlpdf-panel-title"><strong>Crop tool</strong><span id="nlpdfActiveLabel">Select a page</span></div>'+
           '<div class="nlpdf-note">Drag the edges or corners of the crop boundary directly on the A4 sheet.</div>'+
@@ -87,10 +88,10 @@ function workspaceMarkup(){
           rangeMarkup('Content scale','nlpdfContentScale',55,150,1,100,'%')+
           '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfCenterContent" type="button" disabled>Center</button><button class="nlpdf-btn" id="nlpdfResetTransform" type="button" disabled>Reset</button></div>'+
         '</section>'+
-        '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Safe area</strong><span>Word-style margins</span></div>'+
+        '<section class="nlpdf-panel" id="nlpdfSafePanel"><div class="nlpdf-panel-title"><strong>Safe area</strong><span>Word-style margins</span></div>'+
           '<label class="nlpdf-safe-toggle"><input id="nlpdfSafeArea" type="checkbox"><span><strong>Keep content inside safe area</strong><small>25.4 mm (1 in) margins on all four sides</small></span></label>'+
         '</section>'+
-        '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Make Space</strong><span>Automatic signature clearance</span></div>'+
+        '<section class="nlpdf-panel" id="nlpdfSpacePanel"><div class="nlpdf-panel-title"><strong>Make Space</strong><span>Automatic signature clearance</span></div>'+
           '<div class="nlpdf-note">Uniformly fit document content above the signature. No manual spacing or guessing needed.</div>'+
           '<div class="nlpdf-scope"><label><input type="radio" name="nlpdfSpaceScope" value="current" checked>This page</label><label><input type="radio" name="nlpdfSpaceScope" value="all">Every page</label></div>'+
           '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfApplySpace" type="button">Make Space</button><button class="nlpdf-btn" id="nlpdfClearSpace" type="button">Undo Make Space</button></div>'+
@@ -102,20 +103,22 @@ function workspaceMarkup(){
       '<input class="nlpdf-asset-input" id="nlpdfAssetInput" type="file">'+
     '</aside>'+
     '<main class="nlpdf-editor">'+
+      '<nav class="nlpdf-toolrail" id="nlpdfToolRail" aria-label="Page tools"><button type="button" data-tool="crop" title="Crop page" aria-label="Crop page">✂</button><button type="button" data-tool="safe" title="Safe area" aria-label="Safe area">◇</button><button type="button" data-tool="space" title="Make Space" aria-label="Make Space">▤</button><button type="button" data-tool="rotate" title="Rotate clockwise" aria-label="Rotate clockwise">↻</button></nav><div class="nlpdf-tool-flyout hidden" id="nlpdfToolFlyout"><div class="nlpdf-tool-flyout-head"><strong id="nlpdfToolFlyoutTitle">Tools</strong><button type="button" id="nlpdfToolFlyoutClose" aria-label="Close tools">×</button></div><div id="nlpdfToolFlyoutContent"></div></div>'+ 
       '<div class="nlpdf-toolbar">'+
+        '<button class="nlpdf-tool" id="nlpdfUndo" type="button" disabled title="Undo (Ctrl+Z)">↶ Undo</button><button class="nlpdf-tool" id="nlpdfRedo" type="button" disabled title="Redo (Ctrl+Y)">↷ Redo</button>'+ 
         '<button class="nlpdf-tool primary" id="nlpdfAddFiles" type="button">+ Add files / ZIP</button>'+
-        '<button class="nlpdf-tool" id="nlpdfRotateLeft" type="button" disabled>↶ Rotate</button><button class="nlpdf-tool" id="nlpdfRotateRight" type="button" disabled>↷ Rotate</button>'+
+        '<button class="nlpdf-tool" id="nlpdfRotateRight" type="button" disabled>↻ Rotate 90°</button>'+
         '<button class="nlpdf-tool" id="nlpdfMoveFirst" type="button" disabled>⇤ First</button><button class="nlpdf-tool" id="nlpdfMoveUp" type="button" disabled>← Earlier</button><button class="nlpdf-tool" id="nlpdfMoveDown" type="button" disabled>Later →</button><button class="nlpdf-tool" id="nlpdfMoveLast" type="button" disabled>Last ⇥</button>'+
         '<button class="nlpdf-tool" id="nlpdfDuplicate" type="button" disabled>⧉ Duplicate</button><button class="nlpdf-tool" id="nlpdfDelete" type="button" disabled>⌫ Delete</button>'+
         '<span class="nlpdf-toolbar-spacer"></span><span class="nlpdf-selection-label" id="nlpdfSelectionLabel">No page selected</span>'+
         '<div class="nlpdf-view-toggle"><button class="active" id="nlpdfSingleView" type="button">Single</button><button id="nlpdfGridView" type="button">Grid</button></div>'+
       '</div>'+
       '<section class="nlpdf-stage" id="nlpdfStage"><div class="nlpdf-drop-overlay">Drop PDF, images, or ZIP anywhere here</div>'+
-        '<div class="nlpdf-paper" id="nlpdfPaper"><canvas id="nlpdfCanvas" width="840" height="1188"></canvas><div class="nlpdf-safe-guide hidden" id="nlpdfSafeGuide"></div><div class="nlpdf-crop-layer hidden" id="nlpdfCropLayer"><div class="nlpdf-crop-region" id="nlpdfCropRegion"><i data-crop-handle="nw"></i><i data-crop-handle="n"></i><i data-crop-handle="ne"></i><i data-crop-handle="e"></i><i data-crop-handle="se"></i><i data-crop-handle="s"></i><i data-crop-handle="sw"></i><i data-crop-handle="w"></i></div></div><div class="nlpdf-paper-hint" id="nlpdfPaperHint"><div><strong>Blank A4</strong><span>Drop files onto the workspace or click “Add files / ZIP”.<br>Select a page to crop, move, scale, or make space.</span></div></div><span class="nlpdf-paper-badge hidden" id="nlpdfPaperBadge"></span><span class="nlpdf-content-drag-hint hidden" id="nlpdfDragHint">Drag page content to move</span><img class="nlpdf-signature-preview hidden" id="nlpdfSignaturePreview" alt="Signature"></div>'+
+        '<div class="nlpdf-paper" id="nlpdfPaper"><canvas id="nlpdfCanvas" width="840" height="1188"></canvas><div id="nlpdfTransformLayer" class="nlpdf-transform-layer hidden"><i data-resize="nw"></i><i data-resize="ne"></i><i data-resize="sw"></i><i data-resize="se"></i></div><div id="nlpdfSnapX" class="nlpdf-snap-guide x hidden"></div><div id="nlpdfSnapY" class="nlpdf-snap-guide y hidden"></div><div class="nlpdf-safe-guide hidden" id="nlpdfSafeGuide"></div><div class="nlpdf-crop-layer hidden" id="nlpdfCropLayer"><div class="nlpdf-crop-region" id="nlpdfCropRegion"><i data-crop-handle="nw"></i><i data-crop-handle="n"></i><i data-crop-handle="ne"></i><i data-crop-handle="e"></i><i data-crop-handle="se"></i><i data-crop-handle="s"></i><i data-crop-handle="sw"></i><i data-crop-handle="w"></i></div></div><div class="nlpdf-paper-hint" id="nlpdfPaperHint"><div><strong>Blank A4</strong><span>Drop files onto the workspace or click “Add files / ZIP”.<br>Select a page to crop, move, scale, or make space.</span></div></div><span class="nlpdf-paper-badge hidden" id="nlpdfPaperBadge"></span><span class="nlpdf-content-drag-hint hidden" id="nlpdfDragHint">Drag page content to move</span><img class="nlpdf-signature-preview hidden" id="nlpdfSignaturePreview" alt="Signature"></div>'+
         '<span class="nlpdf-empty-drop">Whole workspace accepts drag & drop</span>'+
       '</section>'+
       '<section class="nlpdf-grid-stage hidden" id="nlpdfGridStage"><div class="nlpdf-drop-overlay">Drop PDF, images, or ZIP anywhere here</div><div class="nlpdf-grid" id="nlpdfGrid"></div></section>'+
-      '<section class="nlpdf-filmstrip-wrap" id="nlpdfFilmstripWrap"><div class="nlpdf-filmstrip-head"><strong>Pages</strong><span>Front/Back are shown as stacks, not every default page</span></div><div class="nlpdf-filmstrip" id="nlpdfFilmstrip"></div></section>'+
+      '<aside class="nlpdf-filmstrip-wrap" id="nlpdfFilmstripWrap"><div class="nlpdf-filmstrip-head"><strong>Pages</strong><span>Front/Back are shown as stacks, not every default page</span></div><div class="nlpdf-filmstrip" id="nlpdfFilmstrip"></div></aside>'+
       '<div class="nlpdf-zoom" id="nlpdfZoomControls"><button id="nlpdfZoomOut" type="button" aria-label="Zoom out">−</button><strong id="nlpdfZoomValue">100%</strong><button id="nlpdfZoomIn" type="button" aria-label="Zoom in">+</button><button id="nlpdfZoomFit" type="button">Fit A4</button></div>'+
       '<footer class="nlpdf-footer"><div class="nlpdf-footer-stats"><div class="nlpdf-footer-stat"><strong id="nlpdfPageCount">0</strong><span>Document pages</span></div><div class="nlpdf-footer-stat"><strong id="nlpdfFileCount">0</strong><span>Source files</span></div></div><div class="nlpdf-footer-center" id="nlpdfStatus">Ready · Files stay in this browser</div><button class="nlpdf-create" id="nlpdfCreate" type="button" disabled>Create PDF</button></footer>'+
     '</main>'+
