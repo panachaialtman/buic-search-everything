@@ -103,14 +103,17 @@ function workspaceMarkup(){
       '<input class="nlpdf-asset-input" id="nlpdfAssetInput" type="file">'+
     '</aside>'+
     '<main class="nlpdf-editor">'+
-      '<nav class="nlpdf-toolrail" id="nlpdfToolRail" aria-label="Page tools"><button type="button" data-tool="crop" title="Crop page" aria-label="Crop page">✂</button><button type="button" data-tool="safe" title="Safe area" aria-label="Safe area">◇</button><button type="button" data-tool="space" title="Make Space" aria-label="Make Space">▤</button><button id="nlpdfRotateRight" type="button" data-tool="rotate" title="Rotate clockwise 90°" aria-label="Rotate clockwise 90°" disabled>↻</button></nav><div class="nlpdf-tool-flyout hidden" id="nlpdfToolFlyout"><div class="nlpdf-tool-flyout-head"><strong id="nlpdfToolFlyoutTitle">Tools</strong><button type="button" id="nlpdfToolFlyoutClose" aria-label="Close tools">×</button></div><div id="nlpdfToolFlyoutContent"></div></div>'+ 
+      '<nav class="nlpdf-toolrail" id="nlpdfToolRail" aria-label="Document editing tools">'+
+          '<button type="button" data-tool="crop" title="Crop page" aria-label="Crop page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v13a2 2 0 0 0 2 2h13M18 21V8a2 2 0 0 0-2-2H3"/></svg></button>'+
+          '<button type="button" data-tool="safe" title="Toggle safe area (1-inch margins)" aria-label="Toggle safe area"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><rect x="7" y="7" width="10" height="10" rx="1.5" stroke-dasharray="2 2"/></svg></button>'+
+          '<button type="button" data-tool="space" title="Automatic Make Space" aria-label="Automatic Make Space"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v9H5zM5 21h14M9 16l3 3 3-3M12 13v6"/></svg></button>'+
+          '<button id="nlpdfRotateRight" type="button" data-tool="rotate" title="Rotate clockwise 90°" aria-label="Rotate clockwise 90°" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.5 6.2M3 4v7h7"/></svg></button>'+
+        '</nav><div class="nlpdf-tool-flyout hidden" id="nlpdfToolFlyout"><div class="nlpdf-tool-flyout-head"><strong id="nlpdfToolFlyoutTitle">Tools</strong><button type="button" id="nlpdfToolFlyoutClose" aria-label="Close tools">×</button></div><div id="nlpdfToolFlyoutContent"></div></div>'+ 
       '<div class="nlpdf-toolbar">'+
         '<button class="nlpdf-tool" id="nlpdfUndo" type="button" disabled title="Undo (Ctrl+Z)">↶ Undo</button><button class="nlpdf-tool" id="nlpdfRedo" type="button" disabled title="Redo (Ctrl+Y)">↷ Redo</button>'+ 
-        '<button class="nlpdf-tool primary" id="nlpdfAddFiles" type="button">+ Add files / ZIP</button>'+
-        ''+
-        '<button class="nlpdf-tool" id="nlpdfMoveFirst" type="button" disabled>⇤ First</button><button class="nlpdf-tool" id="nlpdfMoveUp" type="button" disabled>← Earlier</button><button class="nlpdf-tool" id="nlpdfMoveDown" type="button" disabled>Later →</button><button class="nlpdf-tool" id="nlpdfMoveLast" type="button" disabled>Last ⇥</button>'+
         '<button class="nlpdf-tool" id="nlpdfDuplicate" type="button" disabled>⧉ Duplicate</button><button class="nlpdf-tool" id="nlpdfDelete" type="button" disabled>⌫ Delete</button>'+
         '<span class="nlpdf-toolbar-spacer"></span><span class="nlpdf-selection-label" id="nlpdfSelectionLabel">No page selected</span>'+
+        '<div class="nlpdf-toolbar-safe" id="nlpdfToolbarSafe"></div>'+
         '<div class="nlpdf-view-toggle"><button class="active" id="nlpdfSingleView" type="button">Single</button><button id="nlpdfGridView" type="button">Grid</button></div>'+
       '</div>'+
       '<section class="nlpdf-stage" id="nlpdfStage"><div class="nlpdf-drop-overlay">Drop PDF, images, or ZIP anywhere here</div>'+
@@ -119,6 +122,7 @@ function workspaceMarkup(){
       '</section>'+
       '<section class="nlpdf-grid-stage hidden" id="nlpdfGridStage"><div class="nlpdf-drop-overlay">Drop PDF, images, or ZIP anywhere here</div><div class="nlpdf-grid" id="nlpdfGrid"></div></section>'+
       '<aside class="nlpdf-filmstrip-wrap" id="nlpdfFilmstripWrap"><div class="nlpdf-filmstrip-head"><strong>Pages</strong><span>Front/Back are shown as stacks, not every default page</span></div><div class="nlpdf-filmstrip" id="nlpdfFilmstrip"></div></aside>'+
+      '<button class="nlpdf-zoom-add" id="nlpdfAddFiles" type="button" aria-label="Add PDF, images or ZIP" title="Add PDF, images or ZIP">+</button>'+
       '<div class="nlpdf-zoom" id="nlpdfZoomControls"><button id="nlpdfZoomOut" type="button" aria-label="Zoom out">−</button><strong id="nlpdfZoomValue">100%</strong><button id="nlpdfZoomIn" type="button" aria-label="Zoom in">+</button><button id="nlpdfZoomFit" type="button">Fit A4</button></div>'+
       '<footer class="nlpdf-footer"><div class="nlpdf-footer-stats"><div class="nlpdf-footer-stat"><strong id="nlpdfPageCount">0</strong><span>Document pages</span></div><div class="nlpdf-footer-stat"><strong id="nlpdfFileCount">0</strong><span>Source files</span></div></div><div class="nlpdf-footer-center" id="nlpdfStatus">Ready · Files stay in this browser</div><button class="nlpdf-create" id="nlpdfCreate" type="button" disabled>Create PDF</button></footer>'+
     '</main>'+
@@ -233,7 +237,7 @@ function renderAssets(){
     const a=state.assets[id],name=$('#nlpdfAssetName_'+id),remove=$('[data-asset-remove="'+id+'"]'),toggle=$('#'+(id==='front'?'nlpdfUseFront':id==='back'?'nlpdfUseBack':'nlpdfUseSignature'));
     if(name)name.textContent=a?a.name:'Not set';if(remove)remove.classList.toggle('hidden',!a);if(toggle){toggle.disabled=!a;if(!a)toggle.checked=false;}
   }
-  $('#nlpdfSigScope').disabled=!state.assets.signature;$('#nlpdfSigSize').disabled=!state.assets.signature;$('#nlpdfResetSignature').disabled=!state.assets.signature;
+  $('#nlpdfSigScope').disabled=!state.assets.signature;$('#nlpdfSigSize').disabled=!state.assets.signature;
 }
 async function updateAssetInfo(){
   await ensurePdfLibs();
@@ -448,7 +452,7 @@ function syncPageControls(){
   const p=activePage(),disabled=!p;
   $('#nlpdfActiveLabel').textContent=p?'Page '+(state.pages.findIndex(x=>x.id===p.id)+1):'Select a page';
   $('#nlpdfStartCrop').disabled=disabled||state.cropMode;
-  $('#nlpdfResetCrop').disabled=disabled||state.cropMode;
+
   $('#nlpdfApplyCrop').classList.toggle('hidden',!state.cropMode);
   $('#nlpdfCancelCrop').classList.toggle('hidden',!state.cropMode);
   $('#nlpdfCropPanel').classList.toggle('is-cropping',state.cropMode);
@@ -456,14 +460,14 @@ function syncPageControls(){
   $('#nlpdfContentScale').value=p?Math.round((p.transform?.scale||1)*100):100;
   $('#nlpdfContentScaleValue').textContent=(p?Math.round((p.transform?.scale||1)*100):100)+'%';
   $('#nlpdfCenterContent').disabled=disabled||state.cropMode;
-  $('#nlpdfResetTransform').disabled=disabled||state.cropMode;
+
   $('#nlpdfSpaceStatus').textContent=p?.makeSpace?'Make Space active on this page.':'Reserve space automatically above the signature.';
 }
 
 function updateControls(){
   const sel=selectedPages(),p=activePage(),i=p?state.pages.findIndex(x=>x.id===p.id):-1;
   ['nlpdfRotateRight','nlpdfDuplicate','nlpdfDelete'].forEach(id=>$('#'+id).disabled=!sel.length||state.busy);
-  $('#nlpdfMoveUp').disabled=!p||i<=0||state.busy;$('#nlpdfMoveDown').disabled=!p||i<0||i>=state.pages.length-1||state.busy;$('#nlpdfMoveFirst').disabled=!p||i<=0||state.busy;$('#nlpdfMoveLast').disabled=!p||i<0||i>=state.pages.length-1||state.busy;$('#nlpdfCreate').disabled=!state.pages.length||state.busy;
+  $('#nlpdfCreate').disabled=!state.pages.length||state.busy;
   $('#nlpdfSelectionLabel').textContent=sel.length?sel.length+' selected · active page '+(i+1):'No page selected';$('#nlpdfPageCount').textContent=state.pages.length;$('#nlpdfFileCount').textContent=new Set(state.pages.map(p=>p.sourceKey)).size;
 }
 function selectPage(id,event={}){const i=state.pages.findIndex(p=>p.id===id);if(i<0)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}state.activeId=id;const multi=event.ctrlKey||event.metaKey;
@@ -938,13 +942,13 @@ async function build(){
   ['nlpdfUseFront','nlpdfUseBack'].forEach(id=>$('#'+id).addEventListener('change',()=>{savePrefs();renderFilmstrip();renderGrid();recordEdit();}));
   ['nlpdfUseSignature','nlpdfSigScope'].forEach(id=>$('#'+id).addEventListener('change',()=>{if(id==='nlpdfSigScope'&&$('#nlpdfSigScope').value==='page')state.signaturePageId=state.activeId||state.pages[0]?.id||'';savePrefs();renderActive();recordEdit();}));
   $('#nlpdfSigSize').addEventListener('input',e=>{state.sig.widthPct=Number(e.target.value)/100;$('#nlpdfSigSizeValue').textContent=e.target.value+'%';state.sig.xPct=clamp(state.sig.xPct,0,1-state.sig.widthPct);savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked&&(!activePage()||signatureApplies(activePage()))));if(activePage()?.makeSpace)renderActive();});
-  $('#nlpdfResetSignature').addEventListener('click',()=>{state.sig.xPct=.72;state.sig.yPct=.80;state.sig.widthPct=.22;$('#nlpdfSigSize').value=22;$('#nlpdfSigSizeValue').textContent='22%';savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked&&(!activePage()||signatureApplies(activePage()))));if(activePage()?.makeSpace)renderActive();recordEdit();});
 
-  $('#nlpdfRotateRight').addEventListener('click',()=>rotateSelected(90));$('#nlpdfMoveUp').addEventListener('click',()=>moveActive(-1));$('#nlpdfMoveDown').addEventListener('click',()=>moveActive(1));$('#nlpdfMoveFirst').addEventListener('click',()=>moveToEdge('first'));$('#nlpdfMoveLast').addEventListener('click',()=>moveToEdge('last'));$('#nlpdfDuplicate').addEventListener('click',duplicateSelected);$('#nlpdfDelete').addEventListener('click',deleteSelected);
+
+  $('#nlpdfRotateRight').addEventListener('click',()=>rotateSelected(90));$('#nlpdfDuplicate').addEventListener('click',duplicateSelected);$('#nlpdfDelete').addEventListener('click',deleteSelected);
   $('#nlpdfStartCrop').addEventListener('click',startCrop);
   $('#nlpdfApplyCrop').addEventListener('click',applyCrop);
   $('#nlpdfCancelCrop').addEventListener('click',cancelCrop);
-  $('#nlpdfResetCrop').addEventListener('click',resetCrop);
+
   $('#nlpdfContentScale').addEventListener('change',recordEdit);
   $('#nlpdfSigSize').addEventListener('change',recordEdit);
   $('#nlpdfContentScale').addEventListener('input',e=>{
@@ -954,7 +958,7 @@ async function build(){
     renderActive();
   });
   $('#nlpdfCenterContent').addEventListener('click',centerContent);
-  $('#nlpdfResetTransform').addEventListener('click',resetTransform);
+
   $('#nlpdfSafeArea').addEventListener('change',e=>{
     state.safeArea=e.target.checked;savePrefs();renderAll();recordEdit();
   });
