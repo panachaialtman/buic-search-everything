@@ -1,0 +1,56 @@
+BU International Center Workspace — New Letter PDF Editor V4
+Date: 2026-09-30
+
+Major UX rebuild
+- New Letter now becomes a fixed full-screen editor below the main top bar.
+- Removed the large New Letter heading and legacy card layout from the active workspace.
+- Persistent left sidebar contains only document-editing controls and Default Assets.
+- Create Folder remains available as a secondary action in the sidebar.
+- Footer stays at the bottom of the editor viewport.
+
+A4 editor
+- Main view is always a blank A4 sheet, even before documents are imported.
+- Selected document page is rendered inside the A4 sheet.
+- Page content can be dragged directly on the A4 to reposition it.
+- Content scale slider updates the A4 preview immediately.
+- Per-page crop controls update the A4 preview immediately.
+- Make Space supports Current / Selected / All document pages and updates the preview immediately.
+
+Signature
+- Saved Signature remains a persistent browser asset.
+- Signature is visible on applicable A4 pages.
+- Signature can be dragged directly on the A4.
+- Signature size can be adjusted live from the sidebar.
+- Signature position/size are remembered in local browser preferences.
+
+Front / Back defaults
+- Front and Back are no longer expanded into every individual default page in the page strip.
+- Each default is represented by one stacked-paper card with a page-count badge.
+- Front/Back stacks are locked and not editable/reorderable.
+- Final export still includes every page inside the default Front/Back source PDF.
+
+Page management
+- Single view retains a compact filmstrip.
+- Grid view provides a larger page-arrangement workspace.
+- Grid and filmstrip support drag reorder for document pages.
+- Click selects one page.
+- Ctrl/Cmd+Click toggles individual pages.
+- Shift+Click selects a range.
+- Backspace/Delete removes the selected document pages.
+- PDF, JPG, PNG, WebP and ZIP imports remain supported.
+
+Final export review
+- Student number/name, Letter type, PDF filename, package choice and destination have been removed from the editing sidebar/footer.
+- Clicking Create PDF opens a final review modal.
+- Output modes:
+  1. PDF only
+  2. Folder + Letter + PDF
+- Package naming:
+  Folder = Number Name
+  Word = Letter_Name.docx
+  PDF = Documents_Name.pdf
+- Student number is used only in the folder name.
+- Destination is selected in the final review step.
+
+Deployment
+- Direct CSS/JS references use v=4 cache-busting.
