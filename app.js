@@ -189,6 +189,20 @@
     breathing.setAttribute('data-reference-breathing-v1', '');
     document.head.appendChild(breathing);
   }
+  if (!document.querySelector('link[data-new-letter-pdf-v1]')) {
+    const style = document.createElement('link');
+    style.rel = 'stylesheet';
+    style.href = 'new-letter-pdf-v1.css';
+    style.setAttribute('data-new-letter-pdf-v1', '');
+    document.head.appendChild(style);
+  }
+  if (!document.querySelector('script[data-new-letter-pdf-v1]')) {
+    const pdfTools = document.createElement('script');
+    pdfTools.src = 'new-letter-pdf-v1.js';
+    pdfTools.async = false;
+    pdfTools.setAttribute('data-new-letter-pdf-v1', '');
+    document.head.appendChild(pdfTools);
+  }
 
   function loadDataV2() {
     const script = document.createElement('script');
