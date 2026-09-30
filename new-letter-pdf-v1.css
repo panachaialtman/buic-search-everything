@@ -231,3 +231,20 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
  #workspaceDocuments.nlpdf-primary .nlpdf-sidebar{display:none}
  .nlpdf-zoom{right:9px}
 }
+
+
+/* Keep the footer in the final grid row when the filmstrip is hidden. */
+#workspaceDocuments.nlpdf-primary .nlpdf-editor:has(#nlpdfGridStage:not(.hidden)){
+  grid-template-rows:48px minmax(0,1fr) 60px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-editor:has(#nlpdfGridStage:not(.hidden)) .nlpdf-zoom{
+  display:none;
+}
+@media(max-height:650px){
+  #workspaceDocuments.nlpdf-primary .nlpdf-editor{grid-template-rows:46px minmax(0,1fr) 94px 56px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-filmstrip-wrap{height:94px!important;max-height:94px!important}
+  #workspaceDocuments.nlpdf-primary .nlpdf-filmstrip{height:72px;max-height:73px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-footer{height:56px!important;min-height:56px;max-height:56px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-editor:has(#nlpdfGridStage:not(.hidden)){grid-template-rows:46px minmax(0,1fr) 56px}
+  .nlpdf-zoom{bottom:161px}
+}
