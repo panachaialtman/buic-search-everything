@@ -213,7 +213,7 @@
 
   function loadCore() {
     const core = document.createElement('script');
-    core.src = 'app-core.js?v=20260921-searchfix';
+    core.src = 'app-core.js?v=20260930-workspace-v9';
     core.async = false;
     core.onload = () => {
       const enhancement = document.createElement('script');
