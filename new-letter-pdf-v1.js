@@ -136,6 +136,7 @@ function exportModalMarkup(){
       '<div class="nlpdf-final-preview"><div class="nlpdf-final-row"><span>Folder</span><strong id="nlpdfFinalFolder">—</strong></div><div class="nlpdf-final-row"><span>Letter</span><strong id="nlpdfFinalLetter">—</strong></div><div class="nlpdf-final-row"><span>PDF</span><strong id="nlpdfFinalPdf">Documents_Miss ABC.pdf</strong></div><div class="nlpdf-final-row"><span>Pages</span><strong id="nlpdfFinalPages">0 document pages</strong></div></div>'+
       '<div class="nlpdf-destination"><div><strong id="nlpdfDestinationName">No destination selected</strong><span id="nlpdfDestinationHelp">Choose where the final output should be created.</span></div><button class="nlpdf-dest-btn" id="nlpdfChooseDestination" type="button">Choose destination</button></div>'+
     '</div>'+
+    '<div class="nlpdf-export-progress hidden" id="nlpdfExportProgress" role="status" aria-live="polite"><div class="nlpdf-export-progress-spinner" aria-hidden="true"></div><div class="nlpdf-export-progress-title" id="nlpdfProgressTitle">Creating in progress…</div><div class="nlpdf-export-progress-detail" id="nlpdfProgressDetail">Preparing documents.</div><div class="nlpdf-export-progress-track"><div id="nlpdfProgressFill"></div></div><div class="nlpdf-export-progress-counter" id="nlpdfProgressCounter"></div></div>'+
     '<div class="nlpdf-modal-actions"><button class="nlpdf-cancel" type="button" data-nlpdf-close>Cancel</button><button class="nlpdf-confirm" id="nlpdfConfirmExport" type="button">Create PDF</button></div>'+
   '</section></div>';
 }
@@ -631,17 +632,20 @@ function drawSignature(page,img){
   return true;
 }
 
-async function buildPdf(){
+async function buildPdf(progress=()=>{}){
   await ensurePdfLibs();const out=await window.PDFLib.PDFDocument.create();
+  progress('Preparing default documents…',0,state.pages.length);
   if($('#nlpdfUseFront').checked&&state.assets.front)await appendAsset(out,state.assets.front);
   const sig=$('#nlpdfUseSignature').checked&&state.assets.signature?await embedSignature(out):null,scope=$('#nlpdfSigScope').value;
   let signed=0;
   for(let i=0;i<state.pages.length;i++){
+    progress('Processing document '+(i+1)+' of '+state.pages.length+'…',i,state.pages.length);
     const pg=await addDocPage(out,state.pages[i]);
     if(sig&&(scope==='all'||(scope==='page'&&state.pages[i].id===state.signaturePageId)))signed+=drawSignature(pg,sig)?1:0;
   }
   if(sig&&signed===0)throw new Error('Select a document page for the signature or use All document pages.');
   if($('#nlpdfUseBack').checked&&state.assets.back)await appendAsset(out,state.assets.back);
+  progress('Finalizing PDF…',state.pages.length,state.pages.length);
   out.setCreator('BU International Center Workspace');out.setProducer('New Letter PDF Builder');return new Uint8Array(await out.save());
 }
 function customNoIenTemplate(){try{const e=JSON.parse(localStorage.getItem(NO_IEN_OVERRIDE_KEY)||'null');if(e&&typeof e.base64==='string'&&e.base64.length>100)return e;}catch{}return null;}
@@ -664,20 +668,72 @@ async function chooseDestination(){
   if(!window.showDirectoryPicker){toast('Folder selection requires Chrome or Edge.');return false;}
   try{state.destinationHandle=await window.showDirectoryPicker({mode:'readwrite'});$('#nlpdfDestinationName').textContent=state.destinationHandle.name||'Selected folder';$('#nlpdfDestinationHelp').textContent='Output will be created here for this export.';return true;}catch(err){if(err?.name!=='AbortError')toast(err.message||'Could not select destination.');return false;}
 }
-async function confirmExport(){
-  if(state.busy)return;const name=safePath($('#nlpdfExportName').value),num=safePath($('#nlpdfExportNumber').value),mode=$('input[name="nlpdfOutputMode"]:checked')?.value||'pdf';
-  if(!name){toast('Enter the student name.');$('#nlpdfExportName').focus();return;}if(mode==='package'&&!num){toast('Enter the student number.');$('#nlpdfExportNumber').focus();return;}
-  if(!state.destinationHandle){const ok=await chooseDestination();if(!ok)return;}
-  state.busy=true;$('#nlpdfConfirmExport').disabled=true;setStatus('Creating final PDF…');
-  try{
-    const bytes=await buildPdf();let pdfName=safeFile($('#nlpdfExportPdfName').value||('Documents_'+name+'.pdf'));if(!/\.pdf$/i.test(pdfName))pdfName+='.pdf';
-    if(mode==='package'){const folder=await state.destinationHandle.getDirectoryHandle(num+' '+name,{create:true});await writeFile(folder,'Letter_'+name+'.docx',new Blob([letterBytes($('#nlpdfExportLetterType').value)],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));await writeFile(folder,pdfName,new Blob([bytes],{type:'application/pdf'}));toast('Folder + Letter + PDF created.');}
-    else{await writeFile(state.destinationHandle,pdfName,new Blob([bytes],{type:'application/pdf'}));toast('PDF created.');}
-    closeExport();setStatus('Ready · Export complete');
-  }catch(err){console.error(err);toast(err.message||'Could not create output.');setStatus('Export failed');}
-  finally{state.busy=false;$('#nlpdfConfirmExport').disabled=false;updateControls();}
+function exportProgress(title,detail='',done=0,total=0,mode='active'){
+  const layer=$('#nlpdfExportProgress'),heading=$('#nlpdfProgressTitle'),body=$('#nlpdfProgressDetail');
+  if(!layer||!heading||!body)return;
+  layer.classList.remove('hidden');
+  layer.dataset.mode=mode;
+  heading.textContent=title;body.textContent=detail;
+  const fill=$('#nlpdfProgressFill'),counter=$('#nlpdfProgressCounter');
+  const counted=Number.isFinite(total)&&total>0;
+  if(fill){fill.style.width=counted?Math.round(100*clamp(done/total,0,1))+'%':'38%';fill.classList.toggle('indeterminate',!counted&&mode==='active');}
+  if(counter)counter.textContent=counted?done+' / '+total+' document pages':'';
+}
+function hideExportProgress(){
+  const layer=$('#nlpdfExportProgress');if(!layer)return;
+  layer.classList.add('hidden');layer.dataset.mode='';
+}
+async function allowExportProgressToPaint(){
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
 }
 
+async function confirmExport(){
+  if(state.busy)return;
+  const name=safePath($('#nlpdfExportName').value);
+  const num=safePath($('#nlpdfExportNumber').value);
+  const mode=$('input[name="nlpdfOutputMode"]:checked')?.value||'pdf';
+  if(!name){toast('Enter the student name.');$('#nlpdfExportName').focus();return;}
+  if(mode==='package'&&!num){toast('Enter the student number.');$('#nlpdfExportNumber').focus();return;}
+  if(!state.destinationHandle){
+    const ok=await chooseDestination();if(!ok)return;
+  }
+  state.busy=true;
+  $('#nlpdfConfirmExport').disabled=true;
+  exportProgress('Creating in progress…','Preparing your PDF documents.',0,state.pages.length);
+  setStatus('Creating PDF in progress…');
+  updateControls();
+  await allowExportProgressToPaint();
+  try{
+    const bytes=await buildPdf((phase,done,total)=>exportProgress('Creating in progress…',phase,done,total));
+    let pdfName=safeFile($('#nlpdfExportPdfName').value||('Documents_'+name+'.pdf'));
+    if(!/\.pdf$/i.test(pdfName))pdfName+='.pdf';
+    exportProgress('Creating in progress…','Writing files to the selected folder…',state.pages.length,state.pages.length);
+    await allowExportProgressToPaint();
+    if(mode==='package'){
+      const folder=await state.destinationHandle.getDirectoryHandle(num+' '+name,{create:true});
+      await writeFile(folder,'Letter_'+name+'.docx',new Blob([letterBytes($('#nlpdfExportLetterType').value)],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+      await writeFile(folder,pdfName,new Blob([bytes],{type:'application/pdf'}));
+    }else{
+      await writeFile(state.destinationHandle,pdfName,new Blob([bytes],{type:'application/pdf'}));
+    }
+    exportProgress('Successfully created','The files are fully saved in your selected destination.',state.pages.length,state.pages.length,'success');
+    setStatus('Ready · Export complete');
+    toast(mode==='package'?'Folder + Letter + PDF created.':'PDF created.');
+    await new Promise(resolve=>setTimeout(resolve,950));
+    closeExport();
+  }catch(err){
+    console.error(err);
+    exportProgress('Could not create PDF',err?.message||'The export did not complete.',0,0,'error');
+    setStatus('Export failed');
+    toast(err?.message||'Could not create output.');
+    await new Promise(resolve=>setTimeout(resolve,1600));
+  }finally{
+    hideExportProgress();
+    state.busy=false;
+    $('#nlpdfConfirmExport').disabled=false;
+    updateControls();
+  }
+}
 
 /* Movable floating tool panels */
 function setupToolRail(){
