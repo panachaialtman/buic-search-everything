@@ -761,6 +761,20 @@
   function resetBundled(){localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(STORAGE_META_KEY);lastValidationReport={errors:[],warnings:[],label:'Bundled V4.6.12 workbook loaded.'};setRows(window.REFERENCE_SNAPSHOT,{type:'bundled',title:'Bundled data',detail:'Current V4.6.12 workbook snapshot included with this website.'},false);toast('Reset to bundled workbook data.');closeDrawer();}
 
 
+  function syncWorkspaceViewport(){
+    const header=$('.topbar');
+    if(!header)return;
+    const bottom=Math.max(0,Math.ceil(header.getBoundingClientRect().bottom));
+    document.documentElement.style.setProperty('--bu-topbar-bottom',bottom+'px');
+  }
+  window.addEventListener('resize',syncWorkspaceViewport);
+  window.addEventListener('orientationchange',syncWorkspaceViewport);
+  if(window.ResizeObserver){
+    const header=$('.topbar');
+    if(header)new ResizeObserver(syncWorkspaceViewport).observe(header);
+  }
+  syncWorkspaceViewport();
+
   function setWorkspace(name){
     activeWorkspace=['reference','communication','documents','extend','data'].includes(name)?name:'reference';
     $$('.workspace-tab').forEach(b=>b.classList.toggle('active',b.dataset.workspace===activeWorkspace));
@@ -772,6 +786,7 @@
     if(activeWorkspace==='documents')updateDocumentCaseSummary();
     if(activeWorkspace==='data'){updateWorkspaceDataCounts();renderImportHistory();renderValidationSummary();}
     renderFloatingWindows();
+    syncWorkspaceViewport();
   }
 
 
