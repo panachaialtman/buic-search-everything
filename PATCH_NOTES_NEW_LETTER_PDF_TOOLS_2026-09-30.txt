@@ -1,0 +1,15 @@
+BU International Center Workspace — New Letter PDF Tools V1
+Date: 2026-09-30
+
+- Added a functional PDF Tools module inside the New Letter workspace.
+- Local browser processing only; imported student documents are not uploaded.
+- Supports PDF, JPG, PNG and WebP input.
+- PDF files are split into individual draggable page thumbnails.
+- Supports page selection, drag reorder, move earlier/later, rotate, duplicate, delete and clear all.
+- Images are fitted onto A4 pages during export.
+- Exports one combined PDF using the Documents_<student name>.pdf naming pattern.
+- Output filename follows the current student case name unless manually edited.
+- PDF libraries are loaded on demand when the tool is opened.
+- Existing New Letter Word/folder workflow remains unchanged.
+
+V1 scope intentionally focuses on assembly. Crop, signature placement, default front/back documents and advanced A4 positioning can be layered on later without changing the existing New Letter workflow.
