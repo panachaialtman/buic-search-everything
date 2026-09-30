@@ -202,6 +202,90 @@ try{
     const restored=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
     assert.equal(restored,first);
   });
+
+  await run('Right-side preview rail can reorder by dragging and undo',async()=>{
+    const first=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
+    const last=await page.locator('#nlpdfFilmstrip [data-page-id]').last().getAttribute('data-page-id');
+    assert.notEqual(first,last);
+    await page.locator('#nlpdfFilmstrip [data-page-id]').first().dragTo(page.locator('#nlpdfFilmstrip [data-page-id]').last());
+    await page.waitForTimeout(180);
+    const after=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
+    assert.notEqual(after,first,'dragging should reorder the page rail');
+    await page.keyboard.press('Control+z');
+    assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id'),first);
+  });
+  await run('ZIP import extracts supported images and ignores other files',async()=>{
+    const {execFileSync}=await import('node:child_process');
+    const z=`import zipfile,base64,os
+with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
+ z.writestr('evidence/image.png',base64.b64decode(os.environ['PNG_B64']))
+ z.writestr('ignore-me.txt','not a document')`;
+    execFileSync('python3',['-c',z],{env:{...process.env,PNG_B64:png.toString('base64')}});
+    await page.locator('#nlpdfFileInput').setInputFiles('test-results/synthetic-attachments.zip');
+    await awaitCount(4);
+    assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').count(),4);
+  });
+  await run('Real PDF import keeps page count and editable preview',async()=>{
+    await page.evaluate(async()=>{
+      const pdf=await PDFLib.PDFDocument.create();
+      const p=pdf.addPage([595.28,841.89]);
+      p.drawText('Synthetic PDF import regression test',{x:80,y:700,size:22});
+      const bytes=await pdf.save();
+      const dt=new DataTransfer();
+      dt.items.add(new File([bytes],'synthetic.pdf',{type:'application/pdf'}));
+      document.querySelector('#nlpdfStage').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
+    });
+    await awaitCount(5);
+    await page.locator('#nlpdfFilmstrip [data-page-id]').last().click();
+    await page.waitForTimeout(250);
+    assert.equal(await visible('#nlpdfCanvas'),true);
+  });
+  await run('Multi-select, Backspace deletion and Undo restore selected pages',async()=>{
+    await page.locator('#nlpdfFilmstrip [data-page-id]').first().click();
+    await page.locator('#nlpdfFilmstrip [data-page-id]').nth(2).click({modifiers:['Shift']});
+    assert.match(await text('#nlpdfSelectionLabel'),/3 selected/);
+    await page.keyboard.press('Backspace');
+    await awaitCount(2);
+    await page.keyboard.press('Control+z');
+    await awaitCount(5);
+  });
+  await run('A4-only zoom, fixed footer and right rail remain visible in short windows',async()=>{
+    const before=await page.locator('#nlpdfPaper').evaluate(el=>el.getBoundingClientRect().width);
+    await page.locator('#nlpdfZoomIn').click();
+    const after=await page.locator('#nlpdfPaper').evaluate(el=>el.getBoundingClientRect().width);
+    assert(after>before);
+    await page.locator('#nlpdfZoomFit').click();
+    await page.setViewportSize({width:1440,height:630});
+    await page.waitForTimeout(250);
+    const bounds=await page.evaluate(()=>{
+      const selectors=['#nlpdfFooter','#nlpdfFilmstripWrap','#nlpdfCreate'];
+      const f=document.querySelector('.nlpdf-footer').getBoundingClientRect();
+      const rail=document.querySelector('#nlpdfFilmstripWrap').getBoundingClientRect();
+      const canvas=document.querySelector('#nlpdfStage').getBoundingClientRect();
+      return {f:{top:f.top,bottom:f.bottom},rail:{top:rail.top,bottom:rail.bottom},canvas:{top:canvas.top,bottom:canvas.bottom},h:window.innerHeight};
+    });
+    assert(bounds.f.bottom<=bounds.h+2&&bounds.f.top>=0,'footer stays within viewport');
+    assert(bounds.rail.bottom<=bounds.f.top+2,'page rail stops above footer');
+    assert(bounds.canvas.bottom<=bounds.f.top+2,'canvas stops above footer');
+    await page.setViewportSize({width:1440,height:900});
+  });
+  await run('Default asset enable/disable can be undone',async()=>{
+    const front=page.locator('#nlpdfUseFront');
+    assert.equal(await front.isChecked(),true);
+    await front.uncheck();
+    assert.equal(await front.isChecked(),false);
+    await page.keyboard.press('Control+z');
+    assert.equal(await front.isChecked(),true);
+  });
+  await run('Navigation out of New Letter and back preserves editor operation',async()=>{
+    await page.locator('[data-workspace="reference"]').click();
+    await page.locator('[data-workspace="documents"]').click();
+    await page.locator('#nlpdfCreate').waitFor({state:'visible'});
+    assert.equal(await count(),5);
+    await page.locator('#nlpdfSingleView').click();
+    assert.equal(await visible('#nlpdfStage'),true);
+  });
+
   await run('Export modal shows processing, then success only after write completes',async()=>{
     await page.locator('#nlpdfCreate').click();
     assert.equal(await visible('#nlpdfExportModal'),true);
@@ -219,6 +303,32 @@ try{
     await page.waitForTimeout(1000);
     assert.equal(await visible('#nlpdfExportModal'),false);
   });
+
+  await run('Package export creates folder and Word/PDF with correct page count',async()=>{
+    const before=await page.evaluate(()=>window.__mockFiles.length);
+    await page.locator('#nlpdfCreate').click();
+    await page.locator('#nlpdfExportName').fill('QA Student');
+    await page.locator('#nlpdfExportNumber').fill('9012');
+    await page.locator('input[name="nlpdfOutputMode"][value="package"]').check();
+    assert.match(await text('#nlpdfFinalFolder'),/9012 QA Student/);
+    assert.match(await text('#nlpdfFinalLetter'),/Letter_QA Student\.docx/);
+    await page.locator('#nlpdfConfirmExport').click();
+    await page.waitForFunction(()=>document.querySelector('#nlpdfExportProgress')?.dataset.mode==='success',{timeout:60000});
+    const out=await page.evaluate(async before=>{
+      const data=window.__mockFiles.slice(before);
+      const pdf=data.find(f=>f.name.endsWith('.pdf'));
+      return {
+        files:data.map(f=>({name:f.name,finished:f.finished,length:f.bytes?.length||0})),
+        pageCount:pdf?await PDFLib.PDFDocument.load(pdf.bytes).then(d=>d.getPageCount()):null
+      };
+    },before);
+    assert(out.files.find(x=>x.name==='Letter_QA Student.docx'&&x.finished&&x.length>100));
+    assert(out.files.find(x=>x.name==='Documents_QA Student.pdf'&&x.finished&&x.length>100));
+    assert.equal(out.pageCount,7,'5 document pages + 1 front + 1 back');
+    await page.waitForTimeout(1000);
+    assert.equal(await visible('#nlpdfExportModal'),false);
+  });
+
   await run('No browser runtime errors occurred during editor operations',async()=>{
     assert.deepEqual(errors,[]);
   });
