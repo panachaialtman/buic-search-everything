@@ -159,7 +159,20 @@ async function updateAssetInfo(){
   }
   renderFilmstrip();renderGrid();
 }
-function refreshSignatureUrl(){if(state.signatureUrl)URL.revokeObjectURL(state.signatureUrl);state.signatureUrl=state.assets.signature?URL.createObjectURL(state.assets.signature.blob):'';}
+
+function refreshSignatureUrl(){
+  if(state.signatureUrl)URL.revokeObjectURL(state.signatureUrl);
+  state.signatureUrl=state.assets.signature?URL.createObjectURL(state.assets.signature.blob):'';
+  if(!state.signatureUrl)return;
+  const probe=new Image();
+  probe.onload=()=>{
+    state.sigAspect=probe.naturalHeight/Math.max(1,probe.naturalWidth);
+    renderSignature(Boolean($('#nlpdfUseSignature')?.checked&&!state.cropMode));
+    if(activePage()?.makeSpace)renderActive();
+  };
+  probe.src=state.signatureUrl;
+}
+
 async function convertImageBlob(file){
   if(file.type==='image/jpeg'||file.type==='image/png')return file;
   const url=URL.createObjectURL(file);try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;}),c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);return await new Promise(res=>c.toBlob(res,'image/png'));}finally{URL.revokeObjectURL(url);}
@@ -455,32 +468,68 @@ function setView(mode){state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSin
 
 /* Export */
 async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice());state.pdfLibDocs.set(k,d);return d;}
+
 function pdfLayout(srcW,srcH,p){
-  const margin=22,space=(p.spaceMM||0)*72/25.4,availW=A4.wPt-margin*2,availH=A4.hPt-margin*2-space,rot=((p.rotation||0)%360+360)%360,rw=(rot===90||rot===270)?srcH:srcW,rh=(rot===90||rot===270)?srcW:srcH,fit=Math.min(availW/rw,availH/rh)*clamp(p.transform?.scale||1,.3,2),w=srcW*fit,h=srcH*fit,shownW=rw*fit,shownH=rh*fit,dx=(p.transform?.xMM||0)*72/25.4,dy=(p.transform?.yMM||0)*72/25.4;
-  return {rot,w,h,shownW,shownH,x:(A4.wPt-shownW)/2+dx,y:space+margin+(availH-shownH)/2-dy};
+  const rot=((p.rotation||0)%360+360)%360;
+  const rw=(rot===90||rot===270)?srcH:srcW;
+  const rh=(rot===90||rot===270)?srcW:srcH;
+  const L=layoutOnSheet(p,rw,rh,A4.wPt,A4.hPt);
+  const factor=L.w/rw;
+  return {...L,rot,unrotatedW:srcW*factor,unrotatedH:srcH*factor};
 }
 function drawEmbedded(page,embedded,p){
-  const L=pdfLayout(embedded.width,embedded.height,p),o={width:L.w,height:L.h,rotate:window.PDFLib.degrees(L.rot)};
-  if(L.rot===0){o.x=L.x;o.y=L.y;}else if(L.rot===90){o.x=L.x+L.shownW;o.y=L.y;}else if(L.rot===180){o.x=L.x+L.shownW;o.y=L.y+L.shownH;}else{o.x=L.x;o.y=L.y+L.shownH;}page.drawPage(embedded,o);
+  const L=pdfLayout(embedded.width,embedded.height,p);
+  const bottom=A4.hPt-L.y-L.h;
+  const opts={width:L.unrotatedW,height:L.unrotatedH,rotate:window.PDFLib.degrees(L.rot)};
+  if(L.rot===0){opts.x=L.x;opts.y=bottom;}
+  else if(L.rot===90){opts.x=L.x+L.w;opts.y=bottom;}
+  else if(L.rot===180){opts.x=L.x+L.w;opts.y=bottom+L.h;}
+  else{opts.x=L.x;opts.y=bottom+L.h;}
+  page.drawPage(embedded,opts);
 }
 async function addDocPage(out,p){
   if(p.kind==='pdf'){
-    const src=await sourcePdfDoc(p.sourceKey),sp=src.getPage(p.sourcePage-1),sz=sp.getSize(),c=p.crop,left=sz.width*c.left/100,right=sz.width*(1-c.right/100),bottom=sz.height*c.bottom/100,top=sz.height*(1-c.top/100),embedded=await out.embedPage(sp,{left,bottom,right,top}),pg=out.addPage([A4.wPt,A4.hPt]);drawEmbedded(pg,embedded,p);return pg;
+    const src=await sourcePdfDoc(p.sourceKey),sp=src.getPage(p.sourcePage-1),sz=sp.getSize(),c=p.crop;
+    const left=sz.width*c.left/100,right=sz.width*(1-c.right/100);
+    const bottom=sz.height*c.bottom/100,top=sz.height*(1-c.top/100);
+    const embedded=await out.embedPage(sp,{left,bottom,right,top});
+    const page=out.addPage([A4.wPt,A4.hPt]);drawEmbedded(page,embedded,p);return page;
   }
-  const src=await sourceRaster(p),cropped=cropRotateRaster(src,p),blob=await new Promise(res=>cropped.toBlob(res,'image/png')),bytes=new Uint8Array(await blob.arrayBuffer()),img=await out.embedPng(bytes),pg=out.addPage([A4.wPt,A4.hPt]);
-  const margin=22,space=(p.spaceMM||0)*72/25.4,availW=A4.wPt-margin*2,availH=A4.hPt-margin*2-space,fit=Math.min(availW/img.width,availH/img.height)*clamp(p.transform?.scale||1,.3,2),w=img.width*fit,h=img.height*fit,dx=(p.transform?.xMM||0)*72/25.4,dy=(p.transform?.yMM||0)*72/25.4;
-  pg.drawImage(img,{x:(A4.wPt-w)/2+dx,y:space+margin+(availH-h)/2-dy,width:w,height:h});return pg;
+  const source=await sourceRaster(p),cropped=cropRotateRaster(source,p);
+  const png=await new Promise(res=>cropped.toBlob(res,'image/png'));
+  if(!png)throw new Error('Could not render image page.');
+  const image=await out.embedPng(new Uint8Array(await png.arrayBuffer()));
+  const page=out.addPage([A4.wPt,A4.hPt]);
+  const L=layoutOnSheet(p,image.width,image.height,A4.wPt,A4.hPt);
+  page.drawImage(image,{x:L.x,y:A4.hPt-L.y-L.h,width:L.w,height:L.h});
+  return page;
 }
+
 async function appendAsset(out,a){if(!a)return 0;const bytes=new Uint8Array(await a.blob.arrayBuffer());if(a.type==='application/pdf'||/\.pdf$/i.test(a.name)){const src=await window.PDFLib.PDFDocument.load(bytes),pages=await out.copyPages(src,src.getPageIndices());pages.forEach(p=>out.addPage(p));return pages.length;}const img=a.type==='image/jpeg'?await out.embedJpg(bytes):await out.embedPng(bytes),pg=out.addPage([A4.wPt,A4.hPt]),m=22,fit=Math.min((A4.wPt-m*2)/img.width,(A4.hPt-m*2)/img.height),w=img.width*fit,h=img.height*fit;pg.drawImage(img,{x:(A4.wPt-w)/2,y:(A4.hPt-h)/2,width:w,height:h});return 1;}
 async function embedSignature(out){if(!state.assets.signature)return null;const b=new Uint8Array(await state.assets.signature.blob.arrayBuffer());return state.assets.signature.type==='image/jpeg'?await out.embedJpg(b):await out.embedPng(b);}
+
 function drawSignature(page,img){
-  const w=page.getWidth()*state.sig.widthPct,d=img.scale(1),h=w*d.height/d.width,x=clamp(page.getWidth()*state.sig.xPct,0,page.getWidth()-w),y=clamp(page.getHeight()-(page.getHeight()*state.sig.yPct)-h,0,page.getHeight()-h);page.drawImage(img,{x,y,width:w,height:h,opacity:.98});
+  if(!img)return false;
+  const ratio=img.height/img.width;
+  if(!Number.isFinite(ratio)||ratio<=0)throw new Error('Signature has invalid dimensions.');
+  const width=Math.min(page.getWidth()*state.sig.widthPct,page.getHeight()*.55/ratio);
+  const height=width*ratio;
+  const x=clamp(page.getWidth()*state.sig.xPct,0,page.getWidth()-width);
+  const y=clamp(page.getHeight()*(1-state.sig.yPct)-height,0,page.getHeight()-height);
+  page.drawImage(img,{x,y,width,height,opacity:1});
+  return true;
 }
+
 async function buildPdf(){
   await ensurePdfLibs();const out=await window.PDFLib.PDFDocument.create();
   if($('#nlpdfUseFront').checked&&state.assets.front)await appendAsset(out,state.assets.front);
   const sig=$('#nlpdfUseSignature').checked&&state.assets.signature?await embedSignature(out):null,scope=$('#nlpdfSigScope').value;
-  for(let i=0;i<state.pages.length;i++){const pg=await addDocPage(out,state.pages[i]);if(sig&&(scope==='all'||i===state.pages.length-1))drawSignature(pg,sig);}
+  let signed=0;
+  for(let i=0;i<state.pages.length;i++){
+    const pg=await addDocPage(out,state.pages[i]);
+    if(sig&&(scope==='all'||i===state.pages.length-1))signed+=drawSignature(pg,sig)?1:0;
+  }
+  if(sig&&signed===0)throw new Error('The signature could not be applied to any document page.');
   if($('#nlpdfUseBack').checked&&state.assets.back)await appendAsset(out,state.assets.back);
   out.setCreator('BU International Center Workspace');out.setProducer('New Letter PDF Builder');return new Uint8Array(await out.save());
 }
