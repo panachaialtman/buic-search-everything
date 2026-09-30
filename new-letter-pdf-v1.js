@@ -78,18 +78,18 @@ function workspaceMarkup(){
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default asset · Front / Back</strong><span>Locked paper stacks</span></div>'+
           assetRow('front','Front document',p.front)+assetRow('back','Back document',p.back)+'</section>'+ 
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default asset · Signature</strong><span>Saved locally</span></div>'+assetRow('signature','Signature',p.signature,true)+
-          '<div class="nlpdf-signature-controls"><label class="nlpdf-field"><span>Apply signature</span><select id="nlpdfSigScope"><option value="all">All document pages</option><option value="page">Only this page</option></select></label><div class="nlpdf-field"><span>Drag signature directly on A4</span><button class="nlpdf-btn" id="nlpdfResetSignature" type="button">Reset position</button></div><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div><div class="nlpdf-note" id="nlpdfSigHint">Enable the signature to place it on the A4.</div>'+
+          '<div class="nlpdf-signature-controls"><label class="nlpdf-field"><span>Apply signature</span><select id="nlpdfSigScope"><option value="all">All document pages</option><option value="page">Only this page</option></select></label><div class="nlpdf-field nlpdf-signature-hint"><span>Position</span><strong>Drag directly on the A4</strong></div><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div><div class="nlpdf-note" id="nlpdfSigHint">Enable the signature to place it on the A4.</div>'+
         '</section>'+
         '<section class="nlpdf-panel" id="nlpdfCropPanel"><div class="nlpdf-panel-title"><strong>Crop tool</strong><span id="nlpdfActiveLabel">Select a page</span></div>'+
           '<div class="nlpdf-note">Drag the edges or corners of the crop boundary directly on the A4 sheet.</div>'+
-          '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfStartCrop" type="button" disabled>⌗ Crop page</button><button class="nlpdf-btn hidden" id="nlpdfApplyCrop" type="button">✓ Apply crop</button><button class="nlpdf-btn hidden" id="nlpdfCancelCrop" type="button">Cancel</button><button class="nlpdf-btn" id="nlpdfResetCrop" type="button" disabled>Reset crop</button></div>'+
+          '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfStartCrop" type="button" disabled>⌗ Crop page</button><button class="nlpdf-btn hidden" id="nlpdfApplyCrop" type="button">✓ Apply crop</button><button class="nlpdf-btn hidden" id="nlpdfCancelCrop" type="button">Cancel</button></div>'+
         '</section>'+
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Position & scale</strong><span>Drag content<br>inside A4</span></div>'+
           rangeMarkup('Content scale','nlpdfContentScale',55,150,1,100,'%')+
-          '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfCenterContent" type="button" disabled>Center</button><button class="nlpdf-btn" id="nlpdfResetTransform" type="button" disabled>Reset</button></div>'+
+          '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfCenterContent" type="button" disabled>↔ Center content</button></div>'+
         '</section>'+
-        '<section class="nlpdf-panel" id="nlpdfSafePanel"><div class="nlpdf-panel-title"><strong>Safe area</strong><span>Word-style margins</span></div>'+
-          '<label class="nlpdf-safe-toggle"><input id="nlpdfSafeArea" type="checkbox"><span><strong>Keep content inside safe area</strong><small>25.4 mm (1 in) margins on all four sides</small></span></label>'+
+        '<section class="nlpdf-panel nlpdf-safe-strip" id="nlpdfSafePanel">'+
+          '<label class="nlpdf-safe-toggle" title="Restrict content to A4 margins"><input id="nlpdfSafeArea" type="checkbox"><span><strong>Safe area</strong><small>25.4 mm margins</small></span></label>'+
         '</section>'+
         '<section class="nlpdf-panel" id="nlpdfSpacePanel"><div class="nlpdf-panel-title"><strong>Make Space</strong><span>Automatic signature clearance</span></div>'+
           '<div class="nlpdf-note">Uniformly fit document content above the signature. No manual spacing or guessing needed.</div>'+
