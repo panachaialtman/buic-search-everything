@@ -437,3 +437,163 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
 @media(prefers-reduced-motion:reduce){
  .nlpdf-export-progress-spinner,.nlpdf-export-progress-track>div{animation:none!important}
 }
+
+
+/* V9 — floating tool dock, compact safe-area toolbar, floating import control */
+#workspaceDocuments.nlpdf-primary .nlpdf-toolbar{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 14px 5px 15px;
+  overflow:visible;
+  background:var(--surface);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-toolbar .nlpdf-tool{
+  flex-shrink:0;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-toolbar-safe{
+  flex:0 0 auto;
+  display:flex;align-items:center;
+  min-width:0;
+}
+#workspaceDocuments.nlpdf-primary #nlpdfSafePanel{
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  box-shadow:none!important;
+  background:transparent!important;
+}
+#workspaceDocuments.nlpdf-primary #nlpdfSafePanel .nlpdf-safe-toggle{
+  box-sizing:border-box;
+  display:flex;align-items:center;gap:9px;
+  min-height:34px;
+  padding:5px 10px;
+  border:1px solid var(--line)!important;
+  border-radius:9px;
+  background:var(--surface-2);
+  box-shadow:none;
+  white-space:nowrap;
+  cursor:pointer;
+  transition:background .15s ease,border-color .15s ease;
+}
+#workspaceDocuments.nlpdf-primary #nlpdfSafePanel .nlpdf-safe-toggle:hover{
+  background:var(--accent-soft);
+  border-color:var(--accent)!important;
+}
+#workspaceDocuments.nlpdf-primary #nlpdfSafePanel .nlpdf-safe-toggle input{
+  width:16px;height:16px;flex:0 0 16px;margin:0;
+}
+#workspaceDocuments.nlpdf-primary #nlpdfSafePanel .nlpdf-safe-toggle strong{
+  font-size:11px;line-height:1.1;letter-spacing:0;
+}
+#workspaceDocuments.nlpdf-primary #nlpdfSafePanel .nlpdf-safe-toggle small{
+  margin:2px 0 0;
+  font-size:9px;line-height:1.1;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-toolrail{
+  position:absolute;
+  z-index:46;
+  top:62px;left:10px;
+  display:flex;flex-direction:column;
+  gap:5px;
+  width:49px;
+  padding:6px;
+  border-radius:16px;
+  background:color-mix(in srgb,var(--surface) 94%,transparent);
+  border:1px solid var(--line-strong);
+  box-shadow:0 10px 26px rgba(26,46,80,.13);
+  backdrop-filter:blur(16px);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-toolrail button{
+  box-sizing:border-box;
+  width:37px;height:39px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid transparent;
+  border-radius:11px;
+  background:transparent;
+  color:var(--muted);
+  transition:background .13s ease,color .13s ease,transform .13s ease,border-color .13s ease;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-toolrail button svg{
+  display:block;width:20px;height:20px;
+  fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-toolrail button:hover:not(:disabled){
+  background:var(--accent-soft);color:var(--accent);
+  border-color:var(--line);
+  transform:translateX(1px);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-toolrail button.active{
+  color:var(--accent);
+  background:var(--accent-soft);
+  border-color:var(--line-strong);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-toolrail button:disabled{
+  opacity:.38;cursor:not-allowed;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-toolrail button:focus-visible,
+#workspaceDocuments.nlpdf-primary .nlpdf-zoom-add:focus-visible{
+  outline:3px solid var(--accent);
+  outline-offset:2px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-tool-flyout{
+  top:62px;left:69px;
+  border-radius:14px;
+  padding:12px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-zoom-add{
+  position:absolute;
+  z-index:48;
+  right:188px;
+  bottom:117px;
+  width:44px;height:44px;
+  display:grid;place-items:center;
+  border:1px solid color-mix(in srgb,var(--accent) 75%,var(--surface));
+  border-radius:14px;
+  background:var(--accent);
+  box-shadow:0 7px 22px rgba(24,54,98,.19);
+  color:#fff;
+  font-size:27px;
+  font-family:inherit;
+  font-weight:450;
+  line-height:1;
+  cursor:pointer;
+  transition:transform .16s ease,background .16s ease;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-zoom-add:hover{transform:translateY(-2px);background:var(--accent-2)}
+#workspaceDocuments.nlpdf-primary .nlpdf-stage{
+  cursor:ew-resize;
+  touch-action:pan-y;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-stage.nlpdf-gesture-zoom{
+  cursor:ew-resize;
+  user-select:none;
+  touch-action:none;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-stage .nlpdf-paper{cursor:default}
+#workspaceDocuments.nlpdf-primary .nlpdf-stage .nlpdf-paper canvas{cursor:grab}
+#workspaceDocuments.nlpdf-primary .nlpdf-stage .nlpdf-paper canvas:active{cursor:grabbing}
+#workspaceDocuments.nlpdf-primary .nlpdf-editor:has(#nlpdfGridStage:not(.hidden)) .nlpdf-toolrail,
+#workspaceDocuments.nlpdf-primary .nlpdf-editor:has(#nlpdfGridStage:not(.hidden)) .nlpdf-tool-flyout{
+  display:none!important;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-editor:has(#nlpdfGridStage:not(.hidden)) .nlpdf-zoom-add{
+  right:20px;bottom:78px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-signature-hint strong{
+  font-size:10px;color:var(--text);font-weight:650;line-height:1.3;
+}
+@media(max-width:1000px){
+  #workspaceDocuments.nlpdf-primary .nlpdf-toolbar{gap:5px;padding-inline:8px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-selection-label{display:none}
+  #workspaceDocuments.nlpdf-primary #nlpdfSafePanel .nlpdf-safe-toggle small{display:none}
+}
+@media(max-width:900px){
+  #workspaceDocuments.nlpdf-primary .nlpdf-zoom-add{right:145px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-toolrail{left:6px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-tool-flyout{left:60px}
+}
+@media(max-width:680px){
+  #workspaceDocuments.nlpdf-primary .nlpdf-zoom-add{right:105px;width:38px;height:38px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-toolrail{left:3px;width:35px;padding:3px;border-radius:11px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-toolrail button{width:29px;height:32px;border-radius:8px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-toolrail button svg{width:17px;height:17px}
+}
