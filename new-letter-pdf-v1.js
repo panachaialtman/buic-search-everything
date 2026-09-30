@@ -792,12 +792,6 @@ function setupToolRail(){
   }
   function open(key){
     if(key==='rotate')return;
-    if(key==='safe'){
-      const checkbox=$('#nlpdfSafeArea');
-      if(!checkbox?.disabled){checkbox.checked=!checkbox.checked;checkbox.dispatchEvent(new Event('change',{bubbles:true}));}
-      close();
-      return;
-    }
     if(state.toolOpen===key){close();return;}
     state.toolOpen=key;
     flyout.classList.remove('hidden');
@@ -812,10 +806,6 @@ function setupToolRail(){
   });
   state.closeToolFlyout=close;
   state.openToolFlyout=open;
-  $('#nlpdfSafeArea')?.addEventListener('change',()=>{
-    $('[data-tool="safe"]', $('#nlpdfToolRail'))?.classList.toggle('active',$('#nlpdfSafeArea').checked);
-  });
-  $('[data-tool="safe"]', $('#nlpdfToolRail'))?.classList.toggle('active',Boolean($('#nlpdfSafeArea')?.checked));
 }
 function updateTransformOverlay(L){
   const wrap=$('#nlpdfTransformLayer');
