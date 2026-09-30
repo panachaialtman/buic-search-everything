@@ -839,7 +839,7 @@ async function build(){
   ['nlpdfUseFront','nlpdfUseBack'].forEach(id=>$('#'+id).addEventListener('change',()=>{savePrefs();renderFilmstrip();renderGrid();recordEdit();}));
   ['nlpdfUseSignature','nlpdfSigScope'].forEach(id=>$('#'+id).addEventListener('change',()=>{if(id==='nlpdfSigScope'&&$('#nlpdfSigScope').value==='page')state.signaturePageId=state.activeId||state.pages[0]?.id||'';savePrefs();renderActive();recordEdit();}));
   $('#nlpdfSigSize').addEventListener('input',e=>{state.sig.widthPct=Number(e.target.value)/100;$('#nlpdfSigSizeValue').textContent=e.target.value+'%';state.sig.xPct=clamp(state.sig.xPct,0,1-state.sig.widthPct);savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked));if(activePage()?.makeSpace)renderActive();});
-  $('#nlpdfResetSignature').addEventListener('click',()=>{state.sig.xPct=.72;state.sig.yPct=.80;state.sig.widthPct=.22;$('#nlpdfSigSize').value=22;$('#nlpdfSigSizeValue').textContent='22%';savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked));if(activePage()?.makeSpace)renderActive();});
+  $('#nlpdfResetSignature').addEventListener('click',()=>{state.sig.xPct=.72;state.sig.yPct=.80;state.sig.widthPct=.22;$('#nlpdfSigSize').value=22;$('#nlpdfSigSizeValue').textContent='22%';savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked));if(activePage()?.makeSpace)renderActive();recordEdit();});
 
   $('#nlpdfRotateLeft').addEventListener('click',()=>rotateSelected(-90));$('#nlpdfRotateRight').addEventListener('click',()=>rotateSelected(90));$('#nlpdfMoveUp').addEventListener('click',()=>moveActive(-1));$('#nlpdfMoveDown').addEventListener('click',()=>moveActive(1));$('#nlpdfMoveFirst').addEventListener('click',()=>moveToEdge('first'));$('#nlpdfMoveLast').addEventListener('click',()=>moveToEdge('last'));$('#nlpdfDuplicate').addEventListener('click',duplicateSelected);$('#nlpdfDelete').addEventListener('click',deleteSelected);
   $('#nlpdfStartCrop').addEventListener('click',startCrop);
@@ -864,20 +864,41 @@ async function build(){
   $('#nlpdfZoomOut').addEventListener('click',()=>setZoom(state.zoom-.1));
   $('#nlpdfZoomIn').addEventListener('click',()=>setZoom(state.zoom+.1));
   $('#nlpdfZoomFit').addEventListener('click',()=>setZoom(1));
-  setupCropInteraction();
+  setupCropInteraction();setupToolRail();setupResizeDrag();
+  $('#nlpdfUndo').addEventListener('click',()=>undoEdit().catch(console.error));
+  $('#nlpdfRedo').addEventListener('click',()=>redoEdit().catch(console.error));
 
   $('#nlpdfSingleView').addEventListener('click',()=>setView('single'));$('#nlpdfGridView').addEventListener('click',()=>setView('grid'));
 
   setupDrop($('#nlpdfStage'));setupDrop($('#nlpdfGridStage'));setupPageContainer($('#nlpdfFilmstrip'));setupPageContainer($('#nlpdfGrid'));setupContentDrag();setupSignatureDrag();
   if(window.ResizeObserver)new ResizeObserver(()=>fitPaper()).observe($('#nlpdfStage'));
   window.addEventListener('resize',fitPaper);
-  document.addEventListener('keydown',e=>{if((e.key==='Backspace'||e.key==='Delete')&&!ignoreDeleteKey(e)&&state.selected.size){e.preventDefault();deleteSelected();}});
+  document.addEventListener('keydown',e=>{
+    const visible=$('#workspaceDocuments');
+    if(!visible||visible.classList.contains('hidden')||getComputedStyle(visible).display==='none')return;
+    if(ignoreDeleteKey(e))return;
+    const cmd=e.ctrlKey||e.metaKey;
+    if(cmd&&!e.altKey&&e.key.toLowerCase()==='z'){
+      e.preventDefault();(e.shiftKey?redoEdit():undoEdit()).catch(console.error);return;
+    }
+    if(cmd&&!e.altKey&&e.key.toLowerCase()==='y'){
+      e.preventDefault();redoEdit().catch(console.error);return;
+    }
+    if(e.key==='Escape'){
+      if(state.cropMode)cancelCrop();
+      else state.closeToolFlyout?.();
+      return;
+    }
+    if((e.key==='Backspace'||e.key==='Delete')&&state.selected.size){
+      e.preventDefault();deleteSelected();
+    }
+  });
   $('#nlpdfCreate').addEventListener('click',openExport);
   $$('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
   ['nlpdfExportNumber','nlpdfExportName'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(id==='nlpdfExportName')$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();}));
   $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutputMode"]').forEach(x=>x.addEventListener('change',syncExportPreview));
 
-  renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();
+  renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();resetHistory();
 }
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>build().catch(console.error),{once:true});else build().catch(console.error);
