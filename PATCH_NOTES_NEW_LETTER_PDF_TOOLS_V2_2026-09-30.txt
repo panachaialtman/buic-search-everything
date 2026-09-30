@@ -1,0 +1,28 @@
+BU International Center Workspace — New Letter PDF Tools V2
+Date: 2026-09-30
+
+Visibility / deployment
+- PDF Tools now loads directly from index.html with cache-busting query strings.
+- This removes dependence on the indirect app.js loader that could leave the feature invisible on GitHub Pages after a cached deployment.
+
+Package output
+- Folder name: Number + Name
+- Word filename: Letter_Name.docx
+- PDF filename: Documents_Name.pdf
+- Student number is not included in either output filename.
+- PDF export can optionally create the student folder, Word letter, and final PDF together using the browser File System Access API.
+- Letter type can be selected inside PDF Tools.
+
+Persistent defaults
+- Front default asset: PDF or image, stored in IndexedDB and optionally prepended to every export.
+- Back default asset: PDF or image, stored in IndexedDB and optionally appended to every export.
+- Signature default asset: PNG/JPG/WebP image, stored in IndexedDB.
+- Signature can be applied to the last document page or all document pages, with bottom-left / bottom-center / bottom-right placement and small / medium / large size.
+- Default asset preferences are remembered locally.
+
+Assembly
+- Supports PDF/JPG/PNG/WebP imports.
+- PDF pages become draggable page cards.
+- Rotate, move, duplicate, delete, clear, and drag reorder are available.
+- Images are fitted to A4 during export.
+- All processing remains browser-local except loading the PDF libraries from CDN.
