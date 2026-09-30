@@ -112,39 +112,10 @@ try{
     const se=page.locator('[data-resize="se"]');
     assert.equal(await se.isVisible(),true);
     const a=await se.boundingBox();assert(a);
-    await page.evaluate(()=>{
-      window.__resizeEvents=[];
-      for(const type of ['pointerdown','pointermove','pointerup']){
-        document.addEventListener(type,e=>{
-          if(window.__resizeEvents.length>35)return;
-          window.__resizeEvents.push({
-            type,
-            target:e.target?.getAttribute?.('data-resize')||e.target?.id||e.target?.tagName,
-            x:Math.round(e.clientX),y:Math.round(e.clientY)
-          });
-        },true);
-      }
-    });
     const original=Number(await page.locator('#nlpdfContentScale').inputValue());
     await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();
     await page.mouse.move(a.x+a.width/2+25,a.y+a.height/2+26,{steps:7});await page.mouse.up();
     const after=Number(await page.locator('#nlpdfContentScale').inputValue());
-    if(after===original){
-      console.log('RESIZE DEBUG',JSON.stringify(await page.evaluate(()=>{
-        const el=document.querySelector('[data-resize="se"]');
-        const root=document.querySelector('#nlpdfTransformLayer');
-        const b=el.getBoundingClientRect();
-        return {
-          events:window.__resizeEvents,
-          originalElement:el.outerHTML,
-          hitAtHandle:document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)?.outerHTML?.slice(0,220),
-          rootDisplay:getComputedStyle(root).display,
-          rootPointerEvents:getComputedStyle(root).pointerEvents,
-          handlePointerEvents:getComputedStyle(el).pointerEvents,
-          currentScale:document.querySelector('#nlpdfContentScale')?.value
-        };
-      })));
-    }
     assert(after!==original,'resize handle should alter page scale');
     await page.keyboard.press('Control+z');
     assert.equal(Number(await page.locator('#nlpdfContentScale').inputValue()),original);
@@ -210,23 +181,8 @@ try{
     await page.waitForTimeout(250);
     await page.locator('#nlpdfFilmstrip').evaluate(el=>el.scrollTop=0);
     await page.locator('#nlpdfFilmstrip [data-page-id]').first().click();
-    console.log('SELECTED BEFORE DRAG:',JSON.stringify(await page.locator('#nlpdfFilmstrip .nlpdf-page-card.selected').evaluateAll(nodes=>nodes.map(n=>n.dataset.pageId))));
-    await page.evaluate(()=>{
-      window.__dragTrace=[];
-      const el=document.querySelector('#nlpdfFilmstrip');
-      ['dragstart','dragenter','dragover','drop','dragend'].forEach(type=>{
-        el.addEventListener(type,e=>{
-          if(window.__dragTrace.length<30)window.__dragTrace.push({
-            type,target:e.target?.closest?.('[data-page-id],[data-stack]')?.getAttribute('data-page-id')||e.target?.getAttribute?.('data-stack')||e.target?.tagName,
-            defaultPrevented:e.defaultPrevented,
-            effect:e.dataTransfer?.dropEffect
-          });
-        },true);
-      });
-    });
     await page.locator('#nlpdfFilmstrip [data-page-id]').first().dragTo(page.locator('#nlpdfFilmstrip [data-page-id]').nth(1));
     await page.waitForTimeout(180);
-    console.log('DRAG TRACE:',JSON.stringify(await page.evaluate(()=>window.__dragTrace)));
     const after=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
     assert.notEqual(after,first,'dragging should reorder the page rail');
     await page.keyboard.press('Control+z');
