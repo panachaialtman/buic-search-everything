@@ -400,6 +400,7 @@ async function renderActive(){
   const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,840,1188);
   $('#nlpdfSafeGuide')?.classList.toggle('hidden',!state.safeArea);
   if(!p){
+    updateTransformOverlay(null);showSnapGuides(false,false);
     hint.classList.remove('hidden');badge.classList.add('hidden');dragHint.classList.add('hidden');
     $('#nlpdfCropLayer').classList.add('hidden');
     renderSignature(Boolean(state.assets.signature&&$('#nlpdfUseSignature')?.checked));
@@ -410,14 +411,15 @@ async function renderActive(){
   badge.textContent='Document page '+(state.pages.findIndex(x=>x.id===p.id)+1);
   const temp=document.createElement('canvas');
   try{
-    await drawPageToCanvas(p,temp,840,1188);
+    const rendered=await drawPageToCanvas(p,temp,840,1188);
     if(epoch!==state.renderEpoch)return;
     ctx.clearRect(0,0,840,1188);ctx.drawImage(temp,0,0);
+    updateTransformOverlay(rendered);
   }catch(err){if(epoch===state.renderEpoch){console.error(err);setStatus('Preview unavailable: '+err.message);}}
   if(epoch!==state.renderEpoch)return;
   if(state.cropMode)updateCropOverlay();
   else $('#nlpdfCropLayer').classList.add('hidden');
-  renderSignature(Boolean(state.assets.signature&&$('#nlpdfUseSignature')?.checked&&!state.cropMode));
+  renderSignature(Boolean(signatureApplies(p)&&!state.cropMode));
   syncPageControls();
 }
 function signatureApplies(p){
@@ -674,6 +676,89 @@ async function confirmExport(){
     closeExport();setStatus('Ready · Export complete');
   }catch(err){console.error(err);toast(err.message||'Could not create output.');setStatus('Export failed');}
   finally{state.busy=false;$('#nlpdfConfirmExport').disabled=false;updateControls();}
+}
+
+
+/* Movable floating tool panels */
+function setupToolRail(){
+  const flyout=$('#nlpdfToolFlyout'),content=$('#nlpdfToolFlyoutContent');
+  const map={
+    crop:$('#nlpdfCropPanel'),safe:$('#nlpdfSafePanel'),space:$('#nlpdfSpacePanel')
+  };
+  for(const panel of Object.values(map)){if(panel){content.appendChild(panel);panel.classList.add('hidden');}}
+  const label={crop:'Crop tool',safe:'Safe area',space:'Make Space'};
+  function close(){
+    state.toolOpen='';
+    flyout.classList.add('hidden');
+    for(const panel of Object.values(map))panel?.classList.add('hidden');
+    $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.remove('active'));
+  }
+  function open(key){
+    if(key==='rotate'){
+      rotateSelected(90);return;
+    }
+    if(state.toolOpen===key){close();return;}
+    state.toolOpen=key;
+    flyout.classList.remove('hidden');
+    $('#nlpdfToolFlyoutTitle').textContent=label[key]||'Tools';
+    for(const [id,panel] of Object.entries(map))panel?.classList.toggle('hidden',id!==key);
+    $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool===key));
+  }
+  $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.addEventListener('click',()=>open(b.dataset.tool)));
+  $('#nlpdfToolFlyoutClose').addEventListener('click',close);
+  window.addEventListener('pointerdown',e=>{
+    if(state.toolOpen&&!e.target.closest('#nlpdfToolRail,#nlpdfToolFlyout'))close();
+  });
+  state.closeToolFlyout=close;
+  state.openToolFlyout=open;
+}
+function updateTransformOverlay(L){
+  const wrap=$('#nlpdfTransformLayer');
+  if(!wrap)return;
+  const p=activePage();
+  if(!p||state.cropMode||!L){wrap.classList.add('hidden');state.contentBounds=null;return;}
+  state.contentBounds={...L,pageId:p.id};
+  wrap.classList.remove('hidden');
+  wrap.style.left=(L.x/840*100)+'%';
+  wrap.style.top=(L.y/1188*100)+'%';
+  wrap.style.width=(L.w/840*100)+'%';
+  wrap.style.height=(L.h/1188*100)+'%';
+}
+function setupResizeDrag(){
+  const layer=$('#nlpdfTransformLayer'),paper=$('#nlpdfPaper');
+  let gesture=null;
+  layer.addEventListener('pointerdown',e=>{
+    const grip=e.target.closest('[data-resize]');
+    const p=activePage(),L=state.contentBounds;
+    if(!grip||!p||!L||state.cropMode||e.button!==0)return;
+    const r=paper.getBoundingClientRect();
+    gesture={
+      grip:grip.dataset.resize,x:e.clientX,y:e.clientY,
+      scale:p.transform.scale,
+      width:Math.max(15,L.w/840*r.width),height:Math.max(15,L.h/1188*r.height)
+    };
+    grip.setPointerCapture(e.pointerId);e.preventDefault();e.stopPropagation();
+  });
+  layer.addEventListener('pointermove',e=>{
+    if(!gesture)return;
+    const p=activePage();if(!p)return;
+    const {grip,x,y,scale,width,height}=gesture;
+    const sx=grip.includes('e')?1:-1,sy=grip.includes('s')?1:-1;
+    const fx=1+sx*(e.clientX-x)/width,fy=1+sy*(e.clientY-y)/height;
+    const multiplier=Math.max(.1,(fx+fy)/2);
+    p.transform.scale=clamp(scale*multiplier,.3,2);
+    renderActive();
+  });
+  const finish=()=>{
+    if(!gesture)return;gesture=null;
+    recordEdit();renderFilmstrip();
+    if(state.viewMode==='grid')renderGrid();
+  };
+  layer.addEventListener('pointerup',finish);layer.addEventListener('pointercancel',finish);
+}
+function showSnapGuides(x,y){
+  $('#nlpdfSnapX')?.classList.toggle('hidden',!x);
+  $('#nlpdfSnapY')?.classList.toggle('hidden',!y);
 }
 
 /* Events */
