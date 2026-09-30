@@ -103,11 +103,11 @@ function workspaceMarkup(){
       '<input class="nlpdf-asset-input" id="nlpdfAssetInput" type="file">'+
     '</aside>'+
     '<main class="nlpdf-editor">'+
-      '<nav class="nlpdf-toolrail" id="nlpdfToolRail" aria-label="Page tools"><button type="button" data-tool="crop" title="Crop page" aria-label="Crop page">✂</button><button type="button" data-tool="safe" title="Safe area" aria-label="Safe area">◇</button><button type="button" data-tool="space" title="Make Space" aria-label="Make Space">▤</button><button type="button" data-tool="rotate" title="Rotate clockwise" aria-label="Rotate clockwise">↻</button></nav><div class="nlpdf-tool-flyout hidden" id="nlpdfToolFlyout"><div class="nlpdf-tool-flyout-head"><strong id="nlpdfToolFlyoutTitle">Tools</strong><button type="button" id="nlpdfToolFlyoutClose" aria-label="Close tools">×</button></div><div id="nlpdfToolFlyoutContent"></div></div>'+ 
+      '<nav class="nlpdf-toolrail" id="nlpdfToolRail" aria-label="Page tools"><button type="button" data-tool="crop" title="Crop page" aria-label="Crop page">✂</button><button type="button" data-tool="safe" title="Safe area" aria-label="Safe area">◇</button><button type="button" data-tool="space" title="Make Space" aria-label="Make Space">▤</button><button id="nlpdfRotateRight" type="button" data-tool="rotate" title="Rotate clockwise 90°" aria-label="Rotate clockwise 90°" disabled>↻</button></nav><div class="nlpdf-tool-flyout hidden" id="nlpdfToolFlyout"><div class="nlpdf-tool-flyout-head"><strong id="nlpdfToolFlyoutTitle">Tools</strong><button type="button" id="nlpdfToolFlyoutClose" aria-label="Close tools">×</button></div><div id="nlpdfToolFlyoutContent"></div></div>'+ 
       '<div class="nlpdf-toolbar">'+
         '<button class="nlpdf-tool" id="nlpdfUndo" type="button" disabled title="Undo (Ctrl+Z)">↶ Undo</button><button class="nlpdf-tool" id="nlpdfRedo" type="button" disabled title="Redo (Ctrl+Y)">↷ Redo</button>'+ 
         '<button class="nlpdf-tool primary" id="nlpdfAddFiles" type="button">+ Add files / ZIP</button>'+
-        '<button class="nlpdf-tool" id="nlpdfRotateRight" type="button" disabled>↻ Rotate 90°</button>'+
+        ''+
         '<button class="nlpdf-tool" id="nlpdfMoveFirst" type="button" disabled>⇤ First</button><button class="nlpdf-tool" id="nlpdfMoveUp" type="button" disabled>← Earlier</button><button class="nlpdf-tool" id="nlpdfMoveDown" type="button" disabled>Later →</button><button class="nlpdf-tool" id="nlpdfMoveLast" type="button" disabled>Last ⇥</button>'+
         '<button class="nlpdf-tool" id="nlpdfDuplicate" type="button" disabled>⧉ Duplicate</button><button class="nlpdf-tool" id="nlpdfDelete" type="button" disabled>⌫ Delete</button>'+
         '<span class="nlpdf-toolbar-spacer"></span><span class="nlpdf-selection-label" id="nlpdfSelectionLabel">No page selected</span>'+
@@ -694,9 +694,7 @@ function setupToolRail(){
     $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.remove('active'));
   }
   function open(key){
-    if(key==='rotate'){
-      rotateSelected(90);return;
-    }
+    if(key==='rotate')return;
     if(state.toolOpen===key){close();return;}
     state.toolOpen=key;
     flyout.classList.remove('hidden');
@@ -772,7 +770,7 @@ function setupPageContainer(el){
   el.addEventListener('dblclick',e=>{const card=e.target.closest('[data-page-id]');if(card){selectPage(card.dataset.pageId,e);setView('single');}});
   el.addEventListener('dragstart',e=>{const card=e.target.closest('[data-page-id]');if(!card)return;state.dragId=card.dataset.pageId;card.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',state.dragId);});
   el.addEventListener('dragend',e=>{e.target.closest('[data-page-id]')?.classList.remove('dragging');$$('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));state.dragId='';});
-  el.addEventListener('dragover',e=>{if(!state.dragId)return;e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';$$('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));const card=e.target.closest('[data-page-id],[data-stack]');if(card)card.classList.add('drag-target');if(el.id==='nlpdfFilmstrip'){const r=el.getBoundingClientRect();if(e.clientX<r.left+45)el.scrollLeft-=23;else if(e.clientX>r.right-45)el.scrollLeft+=23;}});
+  el.addEventListener('dragover',e=>{if(!state.dragId)return;e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='move';$$('.drag-target',el).forEach(x=>x.classList.remove('drag-target'));const card=e.target.closest('[data-page-id],[data-stack]');if(card)card.classList.add('drag-target');if(el.id==='nlpdfFilmstrip'){const r=el.getBoundingClientRect();if(e.clientY<r.top+55)el.scrollTop-=28;else if(e.clientY>r.bottom-55)el.scrollTop+=28;}});
   el.addEventListener('drop',e=>{if(!state.dragId)return;e.preventDefault();e.stopPropagation();const card=e.target.closest('[data-page-id],[data-stack]'),dragged=state.dragId;if(card?.dataset.stack)moveToEdge(card.dataset.stack==='front'?'first':'last',dragged);else if(card?.dataset.pageId)reorder(dragged,card.dataset.pageId);else moveToEdge('last',dragged);state.dragId='';});
 }
 function setupContentDrag(){
@@ -838,7 +836,7 @@ async function build(){
   $$('[data-asset-import]').forEach(b=>b.addEventListener('click',()=>{state.pendingAsset=b.dataset.assetImport;const i=$('#nlpdfAssetInput');i.accept=state.pendingAsset==='signature'?'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp':'application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp';i.click();}));
   $$('[data-asset-remove]').forEach(b=>b.addEventListener('click',()=>removeAsset(b.dataset.assetRemove).catch(err=>toast(err.message))));
   $('#nlpdfAssetInput').addEventListener('change',async e=>{const f=e.target.files?.[0];try{if(f&&state.pendingAsset)await importAsset(state.pendingAsset,f);}catch(err){console.error(err);toast(err.message||'Could not save asset.');}finally{e.target.value='';state.pendingAsset='';}});
-  ['nlpdfUseFront','nlpdfUseBack'].forEach(id=>$('#'+id).addEventListener('change',()=>{savePrefs();renderFilmstrip();renderGrid();}));
+  ['nlpdfUseFront','nlpdfUseBack'].forEach(id=>$('#'+id).addEventListener('change',()=>{savePrefs();renderFilmstrip();renderGrid();recordEdit();}));
   ['nlpdfUseSignature','nlpdfSigScope'].forEach(id=>$('#'+id).addEventListener('change',()=>{if(id==='nlpdfSigScope'&&$('#nlpdfSigScope').value==='page')state.signaturePageId=state.activeId||state.pages[0]?.id||'';savePrefs();renderActive();recordEdit();}));
   $('#nlpdfSigSize').addEventListener('input',e=>{state.sig.widthPct=Number(e.target.value)/100;$('#nlpdfSigSizeValue').textContent=e.target.value+'%';state.sig.xPct=clamp(state.sig.xPct,0,1-state.sig.widthPct);savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked));if(activePage()?.makeSpace)renderActive();});
   $('#nlpdfResetSignature').addEventListener('click',()=>{state.sig.xPct=.72;state.sig.yPct=.80;state.sig.widthPct=.22;$('#nlpdfSigSize').value=22;$('#nlpdfSigSizeValue').textContent='22%';savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked));if(activePage()?.makeSpace)renderActive();});
@@ -848,6 +846,8 @@ async function build(){
   $('#nlpdfApplyCrop').addEventListener('click',applyCrop);
   $('#nlpdfCancelCrop').addEventListener('click',cancelCrop);
   $('#nlpdfResetCrop').addEventListener('click',resetCrop);
+  $('#nlpdfContentScale').addEventListener('change',recordEdit);
+  $('#nlpdfSigSize').addEventListener('change',recordEdit);
   $('#nlpdfContentScale').addEventListener('input',e=>{
     const pg=activePage();if(!pg||state.cropMode)return;
     pg.transform.scale=Number(e.target.value)/100;
@@ -857,7 +857,7 @@ async function build(){
   $('#nlpdfCenterContent').addEventListener('click',centerContent);
   $('#nlpdfResetTransform').addEventListener('click',resetTransform);
   $('#nlpdfSafeArea').addEventListener('change',e=>{
-    state.safeArea=e.target.checked;savePrefs();renderAll();
+    state.safeArea=e.target.checked;savePrefs();renderAll();recordEdit();
   });
   $('#nlpdfApplySpace').addEventListener('click',()=>applySpace(false));
   $('#nlpdfClearSpace').addEventListener('click',()=>applySpace(true));
