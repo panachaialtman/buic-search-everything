@@ -174,17 +174,17 @@
   }
 
   async function renderPdfToCanvas(doc,pageNum,canvas,opts={}){
-    const page=await doc.getPage(pageNum),base=page.getViewport({scale:1,rotation:opts.rotation||0}),maxW=opts.maxW||760,maxH=opts.maxH||1040,scale=Math.min(maxW/base.width,maxH/base.height),vp=page.getViewport({scale,rotation:opts.rotation||0}),temp=document.createElement('canvas'),ctx=temp.getContext('2d',{alpha:false});temp.width=Math.max(1,Math.floor(vp.width));temp.height=Math.max(1,Math.floor(vp.height));await page.render({canvasContext:ctx,viewport:vp}).promise;drawCroppedAndSpaced(temp,canvas,opts.crop||defaultCrop(),opts.space||defaultSpace());}
-  function drawCroppedAndSpaced(source,canvas,crop,space){
+    const page=await doc.getPage(pageNum),base=page.getViewport({scale:1,rotation:opts.rotation||0}),maxW=opts.maxW||760,maxH=opts.maxH||1040,scale=Math.min(maxW/base.width,maxH/base.height),vp=page.getViewport({scale,rotation:opts.rotation||0}),temp=document.createElement('canvas'),ctx=temp.getContext('2d',{alpha:false});temp.width=Math.max(1,Math.floor(vp.width));temp.height=Math.max(1,Math.floor(vp.height));await page.render({canvasContext:ctx,viewport:vp}).promise;drawCroppedAndSpaced(temp,canvas,opts.crop||defaultCrop(),opts.space||defaultSpace(),opts.maxW||900,opts.maxH||1180);}
+  function drawCroppedAndSpaced(source,canvas,crop,space,maxW=900,maxH=1180){
     const l=clamp(crop.left||0,0,40)/100,r=clamp(crop.right||0,0,40)/100,t=clamp(crop.top||0,0,40)/100,b=clamp(crop.bottom||0,0,40)/100;
     const sx=Math.floor(source.width*l),sy=Math.floor(source.height*t),sw=Math.max(1,Math.floor(source.width*(1-l-r))),sh=Math.max(1,Math.floor(source.height*(1-t-b)));
-    const maxW=900,maxH=1180,spaceRatio=clamp((space.bottomMM||0)/297,0,.25),usableH=maxH*(1-spaceRatio),scale=Math.min(maxW/sw,usableH/sh),dw=Math.max(1,Math.floor(sw*scale)),dh=Math.max(1,Math.floor(sh*scale));
+    const spaceRatio=clamp((space.bottomMM||0)/297,0,.25),usableH=maxH*(1-spaceRatio),scale=Math.min(maxW/sw,usableH/sh),dw=Math.max(1,Math.floor(sw*scale)),dh=Math.max(1,Math.floor(sh*scale));
     canvas.width=dw;canvas.height=Math.max(1,Math.floor(dh+maxH*spaceRatio));const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(source,sx,sy,sw,sh,0,0,dw,dh);
   }
   async function renderImageToCanvas(srcUrl,canvas,opts={}){
     const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=srcUrl;}),temp=document.createElement('canvas'),rot=((opts.rotation||0)%360+360)%360;
     if(rot===90||rot===270){temp.width=img.naturalHeight;temp.height=img.naturalWidth;}else{temp.width=img.naturalWidth;temp.height=img.naturalHeight;}
-    const ctx=temp.getContext('2d');ctx.save();if(rot===90){ctx.translate(temp.width,0);ctx.rotate(Math.PI/2);}else if(rot===180){ctx.translate(temp.width,temp.height);ctx.rotate(Math.PI);}else if(rot===270){ctx.translate(0,temp.height);ctx.rotate(-Math.PI/2);}ctx.drawImage(img,0,0);ctx.restore();drawCroppedAndSpaced(temp,canvas,opts.crop||defaultCrop(),opts.space||defaultSpace());
+    const ctx=temp.getContext('2d');ctx.save();if(rot===90){ctx.translate(temp.width,0);ctx.rotate(Math.PI/2);}else if(rot===180){ctx.translate(temp.width,temp.height);ctx.rotate(Math.PI);}else if(rot===270){ctx.translate(0,temp.height);ctx.rotate(-Math.PI/2);}ctx.drawImage(img,0,0);ctx.restore();drawCroppedAndSpaced(temp,canvas,opts.crop||defaultCrop(),opts.space||defaultSpace(),opts.maxW||900,opts.maxH||1180);
   }
 
   async function renderViewer(){
@@ -287,7 +287,7 @@
   async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice());state.pdfLibDocs.set(k,d);return d;}
   async function embedImage(out,bytes,mime){return mime==='image/jpeg'?await out.embedJpg(bytes):await out.embedPng(bytes);}
   async function rasterizeImageForExport(p){
-    const src=state.sources.get(p.sourceKey),canvas=document.createElement('canvas');await renderImageToCanvas(p.previewUrl,canvas,{rotation:p.rotation,crop:p.crop,space:p.space});const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));return new Uint8Array(await blob.arrayBuffer());
+    const src=state.sources.get(p.sourceKey),canvas=document.createElement('canvas');await renderImageToCanvas(p.previewUrl,canvas,{rotation:p.rotation,crop:p.crop,space:{bottomMM:0},maxW:1600,maxH:2200});const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));return new Uint8Array(await blob.arrayBuffer());
   }
   function drawEmbedded(outPage,embedded,rotation,spaceMM){
     const margin=28,spacePts=(spaceMM||0)*72/25.4,availW=A4.width-margin*2,availH=A4.height-margin*2-spacePts,rot=((rotation||0)%360+360)%360,srcW=embedded.width,srcH=embedded.height,rotW=(rot===90||rot===270)?srcH:srcW,rotH=(rot===90||rot===270)?srcW:srcH,scale=Math.min(availW/rotW,availH/rotH),w=srcW*scale,h=srcH*scale,shownW=rotW*scale,shownH=rotH*scale,x=(A4.width-shownW)/2,y=spacePts+margin+(availH-shownH)/2;
