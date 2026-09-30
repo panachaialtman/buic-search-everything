@@ -482,7 +482,11 @@ function reorder(a,b){
   const moving=state.pages.filter(p=>ids.has(p.id)),rest=state.pages.filter(p=>!ids.has(p.id));
   if(!moving.length||ids.has(b))return;
   const j=rest.findIndex(p=>p.id===b);if(j<0)return;
-  rest.splice(j,0,...moving);
+  const sourcePosition=state.pages.findIndex(p=>p.id===a);
+  const targetPosition=state.pages.findIndex(p=>p.id===b);
+  // Drop downwards means AFTER the target; drop upwards means BEFORE it.
+  // Always inserting before made dragging onto the next page a no-op.
+  rest.splice(j+(sourcePosition<targetPosition?1:0),0,...moving);
   state.pages=rest;state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);renderAll();recordEdit();
 }
 function moveToEdge(edge,draggedId=null){
