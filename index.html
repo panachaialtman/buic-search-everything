@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="red-blue">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -29,18 +29,15 @@
       <div class="top-actions">
         <div class="theme-picker-wrap">
           <button class="ghost-btn theme-btn" id="themeToggle" type="button" title="Choose theme" aria-label="Choose theme" aria-expanded="false">
-            <span class="theme-icon" id="themeIcon">◐</span>
-            <span id="themeLabel">Light</span>
+            <span class="theme-icon" id="themeIcon">◒</span>
+            <span id="themeLabel">Light Red-Blue</span>
             <span class="theme-caret">⌄</span>
           </button>
           <div class="theme-menu hidden" id="themeMenu" role="menu">
-            <button type="button" data-theme-choice="light"><span class="theme-swatch swatch-light"></span><span>Light</span></button>
+            <button type="button" data-theme-choice="light"><span class="theme-swatch swatch-light"></span><span>White</span></button>
             <button type="button" data-theme-choice="dark"><span class="theme-swatch swatch-dark"></span><span>Dark</span></button>
-            <button type="button" data-theme-choice="graphite"><span class="theme-swatch swatch-graphite"></span><span>Graphite Gray</span></button>
-            <button type="button" data-theme-choice="purple-night"><span class="theme-swatch swatch-purple"></span><span>Purple Night</span></button>
+            <button type="button" data-theme-choice="graphite"><span class="theme-swatch swatch-graphite"></span><span>Graphite Grey</span></button>
             <button type="button" data-theme-choice="red-blue"><span class="theme-swatch swatch-redblue"></span><span>Light Red-Blue</span></button>
-            <button type="button" data-theme-choice="forest"><span class="theme-swatch swatch-forest"></span><span>Forest</span></button>
-            <button type="button" data-theme-choice="sand"><span class="theme-swatch swatch-sand"></span><span>Warm Sand</span></button>
           </div>
         </div>
         <button class="ghost-btn data-status-compact" id="dataStatusBtn" type="button" title="View data status">
@@ -201,16 +198,9 @@
         </div>
       </section>
 
-      <section id="workspaceExtend" class="workspace-pane workspace-page extend-letter-workspace">
-        <div class="extend-letter-head">
-          <div>
-            <div class="hero-eyebrow">EXTEND LETTER</div>
-            <h1>Visa extension case workspace</h1>
-            <p>Uses the existing local-first New Student Visa workspace. Student cases, settings, history and imported Word templates stay in the browser.</p>
-          </div>
-          <a class="secondary-btn link-btn" href="/new-student-local/" target="_blank" rel="noopener">Open standalone fallback</a>
-        </div>
-        <iframe class="extend-letter-frame" src="/new-student-local/" title="Extend Letter visa workspace"></iframe>
+      <section id="workspaceExtend" class="workspace-pane extend-letter-workspace" aria-label="Visa extension case workspace">
+        <a class="secondary-btn link-btn extend-letter-fallback" href="/new-student-local/" target="_blank" rel="noopener" title="Open visa workspace in a separate tab">↗ Open standalone fallback</a>
+        <iframe class="extend-letter-frame" src="/new-student-local/" title="Visa extension case workspace" loading="lazy" allow="clipboard-read; clipboard-write"></iframe>
       </section>
 
       <section id="workspaceData" class="workspace-pane workspace-page">
