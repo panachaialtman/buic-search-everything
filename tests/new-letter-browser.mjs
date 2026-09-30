@@ -71,7 +71,6 @@ try{
     await page.locator('[data-tool="safe"]').click();
     assert.equal(await page.locator('#nlpdfSafeArea').isChecked(),true);
     assert.equal(await visible('#nlpdfToolFlyout'),false);
-    await page.locator('#nlpdfToolFlyoutClose').click();
     assert.equal(await visible('#nlpdfToolFlyout'),false);
   });
   await run('Only four website themes; first-visit default persists',async()=>{
