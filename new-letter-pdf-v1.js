@@ -789,7 +789,7 @@ function setupToolRail(){
     state.toolOpen='';
     flyout.classList.add('hidden');
     for(const panel of Object.values(map))panel?.classList.add('hidden');
-    $$('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.remove('active'));
+    $('[data-tool="crop"],[data-tool="space"]', $('#nlpdfToolRail')).forEach(b=>b.classList.remove('active'));
   }
   function open(key){
     if(key==='rotate')return;
