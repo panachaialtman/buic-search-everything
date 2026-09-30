@@ -382,3 +382,12 @@ html[data-theme-mode="dark"] .new-student-btn{color:#e0959d}
 .info-label,.floating-info-label{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .source-context-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e53935;box-shadow:0 0 0 2px rgba(229,57,53,.12);flex:0 0 auto;cursor:help;vertical-align:middle}
 html[data-theme-mode="dark"] .source-context-dot{box-shadow:0 0 0 2px rgba(255,90,85,.16)}
+
+
+/* V4.7 — integrated Extend Letter workspace */
+.extend-letter-workspace{padding:0!important;overflow:hidden;background:var(--bg,#f5f7fb)}
+.extend-letter-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:22px 28px 18px;border-bottom:1px solid var(--line,#dfe5ee);background:var(--surface,#fff)}
+.extend-letter-head h1{margin:4px 0 6px}
+.extend-letter-head p{margin:0;max-width:860px;color:var(--muted,#667085)}
+.extend-letter-frame{display:block;width:100%;height:calc(100vh - 210px);min-height:680px;border:0;background:#f4f7fb}
+@media (max-width:900px){.extend-letter-head{flex-direction:column;padding:18px}.extend-letter-frame{height:calc(100vh - 250px);min-height:620px}}

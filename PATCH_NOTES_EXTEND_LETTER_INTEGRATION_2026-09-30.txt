@@ -1,0 +1,10 @@
+BU International Center Workspace V4.7 — Extend Letter integration
+Date: 2026-09-30
+
+- Renamed the existing Student Documents top-level workspace to New Letter.
+- Added Extend Letter as a new top-level workspace.
+- Extend Letter embeds the existing New Student Visa GitHub Pages app at /new-student-local/ so its local IndexedDB data, backup/restore format, Word generation, case management, settings, history, Central Hub reference integration, and existing test suite remain unchanged.
+- The original new-student-local repository/site remains untouched and available as the standalone fallback.
+- No student data is copied into Search Everything; the integrated view uses the existing browser-local privacy model.
+- Search Everything remains the outer shell with navigation:
+  Reference Search · Communication · New Letter · Extend Letter · Data.

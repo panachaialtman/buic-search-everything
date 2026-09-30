@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="light dark" />
-  <title>BU International Center Workspace V4.6</title>
+  <title>BU International Center Workspace V4.7</title>
   <link rel="stylesheet" href="vendor/flags.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -15,13 +15,14 @@
         <div class="brand-mark" aria-hidden="true">IC</div>
         <div>
           <div class="brand-title">BU International Center Workspace</div>
-          <div class="brand-subtitle">Reference · Communication · Student Documents</div>
+          <div class="brand-subtitle">Reference · Communication · New Letter · Extend Letter · Data</div>
         </div>
       </div>
           <nav class="workspace-nav" aria-label="Workspace sections">
       <button class="workspace-tab active" data-workspace="reference" type="button">Reference Search</button>
       <button class="workspace-tab" data-workspace="communication" type="button">Communication</button>
-      <button class="workspace-tab" data-workspace="documents" type="button">Student Documents</button>
+      <button class="workspace-tab" data-workspace="documents" type="button">New Letter</button>
+      <button class="workspace-tab" data-workspace="extend" type="button">Extend Letter</button>
       <button class="workspace-tab" data-workspace="data" type="button">Data</button>
     </nav>
       <div class="top-actions">
@@ -191,12 +192,24 @@
       </section>
 
       <section id="workspaceDocuments" class="workspace-pane workspace-page">
-        <div class="workspace-page-heading"><div><div class="hero-eyebrow">STUDENT DOCUMENTS</div><h1>Create the student folder and letter file.</h1><p>The folder workflow uses the same student number and name stored in the current case.</p></div></div>
+        <div class="workspace-page-heading"><div><div class="hero-eyebrow">NEW LETTER</div><h1>Create the student folder and letter file.</h1><p>The folder workflow uses the same student number and name stored in the current case.</p></div></div>
         <div class="document-workspace-grid">
           <article class="workspace-feature-card"><div class="feature-icon">📁</div><h2>Create student folder</h2><p>Creates <strong>Number + Name</strong> as the folder and copies the selected Word template as <strong>Letter_Name.docx</strong>.</p><button class="primary-btn" id="documentsCreateFolder" type="button">Create Folder</button></article>
           <article class="workspace-feature-card"><div class="feature-icon">📄</div><h2>Available Word types</h2><div class="template-pill-grid"><span>Bachelor Degree No IEN</span><span>Bachelor Degree</span><span>Current No IEN</span><span>Exchange Bachelor</span><span>Master Degree</span><span>Doctor Degree</span></div></article>
           <article class="workspace-feature-card case-summary-card"><div class="feature-icon">👤</div><h2>Current case</h2><div id="documentCaseSummary" class="case-summary">No student case entered yet.</div><button class="secondary-btn" id="documentsGoCommunication" type="button">Edit case in Communication</button></article>
         </div>
+      </section>
+
+      <section id="workspaceExtend" class="workspace-pane workspace-page extend-letter-workspace">
+        <div class="extend-letter-head">
+          <div>
+            <div class="hero-eyebrow">EXTEND LETTER</div>
+            <h1>Visa extension case workspace</h1>
+            <p>Uses the existing local-first New Student Visa workspace. Student cases, settings, history and imported Word templates stay in the browser.</p>
+          </div>
+          <a class="secondary-btn link-btn" href="/new-student-local/" target="_blank" rel="noopener">Open standalone fallback</a>
+        </div>
+        <iframe class="extend-letter-frame" src="/new-student-local/" title="Extend Letter visa workspace"></iframe>
       </section>
 
       <section id="workspaceData" class="workspace-pane workspace-page">
