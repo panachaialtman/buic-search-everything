@@ -389,3 +389,51 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
   .nlpdf-toolrail button{width:26px;height:28px;font-size:17px}
   .nlpdf-tool-flyout{left:40px;width:min(265px,calc(100vw - 148px))}
 }
+
+
+/* V8 export: status remains visible until the complete folder write */
+.nlpdf-modal-card{position:relative}
+.nlpdf-export-progress{
+  position:absolute;inset:0;z-index:80;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:11px;padding:34px;text-align:center;
+  background:color-mix(in srgb,var(--surface) 96%,transparent);
+  backdrop-filter:blur(7px);
+  border-radius:inherit;
+}
+.nlpdf-export-progress.hidden{display:none!important}
+.nlpdf-export-progress-spinner{
+  width:42px;height:42px;
+  border:4px solid var(--line);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:nlpdf-export-spin .8s linear infinite;
+}
+.nlpdf-export-progress-title{font-size:19px;font-weight:850;color:var(--text);letter-spacing:-.015em}
+.nlpdf-export-progress-detail{font-size:11px;color:var(--muted);max-width:325px;line-height:1.5}
+.nlpdf-export-progress-track{width:min(330px,100%);height:7px;border-radius:99px;background:var(--line);overflow:hidden}
+.nlpdf-export-progress-track>div{height:100%;border-radius:inherit;background:var(--accent);transition:width .16s ease-out}
+.nlpdf-export-progress-track>div.indeterminate{animation:nlpdf-export-loading 1.1s ease-in-out infinite alternate}
+.nlpdf-export-progress-counter{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.nlpdf-export-progress[data-mode="success"] .nlpdf-export-progress-spinner{
+  animation:none;
+  border:4px solid #15935d;
+  display:grid;place-items:center;
+}
+.nlpdf-export-progress[data-mode="success"] .nlpdf-export-progress-spinner::after{
+  content:"✓";font-weight:900;font-size:22px;color:#15935d;
+}
+.nlpdf-export-progress[data-mode="error"] .nlpdf-export-progress-spinner{
+  animation:none;border-color:#c74756;
+}
+.nlpdf-export-progress[data-mode="error"] .nlpdf-export-progress-spinner::after{
+  content:"!";font-size:22px;font-weight:850;color:#c74756;
+}
+.nlpdf-export-progress[data-mode="success"] .nlpdf-export-progress-track>div{background:#15935d}
+.nlpdf-export-progress[data-mode="error"] .nlpdf-export-progress-track>div{background:#c74756}
+@keyframes nlpdf-export-spin{to{transform:rotate(360deg)}}
+@keyframes nlpdf-export-loading{from{transform:translateX(-80%)}to{transform:translateX(130%)}}
+@media(prefers-reduced-motion:reduce){
+ .nlpdf-export-progress-spinner,.nlpdf-export-progress-track>div{animation:none!important}
+}
