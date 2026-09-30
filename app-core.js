@@ -985,8 +985,10 @@
   function clearRecent(){localStorage.removeItem(RECENT_KEY);localStorage.removeItem(LEGACY_RECENT_KEY);renderRecent();toast('Search history cleared.');}
 
   const THEMES={
-    'light':{label:'Light',mode:'light',icon:'☀'},'dark':{label:'Dark',mode:'dark',icon:'◐'},'graphite':{label:'Graphite',mode:'dark',icon:'◼'},
-    'purple-night':{label:'Purple Night',mode:'dark',icon:'◆'},'red-blue':{label:'Red-Blue',mode:'light',icon:'◒'},'forest':{label:'Forest',mode:'light',icon:'●'},'sand':{label:'Warm Sand',mode:'light',icon:'◐'}
+    'light':{label:'White',mode:'light',icon:'☀'},
+    'dark':{label:'Dark',mode:'dark',icon:'◐'},
+    'graphite':{label:'Graphite Grey',mode:'dark',icon:'◼'},
+    'red-blue':{label:'Light Red-Blue',mode:'light',icon:'◒'}
   };
   function applyTheme(theme){
     const key=THEMES[theme]?theme:'light',cfg=THEMES[key];
@@ -995,7 +997,7 @@
     $$('[data-theme-choice]').forEach(b=>b.classList.toggle('active',b.dataset.themeChoice===key));
     try{localStorage.setItem(THEME_KEY,key);}catch{}
   }
-  function initTheme(){let saved='';try{saved=localStorage.getItem(THEME_KEY)||'';}catch{}applyTheme(THEMES[saved]?saved:'light');}
+  function initTheme(){let saved='';try{saved=localStorage.getItem(THEME_KEY)||'';}catch{}applyTheme(THEMES[saved]?saved:'red-blue');}
   function toggleThemeMenu(force){const menu=$('#themeMenu');if(!menu)return;const open=typeof force==='boolean'?force:menu.classList.contains('hidden');menu.classList.toggle('hidden',!open);$('#themeToggle').setAttribute('aria-expanded',String(open));}
 
   function openLetterCreator(){
