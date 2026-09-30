@@ -244,7 +244,6 @@ function cropRotateRaster(src,p){
   const rot=((p.rotation||0)%360+360)%360, out=document.createElement('canvas');if(rot===90||rot===270){out.width=sh;out.height=sw;}else{out.width=sw;out.height=sh;}
   const x=out.getContext('2d');x.save();if(rot===90){x.translate(out.width,0);x.rotate(Math.PI/2);}else if(rot===180){x.translate(out.width,out.height);x.rotate(Math.PI);}else if(rot===270){x.translate(0,out.height);x.rotate(-Math.PI/2);}x.drawImage(src,sx,sy,sw,sh,0,0,sw,sh);x.restore();return out;
 }
-async 
 function layoutOnSheet(p,imgWidth,imgHeight,w,h){
   const mmX=w/A4.wMM,mmY=h/A4.hMM;
   const pad=state.safeArea?25.4:8;
