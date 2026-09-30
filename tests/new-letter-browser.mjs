@@ -207,6 +207,8 @@ try{
     const first=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
     const last=await page.locator('#nlpdfFilmstrip [data-page-id]').last().getAttribute('data-page-id');
     assert.notEqual(first,last);
+    await page.waitForTimeout(250);
+    await page.locator('#nlpdfFilmstrip').evaluate(el=>el.scrollTop=0);
     await page.locator('#nlpdfFilmstrip [data-page-id]').first().click();
     console.log('SELECTED BEFORE DRAG:',JSON.stringify(await page.locator('#nlpdfFilmstrip .nlpdf-page-card.selected').evaluateAll(nodes=>nodes.map(n=>n.dataset.pageId))));
     await page.evaluate(()=>{
@@ -222,7 +224,7 @@ try{
         },true);
       });
     });
-    await page.locator('#nlpdfFilmstrip [data-page-id]').first().dragTo(page.locator('#nlpdfFilmstrip [data-page-id]').last());
+    await page.locator('#nlpdfFilmstrip [data-page-id]').first().dragTo(page.locator('#nlpdfFilmstrip [data-page-id]').nth(1));
     await page.waitForTimeout(180);
     console.log('DRAG TRACE:',JSON.stringify(await page.evaluate(()=>window.__dragTrace)));
     const after=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
