@@ -112,10 +112,39 @@ try{
     const se=page.locator('[data-resize="se"]');
     assert.equal(await se.isVisible(),true);
     const a=await se.boundingBox();assert(a);
+    await page.evaluate(()=>{
+      window.__resizeEvents=[];
+      for(const type of ['pointerdown','pointermove','pointerup']){
+        document.addEventListener(type,e=>{
+          if(window.__resizeEvents.length>35)return;
+          window.__resizeEvents.push({
+            type,
+            target:e.target?.getAttribute?.('data-resize')||e.target?.id||e.target?.tagName,
+            x:Math.round(e.clientX),y:Math.round(e.clientY)
+          });
+        },true);
+      }
+    });
     const original=Number(await page.locator('#nlpdfContentScale').inputValue());
     await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();
     await page.mouse.move(a.x+a.width/2+25,a.y+a.height/2+26,{steps:7});await page.mouse.up();
     const after=Number(await page.locator('#nlpdfContentScale').inputValue());
+    if(after===original){
+      console.log('RESIZE DEBUG',JSON.stringify(await page.evaluate(()=>{
+        const el=document.querySelector('[data-resize="se"]');
+        const root=document.querySelector('#nlpdfTransformLayer');
+        const b=el.getBoundingClientRect();
+        return {
+          events:window.__resizeEvents,
+          originalElement:el.outerHTML,
+          hitAtHandle:document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)?.outerHTML?.slice(0,220),
+          rootDisplay:getComputedStyle(root).display,
+          rootPointerEvents:getComputedStyle(root).pointerEvents,
+          handlePointerEvents:getComputedStyle(el).pointerEvents,
+          currentScale:document.querySelector('#nlpdfContentScale')?.value
+        };
+      })));
+    }
     assert(after!==original,'resize handle should alter page scale');
     await page.keyboard.press('Control+z');
     assert.equal(Number(await page.locator('#nlpdfContentScale').inputValue()),original);
