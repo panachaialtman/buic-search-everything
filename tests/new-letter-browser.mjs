@@ -63,13 +63,32 @@ try{
     assert.equal(await visible('#nlpdfFilmstripWrap'),true);
   });
   await run('Floating Crop/Safe Area/Make Space buttons respond',async()=>{
-    for(const id of ['crop','safe','space']){
+    for(const id of ['crop','space']){
       await page.locator('[data-tool="'+id+'"]').click();
       assert.equal(await visible('#nlpdfToolFlyout'),true,id);
-      assert.equal(await visible('#nlpdf'+(id==='crop'?'CropPanel':id==='safe'?'SafePanel':'SpacePanel')),true,id);
+      assert.equal(await visible('#nlpdf'+(id==='crop'?'CropPanel':'SpacePanel')),true,id);
     }
+    await page.locator('[data-tool="safe"]').click();
+    assert.equal(await page.locator('#nlpdfSafeArea').isChecked(),true);
+    assert.equal(await visible('#nlpdfToolFlyout'),false);
     await page.locator('#nlpdfToolFlyoutClose').click();
     assert.equal(await visible('#nlpdfToolFlyout'),false);
+  });
+  await run('Only four website themes; first-visit default persists',async()=>{
+    const choices=await page.locator('[data-theme-choice]').evaluateAll(nodes=>nodes.map(n=>n.dataset.themeChoice));
+    assert.deepEqual(choices,['light','dark','graphite','red-blue']);
+    assert.equal(await page.locator('html').getAttribute('data-theme'),'red-blue');
+    await page.locator('#themeToggle').click();
+    await page.locator('[data-theme-choice="graphite"]').click();
+    assert.equal(await page.locator('html').getAttribute('data-theme'),'graphite');
+    await page.locator('#themeToggle').click();
+    await page.locator('[data-theme-choice="red-blue"]').click();
+    assert.equal(await page.locator('html').getAttribute('data-theme'),'red-blue');
+  });
+  await run('Page ordering controls are absent and floating plus is available',async()=>{
+    assert.equal(await page.locator('#nlpdfMoveFirst,#nlpdfMoveUp,#nlpdfMoveDown,#nlpdfMoveLast').count(),0);
+    assert.equal(await page.locator('#nlpdfAddFiles').isVisible(),true);
+    assert.equal(await page.locator('#nlpdfResetSignature,#nlpdfResetTransform,#nlpdfResetCrop').count(),0);
   });
   await run('Add Files button imports two images and updates page count',async()=>{
     await page.locator('#nlpdfAddFiles').click();
@@ -135,10 +154,11 @@ try{
     assert.equal(await page.locator('#nlpdfRedo').isDisabled(),false);
   });
   await run('Safe Area toggle and Make Space respond',async()=>{
-    await page.locator('[data-tool="safe"]').click();
     await page.locator('#nlpdfSafeArea').check();
     assert.equal(await visible('#nlpdfSafeGuide'),true);
-    await page.locator('#nlpdfToolFlyoutClose').click();
+    const bar=await page.locator('.nlpdf-toolbar').boundingBox();
+    const safe=await page.locator('#nlpdfSafePanel').boundingBox();
+    assert(bar&&safe&&safe.y>=bar.y-2&&safe.y+safe.height<=bar.y+bar.height+2,'Safe Area must appear in top toolbar');
     await asset('signature','signature-qa.png');
     assert.equal(await page.locator('#nlpdfUseSignature').isChecked(),true);
     await page.locator('[data-tool="space"]').click();
@@ -158,20 +178,21 @@ try{
     await page.locator('#nlpdfGridView').click();
     assert.equal(await visible('#nlpdfGridStage'),true);
     assert.equal(await page.locator('#nlpdfGrid [data-page-id]').count(),3);
-    await page.locator('#nlpdfGrid [data-page-id]').nth(1).click();
-    await page.locator('#nlpdfSingleView').click();
+    await page.locator('#nlpdfGrid [data-page-id]').nth(1).dblclick();
     assert.equal(await visible('#nlpdfStage'),true);
+    assert.equal(await page.locator('#nlpdfSingleView').getAttribute('class')?.then(c=>c.includes('active')),true);
     assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').count(),3);
   });
-  await run('Selected page reorder can be undone',async()=>{
-    const first=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
+  await run('Arrow keys move between pages without reordering',async()=>{
     await page.locator('#nlpdfFilmstrip [data-page-id]').first().click();
-    await page.locator('#nlpdfMoveLast').click();
-    const last=await page.locator('#nlpdfFilmstrip [data-page-id]').last().getAttribute('data-page-id');
-    assert.equal(first,last);
-    await page.keyboard.press('Control+z');
-    const restored=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
-    assert.equal(restored,first);
+    const first=await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id');
+    const second=await page.locator('#nlpdfFilmstrip [data-page-id]').nth(1).getAttribute('data-page-id');
+    await page.keyboard.press('ArrowRight');
+    assert.match(await text('#nlpdfSelectionLabel'),/active page 2/);
+    await page.keyboard.press('ArrowLeft');
+    assert.match(await text('#nlpdfSelectionLabel'),/active page 1/);
+    assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id'),first);
+    assert.notEqual(first,second);
   });
 
   await run('Right-side preview rail can reorder by dragging and undo',async()=>{
@@ -243,6 +264,25 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert(bounds.canvas.bottom<=bounds.f.top+2,'canvas stops above footer');
     await page.setViewportSize({width:1440,height:900});
   });
+  await run('Mirrored empty-stage horizontal drags zoom and unzoom paper',async()=>{
+    await page.locator('#nlpdfSingleView').click();
+    await page.locator('#nlpdfZoomFit').click();
+    const leftBefore=await page.locator('#nlpdfPaper').evaluate(el=>el.getBoundingClientRect().width);
+    const paper=await page.locator('#nlpdfPaper').boundingBox();const stage=await page.locator('#nlpdfStage').boundingBox();
+    assert(paper&&stage);
+    const y=paper.y+paper.height*.5;
+    const xLeft=Math.max(stage.x+18,paper.x-26);
+    await page.mouse.move(xLeft,y);await page.mouse.down();await page.mouse.move(xLeft-95,y,{steps:7});await page.mouse.up();
+    const leftAfter=await page.locator('#nlpdfPaper').evaluate(el=>el.getBoundingClientRect().width);
+    assert(leftAfter>leftBefore,'left-side drag left must zoom in');
+    await page.locator('#nlpdfZoomFit').click();
+    const restored=await page.locator('#nlpdfPaper').boundingBox();assert(restored);
+    const xRight=Math.min(stage.x+stage.width-18,restored.x+restored.width+25);
+    await page.mouse.move(xRight,y);await page.mouse.down();await page.mouse.move(xRight+90,y,{steps:7});await page.mouse.up();
+    const rightAfter=await page.locator('#nlpdfPaper').evaluate(el=>el.getBoundingClientRect().width);
+    assert(rightAfter>leftBefore,'right-side drag right must zoom in');
+    await page.locator('#nlpdfZoomFit').click();
+  });
   await run('Default asset enable/disable can be undone',async()=>{
     const front=page.locator('#nlpdfUseFront');
     assert.equal(await front.isChecked(),true);
@@ -303,6 +343,23 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await visible('#nlpdfExportModal'),false);
   });
 
+  await run('Extend Letter occupies full available viewport and keeps fallback',async()=>{
+    await page.locator('[data-workspace="extend"]').click();
+    await page.locator('#workspaceExtend').waitFor({state:'visible',timeout:10000});
+    const bounds=await page.evaluate(()=>{
+      const header=document.querySelector('.topbar').getBoundingClientRect();
+      const pane=document.querySelector('#workspaceExtend').getBoundingClientRect();
+      const frame=document.querySelector('#workspaceExtend .extend-letter-frame').getBoundingClientRect();
+      return {headerBottom:header.bottom,top:pane.top,bottom:pane.bottom,width:pane.width,frameHeight:frame.height,height:innerHeight,viewportWidth:innerWidth};
+    });
+    assert(bounds.top>=bounds.headerBottom-2&&bounds.top<=bounds.headerBottom+2);
+    assert(bounds.bottom<=bounds.height+2&&bounds.bottom>=bounds.height-2);
+    assert(bounds.width>=bounds.viewportWidth-2);
+    assert(bounds.frameHeight>=bounds.height-bounds.headerBottom-2);
+    assert.equal(await page.locator('.extend-letter-fallback').isVisible(),true);
+    await page.locator('[data-workspace="documents"]').click();
+    assert.equal(await page.locator('#nlpdfAddFiles').isVisible(),true);
+  });
   await run('No browser runtime errors occurred during editor operations',async()=>{
     assert.deepEqual(errors,[]);
   });
