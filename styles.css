@@ -391,3 +391,49 @@ html[data-theme-mode="dark"] .source-context-dot{box-shadow:0 0 0 2px rgba(255,9
 .extend-letter-head p{margin:0;max-width:860px;color:var(--muted,#667085)}
 .extend-letter-frame{display:block;width:100%;height:calc(100vh - 210px);min-height:680px;border:0;background:#f4f7fb}
 @media (max-width:900px){.extend-letter-head{flex-direction:column;padding:18px}.extend-letter-frame{height:calc(100vh - 250px);min-height:620px}}
+
+
+/* V9 — immersive Extend Letter canvas, retaining standalone fallback */
+#workspaceExtend.extend-letter-workspace{
+  position:fixed!important;
+  inset:var(--bu-topbar-bottom,72px) 0 0 0!important;
+  width:100vw!important;
+  height:auto!important;
+  min-height:0!important;
+  max-width:none!important;
+  max-height:none!important;
+  padding:0!important;
+  margin:0!important;
+  overflow:hidden!important;
+  background:var(--bg);
+  border:0;
+  z-index:24;
+}
+#workspaceExtend.extend-letter-workspace:not(.active){display:none!important}
+#workspaceExtend.extend-letter-workspace.active{display:block!important}
+#workspaceExtend .extend-letter-frame{
+  position:absolute!important;
+  inset:0!important;
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  max-height:none!important;
+  border:0!important;
+}
+#workspaceExtend .extend-letter-fallback{
+  position:absolute;
+  top:12px;right:16px;
+  z-index:3;
+  padding:9px 13px;
+  border:1px solid var(--line-strong);
+  box-shadow:0 5px 22px rgba(20,37,65,.13);
+  background:var(--surface);
+  color:var(--text);
+  font-size:11px;
+  font-weight:750;
+  border-radius:10px;
+  text-decoration:none;
+  white-space:nowrap;
+}
+#workspaceExtend .extend-letter-fallback:hover{background:var(--accent-soft);color:var(--accent)}
