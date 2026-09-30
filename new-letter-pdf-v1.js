@@ -773,10 +773,17 @@ function updateTransformOverlay(L){
   if(!p||state.cropMode||!L){wrap.classList.add('hidden');state.contentBounds=null;return;}
   state.contentBounds={...L,pageId:p.id};
   wrap.classList.remove('hidden');
-  wrap.style.left=(L.x/840*100)+'%';
-  wrap.style.top=(L.y/1188*100)+'%';
-  wrap.style.width=(L.w/840*100)+'%';
-  wrap.style.height=(L.h/1188*100)+'%';
+  // Keep the resize grips inside the paper even when content has been dragged beyond A4.
+  // The document itself may extend beyond the clipped A4; the grips must remain accessible.
+  const inset=10;
+  const left=clamp(L.x,inset,840-inset-22);
+  const top=clamp(L.y,inset,1188-inset-22);
+  const right=clamp(L.x+L.w,left+22,840-inset);
+  const bottom=clamp(L.y+L.h,top+22,1188-inset);
+  wrap.style.left=(left/840*100)+'%';
+  wrap.style.top=(top/1188*100)+'%';
+  wrap.style.width=((right-left)/840*100)+'%';
+  wrap.style.height=((bottom-top)/1188*100)+'%';
 }
 function setupResizeDrag(){
   const layer=$('#nlpdfTransformLayer'),paper=$('#nlpdfPaper');
