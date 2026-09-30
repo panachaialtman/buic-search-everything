@@ -111,7 +111,7 @@ try{
   await run('Footer Create Folder opens the existing folder setup',async()=>{
     await page.locator('#nlpdfCreateFolderOnly').click();
     assert.equal(await page.locator('#letterModal').getAttribute('aria-hidden'),'false');
-    await page.locator('#letterModal [data-close-letter]').first().click();
+    await page.locator('#letterModal button[data-close-letter]').first().click();
     assert.equal(await page.locator('#letterModal').getAttribute('aria-hidden'),'true');
   });
   await run('Add Files button imports two images and updates page count',async()=>{
