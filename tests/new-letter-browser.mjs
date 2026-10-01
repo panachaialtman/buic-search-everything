@@ -315,6 +315,33 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.keyboard.press('Control+z');
     assert.equal(await front.isChecked(),true);
   });
+  await run('Clear All removes only imported document pages and Undo restores them',async()=>{
+    assert.equal(await count(),5);
+    assert.equal(await page.locator('#nlpdfClearAll').isVisible(),true);
+    assert.equal(await page.locator('text=Selection').count(),0);
+    const before={
+      front:await page.locator('#nlpdfUseFront').isChecked(),
+      back:await page.locator('#nlpdfUseBack').isChecked(),
+      signature:await page.locator('#nlpdfUseSignature').isChecked(),
+      safe:await page.locator('#nlpdfSafeArea').isChecked(),
+      sigSize:await page.locator('#nlpdfSigSize').inputValue()
+    };
+    await page.locator('#nlpdfClearAll').click();
+    await awaitCount(0);
+    assert.equal(Number(await text('#nlpdfFileCount')),0);
+    assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').count(),0);
+    assert.equal(await page.locator('#nlpdfFilmstrip [data-stack]').count(),2);
+    assert.equal(await page.locator('#nlpdfUseFront').isChecked(),before.front);
+    assert.equal(await page.locator('#nlpdfUseBack').isChecked(),before.back);
+    assert.equal(await page.locator('#nlpdfUseSignature').isChecked(),before.signature);
+    assert.equal(await page.locator('#nlpdfSafeArea').isChecked(),before.safe);
+    assert.equal(await page.locator('#nlpdfSigSize').inputValue(),before.sigSize);
+    assert.equal(await page.locator('#nlpdfCreate').isDisabled(),true);
+    await page.keyboard.press('Control+z');
+    await awaitCount(5);
+    assert.equal(Number(await text('#nlpdfFileCount')),5);
+  });
+
   await run('Navigation out of New Letter and back preserves editor operation',async()=>{
     await page.locator('[data-workspace="reference"]').click();
     await page.locator('[data-workspace="documents"]').click();
@@ -367,7 +394,9 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await visible('#nlpdfExportModal'),false);
   });
 
-  await run('Extend Letter occupies full available viewport and keeps fallback',async()=>{
+  await run('Current Letter fills the viewport, exposes reserved topics, and keeps fallback in Settings',async()=>{
+    assert.equal((await page.locator('[data-workspace="extend"]').innerText()).trim(),'Current Letter');
+    assert.equal((await page.locator('.brand-subtitle').innerText()).includes('Extend Letter'),false);
     await page.locator('[data-workspace="extend"]').click();
     await page.locator('#workspaceExtend').waitFor({state:'visible',timeout:10000});
     const bounds=await page.evaluate(()=>{
@@ -383,6 +412,17 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await page.locator('.extend-letter-fallback').count(),0);
     const visa=page.frameLocator('#workspaceExtend .extend-letter-frame');
     await visa.locator('[data-view="settings"]').waitFor({state:'visible',timeout:30000});
+    for(const [key,title] of [['cancel','Cancel'],['graduated','Graduated'],['criminal_record','Criminal Record']]){
+      const nav=visa.locator('[data-view="placeholder"][data-placeholder="'+key+'"]');
+      await nav.click();
+      assert.equal((await visa.locator('#pageTitle').innerText()).trim(),title);
+      assert.equal((await visa.locator('#placeholderView').innerText()).trim(),'');
+      assert.equal(await visa.locator('#placeholderView').getAttribute('class').then(v=>v.includes('active')),true);
+      assert.equal(await visa.locator('#draftsBtn').isVisible(),false);
+      assert.equal(await visa.locator('#addStudentBtn').isVisible(),false);
+    }
+    await visa.locator('[data-view="workspace"][data-case-category="normal"]').click();
+    assert.equal(await visa.locator('#addStudentBtn').isVisible(),true);
     await visa.locator('[data-view="settings"]').click();
     await visa.locator('#settingsPanel_general').waitFor({state:'visible',timeout:12000});
     await visa.locator('#embeddedStandaloneSettingsCard').waitFor({state:'visible',timeout:12000});
