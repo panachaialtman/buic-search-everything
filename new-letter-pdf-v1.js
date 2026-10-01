@@ -318,7 +318,7 @@ async function sourceRaster(p){
   let canvas;
   if(p.kind==='pdf'){
     const doc=state.pdfJsDocs.get(p.sourceKey),page=await doc.getPage(p.sourcePage),base=page.getViewport({scale:1}),scale=Math.min(2,1500/base.width),vp=page.getViewport({scale});
-    canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.floor(vp.width));canvas.height=Math.max(1,Math.floor(vp.height));await page.render({canvasContext:canvas.getContext('2d',{alpha:false}),viewport:vp}).promise;
+    canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.floor(vp.width));canvas.height=Math.max(1,Math.floor(vp.height));await page.render({canvasContext:canvas.getContext('2d',{alpha:false}),viewport:vp,intent:'display',annotationMode:pdfCanvasAnnotationMode()}).promise;
   }else{
     const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=p.previewUrl;});
     canvas=document.createElement('canvas');const scale=Math.min(1,1800/img.naturalWidth,2400/img.naturalHeight);canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
@@ -680,6 +680,36 @@ async function canvasPngBytes(canvas){
   if(!png)throw new Error('Could not render PDF page.');
   return new Uint8Array(await png.arrayBuffer());
 }
+function pdfCanvasAnnotationMode(){
+  const modes=window.pdfjsLib?.AnnotationMode;
+  return modes?.ENABLE_STORAGE??modes?.ENABLE??1;
+}
+async function pdfPageHasAnnotations(p){
+  if(!p||p.kind!=='pdf')return false;
+  const doc=state.pdfJsDocs.get(p.sourceKey);
+  if(!doc)return true;
+  try{
+    const page=await doc.getPage(p.sourcePage);
+    const annotations=await page.getAnnotations({intent:'any'});
+    return Array.isArray(annotations)&&annotations.length>0;
+  }catch(err){
+    console.warn('Could not inspect PDF annotations; using raster-safe export for '+p.fileName+'.',err);
+    return true;
+  }
+}
+async function pdfBytesHaveAnnotations(bytes){
+  const doc=await window.pdfjsLib.getDocument({data:bytes.slice()}).promise;
+  try{
+    for(let n=1;n<=doc.numPages;n++){
+      const page=await doc.getPage(n),annotations=await page.getAnnotations({intent:'any'});
+      if(Array.isArray(annotations)&&annotations.length)return true;
+    }
+    return false;
+  }catch(err){
+    console.warn('Could not inspect PDF annotations; using raster-safe asset export.',err);
+    return true;
+  }finally{doc.destroy?.();}
+}
 async function renderPdfPageForExport(doc,pageNumber,maxWidth=2000){
   const page=await doc.getPage(pageNumber),base=page.getViewport({scale:1});
   const scale=Math.max(1,Math.min(3,maxWidth/Math.max(1,base.width)));
@@ -688,7 +718,7 @@ async function renderPdfPageForExport(doc,pageNumber,maxWidth=2000){
   canvas.width=Math.max(1,Math.ceil(viewport.width));canvas.height=Math.max(1,Math.ceil(viewport.height));
   const ctx=canvas.getContext('2d',{alpha:false});
   ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
-  await page.render({canvasContext:ctx,viewport,intent:'print'}).promise;
+  await page.render({canvasContext:ctx,viewport,intent:'display',annotationMode:pdfCanvasAnnotationMode()}).promise;
   return {canvas,base};
 }
 async function addRasterizedDocPage(out,p){
@@ -703,6 +733,10 @@ async function addRasterizedDocPage(out,p){
 }
 async function addDocPage(out,p){
   if(p.kind==='pdf'){
+    // pdf-lib embedPage copies page content streams but not page annotations/widgets.
+    // Rasterize annotated PDFs so added text, form values, highlights and other
+    // visible overlays are flattened into the exported page instead of disappearing.
+    if(await pdfPageHasAnnotations(p))return addRasterizedDocPage(out,p);
     try{
       const src=await sourcePdfDoc(p.sourceKey),sp=src.getPage(p.sourcePage-1),sz=sp.getSize(),c=p.crop;
       const sourceRot=pdfSourceVisualRotation(sp);
@@ -742,6 +776,9 @@ async function appendAsset(out,a){
   if(!a)return 0;
   const bytes=new Uint8Array(await a.blob.arrayBuffer());
   if(a.type==='application/pdf'||/\.pdf$/i.test(a.name)){
+    // copyPages can lose AcroForm structure/field appearances. Preserve what the
+    // user can actually see by flattening annotated default PDFs through PDF.js.
+    if(await pdfBytesHaveAnnotations(bytes))return appendPdfAssetRasterized(out,bytes);
     try{
       const src=await window.PDFLib.PDFDocument.load(bytes.slice()),pages=await out.copyPages(src,src.getPageIndices());
       pages.forEach(p=>out.addPage(p));return pages.length;
