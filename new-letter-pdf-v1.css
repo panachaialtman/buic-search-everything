@@ -687,3 +687,78 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
   font-size:9px;
   line-height:1.35;
 }
+
+
+/* V14 — crop mode is canvas-first: no hint pills, bottom-centre Accept/Cancel controls */
+#workspaceDocuments.nlpdf-primary .nlpdf-content-drag-hint,
+#workspaceDocuments.nlpdf-primary .nlpdf-empty-drop{
+  display:none!important;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-crop-actions{
+  position:absolute;
+  z-index:58;
+  left:50%;
+  bottom:16px;
+  transform:translateX(-50%);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:6px;
+  border:1px solid var(--line-strong);
+  border-radius:13px;
+  background:color-mix(in srgb,var(--surface) 96%,transparent);
+  box-shadow:0 10px 30px rgba(15,23,42,.16);
+  backdrop-filter:blur(12px);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-crop-actions.hidden{display:none!important}
+#workspaceDocuments.nlpdf-primary .nlpdf-crop-actions button{
+  min-width:94px;
+  height:36px;
+  border-radius:9px;
+  padding:0 14px;
+  font:inherit;
+  font-size:11px;
+  font-weight:800;
+  cursor:pointer;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-crop-apply{
+  border:1px solid #176d4b;
+  background:#176d4b;
+  color:#fff;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-crop-apply:hover{filter:brightness(1.06)}
+#workspaceDocuments.nlpdf-primary .nlpdf-crop-cancel{
+  border:1px solid var(--line-strong);
+  background:var(--surface);
+  color:var(--text);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-crop-cancel:hover{
+  border-color:var(--accent);
+  color:var(--accent);
+  background:var(--accent-soft);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-stage:has(#nlpdfCropLayer:not(.hidden)){
+  cursor:default;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-stage:has(#nlpdfCropLayer:not(.hidden))::after{
+  content:"Click empty space to accept";
+  position:absolute;
+  left:50%;
+  bottom:62px;
+  transform:translateX(-50%);
+  z-index:56;
+  pointer-events:none;
+  padding:4px 8px;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--surface) 90%,transparent);
+  color:var(--muted);
+  border:1px solid var(--line);
+  font-size:8px;
+  font-weight:700;
+}
+@media(max-width:680px){
+  #workspaceDocuments.nlpdf-primary .nlpdf-crop-actions{bottom:10px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-crop-actions button{min-width:82px;padding-inline:10px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-stage:has(#nlpdfCropLayer:not(.hidden))::after{bottom:55px}
+}
