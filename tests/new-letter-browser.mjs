@@ -62,17 +62,43 @@ try{
     assert.equal(await visible('#nlpdfCreate'),true);
     assert.equal(await visible('#nlpdfFilmstripWrap'),true);
   });
-  await run('Crop and Make Space work without duplicate Safe Area dock button',async()=>{
+  await run('Crop starts immediately while Make Space keeps its flyout',async()=>{
     assert.equal(await page.locator('[data-tool="safe"]').count(),0);
-    for(const id of ['crop','space']){
-      await page.locator('[data-tool="'+id+'"]').click();
-      assert.equal(await visible('#nlpdfToolFlyout'),true,id);
-      assert.equal(await visible('#nlpdf'+(id==='crop'?'CropPanel':'SpacePanel')),true,id);
-    }
+    assert.equal(await page.getByText('Whole workspace accepts drag & drop',{exact:true}).count(),0);
+    assert.equal(await page.getByText('Drag page content to move',{exact:true}).count(),0);
+    assert.equal(await page.locator('[data-tool="crop"]').isDisabled(),true);
+    await page.locator('[data-tool="space"]').click();
+    assert.equal(await visible('#nlpdfToolFlyout'),true);
+    assert.equal(await visible('#nlpdfSpacePanel'),true);
     await page.locator('#nlpdfToolFlyoutClose').click();
     assert.equal(await visible('#nlpdfToolFlyout'),false);
     assert.equal(await visible('#nlpdfSafePanel'),true);
   });
+  await run('Embassy reference uses P.R. China and active Thimphu honorary consulate',async()=>{
+    const result=await page.evaluate(()=>{
+      const d=window.REFERENCE_SNAPSHOT;
+      const h=d.Embassy[0],ix=Object.fromEntries(h.map((v,i)=>[v,i]));
+      const rows=d.Embassy.slice(1);
+      const china=rows.filter(r=>r[ix['Country / Territory EN']]==='China');
+      const thimphu=rows.find(r=>r[0]==='E102');
+      return {
+        china:china.map(r=>r[ix['Current Display Name EN']]||r[ix['Display Name EN']]),
+        thimphu:{
+          active:thimphu?.[ix.Active],
+          display:thimphu?.[ix['Current Display Name EN']]||thimphu?.[ix['Display Name EN']],
+          address:thimphu?.[ix['Current Address EN']]||thimphu?.[ix['Address EN']],
+          thai:thimphu?.[ix['Current Official Name TH']]||thimphu?.[ix['Official Name TH']]
+        }
+      };
+    });
+    assert(result.china.length>=9);
+    assert(result.china.every(v=>/P\.R\. China$/.test(v)),JSON.stringify(result.china));
+    assert.equal(result.thimphu.active,'YES');
+    assert.equal(result.thimphu.display,'Royal Thai Honorary Consulate General in Thimphu, Bhutan');
+    assert.match(result.thimphu.address,/Singye Office Building/);
+    assert.equal(result.thimphu.thai,'สถานกงสุลกิตติมศักดิ์ ณ กรุงทิมพู ราชอาณาจักรภูฏาน');
+  });
+
   await run('Only four website themes; first-visit default persists',async()=>{
     const choices=await page.locator('[data-theme-choice]').evaluateAll(nodes=>nodes.map(n=>n.dataset.themeChoice));
     assert.deepEqual(choices,['light','dark','graphite','red-blue']);
@@ -163,19 +189,32 @@ try{
     await page.keyboard.press('Control+z');
     assert.equal(Number(await page.locator('#nlpdfContentScale').inputValue()),original);
   });
-  await run('Crop keeps its current rotation, Apply and Undo work',async()=>{
+  await run('Crop icon enters crop mode; controls are bottom-center; empty click accepts',async()=>{
     await page.locator('[data-tool="crop"]').click();
-    await page.locator('#nlpdfStartCrop').click();
     assert.equal(await visible('#nlpdfCropLayer'),true);
+    assert.equal(await visible('#nlpdfToolFlyout'),false);
     assert.equal(await visible('#nlpdfApplyCrop'),true);
+    assert.equal(await visible('#nlpdfCancelCrop'),true);
+    const stage=await page.locator('#nlpdfStage').boundingBox();
+    const apply=await page.locator('#nlpdfApplyCrop').boundingBox();
+    const cancel=await page.locator('#nlpdfCancelCrop').boundingBox();
+    assert(stage&&apply&&cancel);
+    assert(apply.x<cancel.x,'Accept crop must be left of Cancel');
+    assert(Math.abs((apply.x+cancel.x+cancel.width-stage.x*2-stage.width)/2)<90,'crop controls should be centered');
+    assert(cancel.y+cancel.height<=stage.y+stage.height+3&&cancel.y>stage.y+stage.height-90,'crop controls should sit at canvas bottom');
     const grip=page.locator('#nlpdfCropRegion [data-crop-handle="nw"]');
     const r=await grip.boundingBox();assert(r);
     await page.mouse.move(r.x+6,r.y+6);await page.mouse.down();
     await page.mouse.move(r.x+28,r.y+25,{steps:5});await page.mouse.up();
-    await page.locator('#nlpdfApplyCrop').click();
-    assert.equal(await visible('#nlpdfCropLayer'),false);
+    await page.mouse.click(stage.x+stage.width-12,stage.y+stage.height*.5);
+    await page.waitForFunction(()=>document.querySelector('#nlpdfCropLayer')?.classList.contains('hidden'));
+    assert.equal(await visible('#nlpdfApplyCrop'),false);
     await page.keyboard.press('Control+z');
     assert.equal(await page.locator('#nlpdfRedo').isDisabled(),false);
+    await page.locator('[data-tool="crop"]').click();
+    assert.equal(await visible('#nlpdfCropLayer'),true);
+    await page.locator('#nlpdfCancelCrop').click();
+    assert.equal(await visible('#nlpdfCropLayer'),false);
   });
   await run('Safe Area toggle and Make Space respond',async()=>{
     await page.locator('#nlpdfSafeArea').check();
@@ -340,6 +379,65 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.keyboard.press('Control+z');
     await awaitCount(5);
     assert.equal(Number(await text('#nlpdfFileCount')),5);
+  });
+
+  await run('PDF export rotation matches upright editor preview for intrinsically rotated source PDF',async()=>{
+    await page.evaluate(async()=>{
+      const pdf=await PDFLib.PDFDocument.create();
+      const p=pdf.addPage([300,420]);
+      p.drawRectangle({x:35,y:315,width:105,height:65,color:PDFLib.rgb(1,0,0)});
+      p.drawRectangle({x:160,y:40,width:105,height:65,color:PDFLib.rgb(0,0,1)});
+      p.setRotation(PDFLib.degrees(180));
+      const bytes=await pdf.save();
+      const dt=new DataTransfer();
+      dt.items.add(new File([bytes],'intrinsic-180.pdf',{type:'application/pdf'}));
+      document.querySelector('#nlpdfStage').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
+    });
+    await awaitCount(6);
+    await page.locator('#nlpdfFilmstrip [data-page-id]').last().click();
+    await page.locator('#nlpdfRotateRight').click();
+    await page.locator('#nlpdfRotateRight').click();
+    await page.waitForTimeout(350);
+    const preview=await page.locator('#nlpdfCanvas').evaluate(canvas=>{
+      const ctx=canvas.getContext('2d'),d=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+      let ry=0,rc=0,by=0,bc=0;
+      for(let y=0;y<canvas.height;y+=2)for(let x=0;x<canvas.width;x+=2){
+        const i=(y*canvas.width+x)*4,r=d[i],g=d[i+1],b=d[i+2];
+        if(r>180&&g<100&&b<100){ry+=y;rc++;}
+        if(b>180&&r<100&&g<100){by+=y;bc++;}
+      }
+      return {redY:rc?ry/rc:null,blueY:bc?by/bc:null,rc,bc};
+    });
+    assert(preview.rc>20&&preview.bc>20&&preview.redY<preview.blueY,JSON.stringify(preview));
+
+    const before=await page.evaluate(()=>window.__mockFiles.length);
+    await page.locator('#nlpdfCreate').click();
+    await page.locator('#nlpdfExportName').fill('Rotation QA');
+    await page.locator('#nlpdfChooseDestination').click();
+    await page.locator('#nlpdfConfirmExport').click();
+    await page.waitForFunction(()=>document.querySelector('#nlpdfExportProgress')?.dataset.mode==='success',{timeout:60000});
+    const exported=await page.evaluate(async before=>{
+      const file=window.__mockFiles.slice(before).find(f=>f.name.endsWith('.pdf'));
+      if(!file)return null;
+      const pdf=await pdfjsLib.getDocument({data:file.bytes.slice()}).promise;
+      const pg=await pdf.getPage(pdf.numPages-1); // final document page; no default back yet at this point
+      const vp=pg.getViewport({scale:1.2});
+      const canvas=document.createElement('canvas');canvas.width=Math.round(vp.width);canvas.height=Math.round(vp.height);
+      await pg.render({canvasContext:canvas.getContext('2d',{alpha:false}),viewport:vp}).promise;
+      const d=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+      let ry=0,rc=0,by=0,bc=0;
+      for(let y=0;y<canvas.height;y+=2)for(let x=0;x<canvas.width;x+=2){
+        const i=(y*canvas.width+x)*4,r=d[i],g=d[i+1],b=d[i+2];
+        if(r>180&&g<100&&b<100){ry+=y;rc++;}
+        if(b>180&&r<100&&g<100){by+=y;bc++;}
+      }
+      return {redY:rc?ry/rc:null,blueY:bc?by/bc:null,rc,bc,pages:pdf.numPages};
+    },before);
+    assert(exported&&exported.rc>20&&exported.bc>20&&exported.redY<exported.blueY,JSON.stringify(exported));
+    await page.waitForTimeout(1000);
+    await page.locator('#nlpdfFilmstrip [data-page-id]').last().click();
+    await page.keyboard.press('Backspace');
+    await awaitCount(5);
   });
 
   await run('Navigation out of New Letter and back preserves editor operation',async()=>{
