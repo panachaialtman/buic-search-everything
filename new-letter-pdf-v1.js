@@ -650,7 +650,7 @@ async function renderAll(){updateControls();const tasks=[renderActive()];if(stat
 function setView(mode){state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSingleView').classList.toggle('active',state.viewMode==='single');$('#nlpdfGridView').classList.toggle('active',state.viewMode==='grid');$('#nlpdfStage').classList.toggle('hidden',state.viewMode==='grid');$('#nlpdfGridStage').classList.toggle('hidden',state.viewMode!=='grid');$('#nlpdfFilmstripWrap').classList.toggle('hidden',state.viewMode==='grid');if(state.viewMode==='grid')renderGrid();else{renderFilmstrip();renderActive();requestAnimationFrame(fitPaper);}}
 
 /* Export */
-async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice(),{ignoreEncryption:true});state.pdfLibDocs.set(k,d);return d;}
+async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice());state.pdfLibDocs.set(k,d);return d;}
 
 function normalizeRightAngle(value){return ((Math.round((Number(value)||0)/90)*90)%360+360)%360;}
 function pdfSourceVisualRotation(page){
@@ -675,27 +675,84 @@ function drawEmbedded(page,embedded,p,visualRot){
   else{opts.x=L.x;opts.y=bottom+L.h;}
   page.drawPage(embedded,opts);
 }
+async function canvasPngBytes(canvas){
+  const png=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+  if(!png)throw new Error('Could not render PDF page.');
+  return new Uint8Array(await png.arrayBuffer());
+}
+async function renderPdfPageForExport(doc,pageNumber,maxWidth=2000){
+  const page=await doc.getPage(pageNumber),base=page.getViewport({scale:1});
+  const scale=Math.max(1,Math.min(3,maxWidth/Math.max(1,base.width)));
+  const viewport=page.getViewport({scale});
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.max(1,Math.ceil(viewport.width));canvas.height=Math.max(1,Math.ceil(viewport.height));
+  const ctx=canvas.getContext('2d',{alpha:false});
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  await page.render({canvasContext:ctx,viewport,intent:'print'}).promise;
+  return {canvas,base};
+}
+async function addRasterizedDocPage(out,p){
+  const doc=state.pdfJsDocs.get(p.sourceKey);
+  if(!doc)throw new Error('PDF preview source is unavailable.');
+  const rendered=await renderPdfPageForExport(doc,p.sourcePage),cropped=cropRotateRaster(rendered.canvas,p);
+  const image=await out.embedPng(await canvasPngBytes(cropped));
+  const page=out.addPage([A4.wPt,A4.hPt]);
+  const L=layoutOnSheet(p,image.width,image.height,A4.wPt,A4.hPt);
+  page.drawImage(image,{x:L.x,y:A4.hPt-L.y-L.h,width:L.w,height:L.h});
+  return page;
+}
 async function addDocPage(out,p){
   if(p.kind==='pdf'){
-    const src=await sourcePdfDoc(p.sourceKey),sp=src.getPage(p.sourcePage-1),sz=sp.getSize(),c=p.crop;
-    const sourceRot=pdfSourceVisualRotation(sp);
-    const visualRot=normalizeRightAngle(sourceRot+(p.rotation||0));
-    const sourceCrop=sourceCropForRotation(c,visualRot);const left=sz.width*sourceCrop.left/100,right=sz.width*(1-sourceCrop.right/100);
-    const bottom=sz.height*sourceCrop.bottom/100,top=sz.height*(1-sourceCrop.top/100);
-    const embedded=await out.embedPage(sp,{left,bottom,right,top});
-    const page=out.addPage([A4.wPt,A4.hPt]);drawEmbedded(page,embedded,p,visualRot);return page;
+    try{
+      const src=await sourcePdfDoc(p.sourceKey),sp=src.getPage(p.sourcePage-1),sz=sp.getSize(),c=p.crop;
+      const sourceRot=pdfSourceVisualRotation(sp);
+      const visualRot=normalizeRightAngle(sourceRot+(p.rotation||0));
+      const sourceCrop=sourceCropForRotation(c,visualRot);const left=sz.width*sourceCrop.left/100,right=sz.width*(1-sourceCrop.right/100);
+      const bottom=sz.height*sourceCrop.bottom/100,top=sz.height*(1-sourceCrop.top/100);
+      const embedded=await out.embedPage(sp,{left,bottom,right,top});
+      const page=out.addPage([A4.wPt,A4.hPt]);drawEmbedded(page,embedded,p,visualRot);return page;
+    }catch(err){
+      state.pdfLibDocs.delete(p.sourceKey);
+      console.warn('Vector PDF export unavailable; using PDF.js raster fallback for '+p.fileName+'.',err);
+      return addRasterizedDocPage(out,p);
+    }
   }
   const source=await sourceRaster(p),cropped=cropRotateRaster(source,p);
-  const png=await new Promise(res=>cropped.toBlob(res,'image/png'));
-  if(!png)throw new Error('Could not render image page.');
-  const image=await out.embedPng(new Uint8Array(await png.arrayBuffer()));
+  const image=await out.embedPng(await canvasPngBytes(cropped));
   const page=out.addPage([A4.wPt,A4.hPt]);
   const L=layoutOnSheet(p,image.width,image.height,A4.wPt,A4.hPt);
   page.drawImage(image,{x:L.x,y:A4.hPt-L.y-L.h,width:L.w,height:L.h});
   return page;
 }
 
-async function appendAsset(out,a){if(!a)return 0;const bytes=new Uint8Array(await a.blob.arrayBuffer());if(a.type==='application/pdf'||/\.pdf$/i.test(a.name)){const src=await window.PDFLib.PDFDocument.load(bytes,{ignoreEncryption:true}),pages=await out.copyPages(src,src.getPageIndices());pages.forEach(p=>out.addPage(p));return pages.length;}const img=a.type==='image/jpeg'?await out.embedJpg(bytes):await out.embedPng(bytes),pg=out.addPage([A4.wPt,A4.hPt]),m=22,fit=Math.min((A4.wPt-m*2)/img.width,(A4.hPt-m*2)/img.height),w=img.width*fit,h=img.height*fit;pg.drawImage(img,{x:(A4.wPt-w)/2,y:(A4.hPt-h)/2,width:w,height:h});return 1;}
+async function appendPdfAssetRasterized(out,bytes){
+  const doc=await window.pdfjsLib.getDocument({data:bytes.slice()}).promise;
+  try{
+    const count=doc.numPages;
+    for(let n=1;n<=count;n++){
+      const rendered=await renderPdfPageForExport(doc,n);
+      const image=await out.embedPng(await canvasPngBytes(rendered.canvas));
+      const page=out.addPage([rendered.base.width,rendered.base.height]);
+      page.drawImage(image,{x:0,y:0,width:rendered.base.width,height:rendered.base.height});
+    }
+    return count;
+  }finally{doc.destroy?.();}
+}
+async function appendAsset(out,a){
+  if(!a)return 0;
+  const bytes=new Uint8Array(await a.blob.arrayBuffer());
+  if(a.type==='application/pdf'||/\.pdf$/i.test(a.name)){
+    try{
+      const src=await window.PDFLib.PDFDocument.load(bytes.slice()),pages=await out.copyPages(src,src.getPageIndices());
+      pages.forEach(p=>out.addPage(p));return pages.length;
+    }catch(err){
+      console.warn('Vector PDF asset import unavailable; using PDF.js raster fallback for '+a.name+'.',err);
+      return appendPdfAssetRasterized(out,bytes);
+    }
+  }
+  const img=a.type==='image/jpeg'?await out.embedJpg(bytes):await out.embedPng(bytes),pg=out.addPage([A4.wPt,A4.hPt]),m=22,fit=Math.min((A4.wPt-m*2)/img.width,(A4.hPt-m*2)/img.height),w=img.width*fit,h=img.height*fit;
+  pg.drawImage(img,{x:(A4.wPt-w)/2,y:(A4.hPt-h)/2,width:w,height:h});return 1;
+}
 async function embedSignature(out){if(!state.assets.signature)return null;const b=new Uint8Array(await state.assets.signature.blob.arrayBuffer());return state.assets.signature.type==='image/jpeg'?await out.embedJpg(b):await out.embedPng(b);}
 
 function drawSignature(page,img){
