@@ -824,7 +824,7 @@ function setupToolRail(){
     state.toolOpen='';
     flyout.classList.add('hidden');
     for(const panel of Object.values(map))panel?.classList.add('hidden');
-    $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool==='crop'&&state.cropMode));
+    Array.from(document.querySelectorAll('#nlpdfToolRail [data-tool]')).forEach(b=>b.classList.toggle('active',b.dataset.tool==='crop'&&state.cropMode));
   }
   function open(key){
     if(key==='rotate')return;
@@ -832,7 +832,7 @@ function setupToolRail(){
       if(!activePage()||state.busy)return;
       close();
       if(!state.cropMode)startCrop();
-      $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool==='crop'));
+      Array.from(document.querySelectorAll('#nlpdfToolRail [data-tool]')).forEach(b=>b.classList.toggle('active',b.dataset.tool==='crop'));
       return;
     }
     if(state.toolOpen===key){close();return;}
@@ -840,9 +840,9 @@ function setupToolRail(){
     flyout.classList.remove('hidden');
     $('#nlpdfToolFlyoutTitle').textContent='Make Space';
     for(const [id,panel] of Object.entries(map))panel?.classList.toggle('hidden',id!==key);
-    $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool===key));
+    Array.from(document.querySelectorAll('#nlpdfToolRail [data-tool]')).forEach(b=>b.classList.toggle('active',b.dataset.tool===key));
   }
-  $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.addEventListener('click',()=>open(b.dataset.tool)));
+  Array.from(document.querySelectorAll('#nlpdfToolRail [data-tool]')).forEach(b=>b.addEventListener('click',()=>open(b.dataset.tool)));
   $('#nlpdfToolFlyoutClose').addEventListener('click',close);
   window.addEventListener('pointerdown',e=>{
     if(state.toolOpen&&!e.target.closest('#nlpdfToolRail,#nlpdfToolFlyout'))close();
