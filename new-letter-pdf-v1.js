@@ -650,7 +650,7 @@ async function renderAll(){updateControls();const tasks=[renderActive()];if(stat
 function setView(mode){state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSingleView').classList.toggle('active',state.viewMode==='single');$('#nlpdfGridView').classList.toggle('active',state.viewMode==='grid');$('#nlpdfStage').classList.toggle('hidden',state.viewMode==='grid');$('#nlpdfGridStage').classList.toggle('hidden',state.viewMode!=='grid');$('#nlpdfFilmstripWrap').classList.toggle('hidden',state.viewMode==='grid');if(state.viewMode==='grid')renderGrid();else{renderFilmstrip();renderActive();requestAnimationFrame(fitPaper);}}
 
 /* Export */
-async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice());state.pdfLibDocs.set(k,d);return d;}
+async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice(),{ignoreEncryption:true});state.pdfLibDocs.set(k,d);return d;}
 
 function normalizeRightAngle(value){return ((Math.round((Number(value)||0)/90)*90)%360+360)%360;}
 function pdfSourceVisualRotation(page){
@@ -695,7 +695,7 @@ async function addDocPage(out,p){
   return page;
 }
 
-async function appendAsset(out,a){if(!a)return 0;const bytes=new Uint8Array(await a.blob.arrayBuffer());if(a.type==='application/pdf'||/\.pdf$/i.test(a.name)){const src=await window.PDFLib.PDFDocument.load(bytes),pages=await out.copyPages(src,src.getPageIndices());pages.forEach(p=>out.addPage(p));return pages.length;}const img=a.type==='image/jpeg'?await out.embedJpg(bytes):await out.embedPng(bytes),pg=out.addPage([A4.wPt,A4.hPt]),m=22,fit=Math.min((A4.wPt-m*2)/img.width,(A4.hPt-m*2)/img.height),w=img.width*fit,h=img.height*fit;pg.drawImage(img,{x:(A4.wPt-w)/2,y:(A4.hPt-h)/2,width:w,height:h});return 1;}
+async function appendAsset(out,a){if(!a)return 0;const bytes=new Uint8Array(await a.blob.arrayBuffer());if(a.type==='application/pdf'||/\.pdf$/i.test(a.name)){const src=await window.PDFLib.PDFDocument.load(bytes,{ignoreEncryption:true}),pages=await out.copyPages(src,src.getPageIndices());pages.forEach(p=>out.addPage(p));return pages.length;}const img=a.type==='image/jpeg'?await out.embedJpg(bytes):await out.embedPng(bytes),pg=out.addPage([A4.wPt,A4.hPt]),m=22,fit=Math.min((A4.wPt-m*2)/img.width,(A4.hPt-m*2)/img.height),w=img.width*fit,h=img.height*fit;pg.drawImage(img,{x:(A4.wPt-w)/2,y:(A4.hPt-h)/2,width:w,height:h});return 1;}
 async function embedSignature(out){if(!state.assets.signature)return null;const b=new Uint8Array(await state.assets.signature.blob.arrayBuffer());return state.assets.signature.type==='image/jpeg'?await out.embedJpg(b):await out.embedPng(b);}
 
 function drawSignature(page,img){
