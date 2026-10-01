@@ -741,24 +741,7 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
 #workspaceDocuments.nlpdf-primary .nlpdf-stage:has(#nlpdfCropLayer:not(.hidden)){
   cursor:default;
 }
-#workspaceDocuments.nlpdf-primary .nlpdf-stage:has(#nlpdfCropLayer:not(.hidden))::after{
-  content:"Click empty space to accept";
-  position:absolute;
-  left:50%;
-  bottom:62px;
-  transform:translateX(-50%);
-  z-index:56;
-  pointer-events:none;
-  padding:4px 8px;
-  border-radius:999px;
-  background:color-mix(in srgb,var(--surface) 90%,transparent);
-  color:var(--muted);
-  border:1px solid var(--line);
-  font-size:8px;
-  font-weight:700;
-}
 @media(max-width:680px){
   #workspaceDocuments.nlpdf-primary .nlpdf-crop-actions{bottom:10px}
   #workspaceDocuments.nlpdf-primary .nlpdf-crop-actions button{min-width:82px;padding-inline:10px}
-  #workspaceDocuments.nlpdf-primary .nlpdf-stage:has(#nlpdfCropLayer:not(.hidden))::after{bottom:55px}
 }
