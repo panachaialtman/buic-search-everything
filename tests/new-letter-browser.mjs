@@ -450,6 +450,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
   });
 
   await run('Export modal shows processing, then success only after write completes',async()=>{
+    const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
     assert.equal(await visible('#nlpdfExportModal'),true);
     await page.locator('#nlpdfExportName').fill('Test Student');
@@ -457,10 +458,10 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfConfirmExport').click();
     await page.locator('#nlpdfExportProgress').waitFor({state:'visible',timeout:12000});
     assert.match(await text('#nlpdfProgressTitle'),/Creating in progress/);
-    const during=await page.evaluate(()=>window.__mockFiles.every(f=>!f.finished));
+    const during=await page.evaluate(before=>window.__mockFiles.slice(before).every(f=>!f.finished),before);
     assert.equal(during,true,'must not claim success before writes close');
     await page.waitForFunction(()=>document.querySelector('#nlpdfExportProgress')?.dataset.mode==='success',{timeout:60000});
-    const after=await page.evaluate(()=>window.__mockFiles.map(f=>({name:f.name,done:f.finished,size:f.bytes?.length||0})));
+    const after=await page.evaluate(before=>window.__mockFiles.slice(before).map(f=>({name:f.name,done:f.finished,size:f.bytes?.length||0})),before);
     assert(after.some(f=>f.name.endsWith('.pdf')&&f.done&&f.size>100),'export must save PDF bytes');
     assert.equal(after.every(f=>f.done),true);
     await page.waitForTimeout(1000);
