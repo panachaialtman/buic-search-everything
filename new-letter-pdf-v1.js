@@ -81,8 +81,7 @@ function workspaceMarkup(){
           '<div class="nlpdf-signature-controls"><select id="nlpdfSigScope" hidden aria-label="Signature scope"><option value="all">All document pages</option></select><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div>'+
         '</section>'+
         '<section class="nlpdf-panel" id="nlpdfCropPanel"><div class="nlpdf-panel-title"><strong>Crop tool</strong><span id="nlpdfActiveLabel">Select a page</span></div>'+
-          '<div class="nlpdf-note">Drag the edges or corners of the crop boundary directly on the A4 sheet.</div>'+
-          '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfStartCrop" type="button" disabled>⌗ Crop page</button><button class="nlpdf-btn hidden" id="nlpdfApplyCrop" type="button">✓ Apply crop</button><button class="nlpdf-btn hidden" id="nlpdfCancelCrop" type="button">Cancel</button></div>'+
+          '<div class="nlpdf-note">Crop mode starts immediately. Drag the edges or corners of the crop boundary directly on the A4 sheet.</div>'+
         '</section>'+
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Position & scale</strong><span>Drag content<br>inside A4</span></div>'+
           rangeMarkup('Content scale','nlpdfContentScale',55,150,1,100,'%')+
@@ -116,8 +115,8 @@ function workspaceMarkup(){
         '<div class="nlpdf-view-toggle"><button class="active" id="nlpdfSingleView" type="button">Single</button><button id="nlpdfGridView" type="button">Grid</button></div>'+
       '</div>'+
       '<section class="nlpdf-stage" id="nlpdfStage"><div class="nlpdf-drop-overlay">Drop PDF, images, or ZIP anywhere here</div>'+
-        '<div class="nlpdf-paper" id="nlpdfPaper"><canvas id="nlpdfCanvas" width="840" height="1188"></canvas><div id="nlpdfTransformLayer" class="nlpdf-transform-layer hidden"><i data-resize="nw"></i><i data-resize="ne"></i><i data-resize="sw"></i><i data-resize="se"></i></div><div id="nlpdfSnapX" class="nlpdf-snap-guide x hidden"></div><div id="nlpdfSnapY" class="nlpdf-snap-guide y hidden"></div><div class="nlpdf-safe-guide hidden" id="nlpdfSafeGuide"></div><div class="nlpdf-crop-layer hidden" id="nlpdfCropLayer"><div class="nlpdf-crop-region" id="nlpdfCropRegion"><i data-crop-handle="nw"></i><i data-crop-handle="n"></i><i data-crop-handle="ne"></i><i data-crop-handle="e"></i><i data-crop-handle="se"></i><i data-crop-handle="s"></i><i data-crop-handle="sw"></i><i data-crop-handle="w"></i></div></div><div class="nlpdf-paper-hint" id="nlpdfPaperHint"><div><strong>Blank A4</strong><span>Drop files onto the workspace or click “Add files / ZIP”.<br>Select a page to crop, move, scale, or make space.</span></div></div><span class="nlpdf-paper-badge hidden" id="nlpdfPaperBadge"></span><span class="nlpdf-content-drag-hint hidden" id="nlpdfDragHint">Drag page content to move</span><img class="nlpdf-signature-preview hidden" id="nlpdfSignaturePreview" alt="Signature"></div>'+
-        '<span class="nlpdf-empty-drop">Whole workspace accepts drag & drop</span>'+
+        '<div class="nlpdf-paper" id="nlpdfPaper"><canvas id="nlpdfCanvas" width="840" height="1188"></canvas><div id="nlpdfTransformLayer" class="nlpdf-transform-layer hidden"><i data-resize="nw"></i><i data-resize="ne"></i><i data-resize="sw"></i><i data-resize="se"></i></div><div id="nlpdfSnapX" class="nlpdf-snap-guide x hidden"></div><div id="nlpdfSnapY" class="nlpdf-snap-guide y hidden"></div><div class="nlpdf-safe-guide hidden" id="nlpdfSafeGuide"></div><div class="nlpdf-crop-layer hidden" id="nlpdfCropLayer"><div class="nlpdf-crop-region" id="nlpdfCropRegion"><i data-crop-handle="nw"></i><i data-crop-handle="n"></i><i data-crop-handle="ne"></i><i data-crop-handle="e"></i><i data-crop-handle="se"></i><i data-crop-handle="s"></i><i data-crop-handle="sw"></i><i data-crop-handle="w"></i></div></div><div class="nlpdf-paper-hint" id="nlpdfPaperHint"><div><strong>Blank A4</strong><span>Drop files onto the workspace or click “Add files / ZIP”.<br>Select a page to crop, move, scale, or make space.</span></div></div><span class="nlpdf-paper-badge hidden" id="nlpdfPaperBadge"></span><img class="nlpdf-signature-preview hidden" id="nlpdfSignaturePreview" alt="Signature"></div>'+
+        '<div class="nlpdf-crop-actions hidden" id="nlpdfCropActions" role="group" aria-label="Crop actions"><button class="nlpdf-crop-apply" id="nlpdfApplyCrop" type="button">✓ Accept crop</button><button class="nlpdf-crop-cancel" id="nlpdfCancelCrop" type="button">Cancel</button></div>'+
       '</section>'+
       '<section class="nlpdf-grid-stage hidden" id="nlpdfGridStage"><div class="nlpdf-drop-overlay">Drop PDF, images, or ZIP anywhere here</div><div class="nlpdf-grid" id="nlpdfGrid"></div></section>'+
       '<aside class="nlpdf-filmstrip-wrap" id="nlpdfFilmstripWrap"><div class="nlpdf-filmstrip-head"><strong>Pages</strong><span>Front/Back are shown as stacks, not every default page</span></div><div class="nlpdf-filmstrip" id="nlpdfFilmstrip"></div></aside>'+
@@ -398,20 +397,19 @@ function activePage(){return state.pages.find(p=>p.id===state.activeId)||null;}
 function selectedPages(){return state.pages.filter(p=>state.selected.has(p.id));}
 
 async function renderActive(){
-  const canvas=$('#nlpdfCanvas'),hint=$('#nlpdfPaperHint'),badge=$('#nlpdfPaperBadge'),dragHint=$('#nlpdfDragHint'),p=activePage();
+  const canvas=$('#nlpdfCanvas'),hint=$('#nlpdfPaperHint'),badge=$('#nlpdfPaperBadge'),p=activePage();
   const epoch=++state.renderEpoch;
   canvas.width=840;canvas.height=1188;
   const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,840,1188);
   $('#nlpdfSafeGuide')?.classList.toggle('hidden',!state.safeArea);
   if(!p){
     updateTransformOverlay(null);showSnapGuides(false,false);
-    hint.classList.remove('hidden');badge.classList.add('hidden');dragHint.classList.add('hidden');
+    hint.classList.remove('hidden');badge.classList.add('hidden');
     $('#nlpdfCropLayer').classList.add('hidden');
     renderSignature(Boolean(state.assets.signature&&$('#nlpdfUseSignature')?.checked));
     syncPageControls();return;
   }
   hint.classList.add('hidden');badge.classList.remove('hidden');
-  dragHint.classList.toggle('hidden',state.cropMode);
   badge.textContent='Document page '+(state.pages.findIndex(x=>x.id===p.id)+1);
   const temp=document.createElement('canvas');
   try{
@@ -450,10 +448,7 @@ function renderSignature(show){
 function syncPageControls(){
   const p=activePage(),disabled=!p;
   $('#nlpdfActiveLabel').textContent=p?'Page '+(state.pages.findIndex(x=>x.id===p.id)+1):'Select a page';
-  $('#nlpdfStartCrop').disabled=disabled||state.cropMode;
-
-  $('#nlpdfApplyCrop').classList.toggle('hidden',!state.cropMode);
-  $('#nlpdfCancelCrop').classList.toggle('hidden',!state.cropMode);
+  $('#nlpdfCropActions').classList.toggle('hidden',!state.cropMode);
   $('#nlpdfCropPanel').classList.toggle('is-cropping',state.cropMode);
   $('#nlpdfContentScale').disabled=disabled||state.cropMode;
   $('#nlpdfContentScale').value=p?Math.round((p.transform?.scale||1)*100):100;
@@ -466,6 +461,7 @@ function syncPageControls(){
 function updateControls(){
   const sel=selectedPages(),p=activePage(),i=p?state.pages.findIndex(x=>x.id===p.id):-1;
   ['nlpdfRotateRight','nlpdfDuplicate','nlpdfDelete'].forEach(id=>$('#'+id).disabled=!sel.length||state.busy);
+  const cropTool=$('[data-tool="crop"]', $('#nlpdfToolRail'));if(cropTool)cropTool.disabled=!p||state.busy;
   $('#nlpdfCreate').disabled=!state.pages.length||state.busy;
   $('#nlpdfClearAll').disabled=!state.pages.length||state.busy;
   $('#nlpdfSelectionLabel').textContent=sel.length?sel.length+' selected · active page '+(i+1):'No page selected';$('#nlpdfPageCount').textContent=state.pages.length;$('#nlpdfFileCount').textContent=new Set(state.pages.map(p=>p.sourceKey)).size;
@@ -530,9 +526,13 @@ function startCrop(){
 }
 function applyCrop(){
   const p=activePage();if(!p||!state.cropMode)return;
-  p.crop={...state.cropDraft};state.cropMode=false;state.cropDraft=null;state.cropBounds=null;renderAll();recordEdit();
+  p.crop={...state.cropDraft};state.cropMode=false;state.cropDraft=null;state.cropBounds=null;
+  state.closeToolFlyout?.();renderAll();recordEdit();
 }
-function cancelCrop(){state.cropMode=false;state.cropDraft=null;state.cropBounds=null;renderActive();}
+function cancelCrop(){
+  state.cropMode=false;state.cropDraft=null;state.cropBounds=null;
+  state.closeToolFlyout?.();renderActive();
+}
 function resetCrop(){const p=activePage();if(!p)return;state.cropMode=false;state.cropDraft=null;p.crop=defaultCrop();renderAll();recordEdit();}
 function updateCropOverlay(){
   const layer=$('#nlpdfCropLayer'),box=$('#nlpdfCropRegion'),b=state.cropBounds;
@@ -809,12 +809,22 @@ function setupToolRail(){
   }
   function open(key){
     if(key==='rotate')return;
+    if(key==='crop'){
+      if(!activePage()||state.busy)return;
+      if(!state.cropMode)startCrop();
+      state.toolOpen='crop';
+      flyout.classList.remove('hidden');
+      $('#nlpdfToolFlyoutTitle').textContent='Crop tool';
+      for(const [id,panel] of Object.entries(map))panel?.classList.toggle('hidden',id!=='crop');
+      $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool==='crop'));
+      return;
+    }
     if(state.toolOpen===key){close();return;}
     state.toolOpen=key;
     flyout.classList.remove('hidden');
     $('#nlpdfToolFlyoutTitle').textContent=label[key]||'Tools';
     for(const [id,panel] of Object.entries(map))panel?.classList.toggle('hidden',id!==key);
-    $$('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool===key));
+    $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool===key));
   }
   $$('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.addEventListener('click',()=>open(b.dataset.tool)));
   $('#nlpdfToolFlyoutClose').addEventListener('click',close);
@@ -1006,7 +1016,6 @@ async function build(){
 
 
   $('#nlpdfRotateRight').addEventListener('click',()=>rotateSelected(90));$('#nlpdfDuplicate').addEventListener('click',duplicateSelected);$('#nlpdfDelete').addEventListener('click',deleteSelected);$('#nlpdfClearAll').addEventListener('click',clearAllDocuments);
-  $('#nlpdfStartCrop').addEventListener('click',startCrop);
   $('#nlpdfApplyCrop').addEventListener('click',applyCrop);
   $('#nlpdfCancelCrop').addEventListener('click',cancelCrop);
 
