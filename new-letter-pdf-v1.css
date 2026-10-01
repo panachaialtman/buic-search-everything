@@ -653,3 +653,37 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
   #workspaceDocuments.nlpdf-primary .nlpdf-footer-stats{gap:6px}
   #workspaceDocuments.nlpdf-primary .nlpdf-footer-center{display:none}
 }
+
+
+/* V13 — compact destructive reset for imported document content only */
+#workspaceDocuments.nlpdf-primary .nlpdf-clear-panel{
+  display:grid;
+  gap:7px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-clear-all{
+  width:100%;
+  min-height:36px;
+  border:1px solid color-mix(in srgb,#c74756 42%,var(--line));
+  border-radius:10px;
+  background:color-mix(in srgb,#c74756 7%,var(--surface));
+  color:#a62f40;
+  font:inherit;
+  font-size:11px;
+  font-weight:800;
+  cursor:pointer;
+  transition:background .15s ease,border-color .15s ease,transform .15s ease;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-clear-all:hover:not(:disabled){
+  background:color-mix(in srgb,#c74756 12%,var(--surface));
+  border-color:#c74756;
+  transform:translateY(-1px);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-clear-all:disabled{
+  opacity:.42;
+  cursor:not-allowed;
+  transform:none;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-clear-panel .nlpdf-note{
+  font-size:9px;
+  line-height:1.35;
+}
