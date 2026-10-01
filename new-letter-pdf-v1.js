@@ -447,9 +447,8 @@ function renderSignature(show){
 }
 function syncPageControls(){
   const p=activePage(),disabled=!p;
-  $('#nlpdfActiveLabel').textContent=p?'Page '+(state.pages.findIndex(x=>x.id===p.id)+1):'Select a page';
   $('#nlpdfCropActions').classList.toggle('hidden',!state.cropMode);
-  $('#nlpdfCropPanel').classList.toggle('is-cropping',state.cropMode);
+  const cropTool=$('[data-tool="crop"]', $('#nlpdfToolRail'));if(cropTool)cropTool.classList.toggle('active',state.cropMode);
   $('#nlpdfContentScale').disabled=disabled||state.cropMode;
   $('#nlpdfContentScale').value=p?Math.round((p.transform?.scale||1)*100):100;
   $('#nlpdfContentScaleValue').textContent=(p?Math.round((p.transform?.scale||1)*100):100)+'%';
@@ -572,6 +571,22 @@ function setupCropInteraction(){
   box.addEventListener('pointerup',()=>drag=null);
   box.addEventListener('pointercancel',()=>drag=null);
 }
+function setupCropEmptyClickApply(){
+  const stage=$('#nlpdfStage');let tap=null;
+  stage.addEventListener('pointerdown',e=>{
+    if(!state.cropMode||e.button!==0||e.target.closest('#nlpdfCropRegion,#nlpdfCropActions,#nlpdfToolRail'))return;
+    tap={id:e.pointerId,x:e.clientX,y:e.clientY};
+  },true);
+  stage.addEventListener('pointerup',e=>{
+    if(!tap||tap.id!==e.pointerId)return;
+    const dx=e.clientX-tap.x,dy=e.clientY-tap.y,moved=Math.hypot(dx,dy)>6;
+    tap=null;
+    if(!moved&&state.cropMode&&!e.target.closest('#nlpdfCropRegion,#nlpdfCropActions,#nlpdfToolRail')){
+      e.preventDefault();e.stopPropagation();applyCrop();
+    }
+  },true);
+  stage.addEventListener('pointercancel',()=>{tap=null;},true);
+}
 function fitPaper(){
   const stage=$('#nlpdfStage'),paper=$('#nlpdfPaper');if(!stage||!paper||stage.classList.contains('hidden'))return;
   const availableW=Math.max(170,stage.clientWidth-58),availableH=Math.max(190,stage.clientHeight-44);
@@ -637,31 +652,38 @@ function setView(mode){state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSin
 /* Export */
 async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice());state.pdfLibDocs.set(k,d);return d;}
 
-function pdfLayout(srcW,srcH,p){
-  const rot=((p.rotation||0)%360+360)%360;
+function normalizeRightAngle(value){return ((Math.round((Number(value)||0)/90)*90)%360+360)%360;}
+function pdfSourceVisualRotation(page){
+  try{return normalizeRightAngle(page?.getRotation?.().angle||0);}catch{return 0;}
+}
+function pdfLayout(srcW,srcH,p,visualRot=normalizeRightAngle(p.rotation)){
+  const rot=normalizeRightAngle(visualRot);
   const rw=(rot===90||rot===270)?srcH:srcW;
   const rh=(rot===90||rot===270)?srcW:srcH;
   const L=layoutOnSheet(p,rw,rh,A4.wPt,A4.hPt);
   const factor=L.w/rw;
   return {...L,rot,unrotatedW:srcW*factor,unrotatedH:srcH*factor};
 }
-function drawEmbedded(page,embedded,p){
-  const L=pdfLayout(embedded.width,embedded.height,p);
+function drawEmbedded(page,embedded,p,visualRot){
+  const L=pdfLayout(embedded.width,embedded.height,p,visualRot);
   const bottom=A4.hPt-L.y-L.h;
-  const opts={width:L.unrotatedW,height:L.unrotatedH,rotate:window.PDFLib.degrees(L.rot)};
-  if(L.rot===0){opts.x=L.x;opts.y=bottom;}
-  else if(L.rot===90){opts.x=L.x+L.w;opts.y=bottom;}
-  else if(L.rot===180){opts.x=L.x+L.w;opts.y=bottom+L.h;}
+  const pdfRot=normalizeRightAngle(360-L.rot);
+  const opts={width:L.unrotatedW,height:L.unrotatedH,rotate:window.PDFLib.degrees(pdfRot)};
+  if(pdfRot===0){opts.x=L.x;opts.y=bottom;}
+  else if(pdfRot===90){opts.x=L.x+L.w;opts.y=bottom;}
+  else if(pdfRot===180){opts.x=L.x+L.w;opts.y=bottom+L.h;}
   else{opts.x=L.x;opts.y=bottom+L.h;}
   page.drawPage(embedded,opts);
 }
 async function addDocPage(out,p){
   if(p.kind==='pdf'){
     const src=await sourcePdfDoc(p.sourceKey),sp=src.getPage(p.sourcePage-1),sz=sp.getSize(),c=p.crop;
-    const sourceCrop=sourceCropForRotation(c,p.rotation);const left=sz.width*sourceCrop.left/100,right=sz.width*(1-sourceCrop.right/100);
+    const sourceRot=pdfSourceVisualRotation(sp);
+    const visualRot=normalizeRightAngle(sourceRot+(p.rotation||0));
+    const sourceCrop=sourceCropForRotation(c,visualRot);const left=sz.width*sourceCrop.left/100,right=sz.width*(1-sourceCrop.right/100);
     const bottom=sz.height*sourceCrop.bottom/100,top=sz.height*(1-sourceCrop.top/100);
     const embedded=await out.embedPage(sp,{left,bottom,right,top});
-    const page=out.addPage([A4.wPt,A4.hPt]);drawEmbedded(page,embedded,p);return page;
+    const page=out.addPage([A4.wPt,A4.hPt]);drawEmbedded(page,embedded,p,visualRot);return page;
   }
   const source=await sourceRaster(p),cropped=cropRotateRaster(source,p);
   const png=await new Promise(res=>cropped.toBlob(res,'image/png'));
@@ -794,39 +816,33 @@ async function confirmExport(){
 /* Movable floating tool panels */
 function setupToolRail(){
   const flyout=$('#nlpdfToolFlyout'),content=$('#nlpdfToolFlyoutContent');
-  const map={
-    crop:$('#nlpdfCropPanel'),space:$('#nlpdfSpacePanel')
-  };
+  const map={space:$('#nlpdfSpacePanel')};
   const safe=$('#nlpdfSafePanel');
   if(safe){$('#nlpdfToolbarSafe').appendChild(safe);safe.classList.remove('hidden');}
   for(const panel of Object.values(map)){if(panel){content.appendChild(panel);panel.classList.add('hidden');}}
-  const label={crop:'Crop tool',space:'Make Space'};
   function close(){
     state.toolOpen='';
     flyout.classList.add('hidden');
     for(const panel of Object.values(map))panel?.classList.add('hidden');
-    Array.from(document.querySelectorAll('#nlpdfToolRail [data-tool="crop"],#nlpdfToolRail [data-tool="space"]')).forEach(b=>b.classList.remove('active'));
+    $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool==='crop'&&state.cropMode));
   }
   function open(key){
     if(key==='rotate')return;
     if(key==='crop'){
       if(!activePage()||state.busy)return;
+      close();
       if(!state.cropMode)startCrop();
-      state.toolOpen='crop';
-      flyout.classList.remove('hidden');
-      $('#nlpdfToolFlyoutTitle').textContent='Crop tool';
-      for(const [id,panel] of Object.entries(map))panel?.classList.toggle('hidden',id!=='crop');
       $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool==='crop'));
       return;
     }
     if(state.toolOpen===key){close();return;}
     state.toolOpen=key;
     flyout.classList.remove('hidden');
-    $('#nlpdfToolFlyoutTitle').textContent=label[key]||'Tools';
+    $('#nlpdfToolFlyoutTitle').textContent='Make Space';
     for(const [id,panel] of Object.entries(map))panel?.classList.toggle('hidden',id!==key);
     $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.classList.toggle('active',b.dataset.tool===key));
   }
-  $$('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.addEventListener('click',()=>open(b.dataset.tool)));
+  $('[data-tool]', $('#nlpdfToolRail')).forEach(b=>b.addEventListener('click',()=>open(b.dataset.tool)));
   $('#nlpdfToolFlyoutClose').addEventListener('click',close);
   window.addEventListener('pointerdown',e=>{
     if(state.toolOpen&&!e.target.closest('#nlpdfToolRail,#nlpdfToolFlyout'))close();
@@ -1037,7 +1053,7 @@ async function build(){
   $('#nlpdfZoomOut').addEventListener('click',()=>setZoom(state.zoom-.1));
   $('#nlpdfZoomIn').addEventListener('click',()=>setZoom(state.zoom+.1));
   $('#nlpdfZoomFit').addEventListener('click',()=>setZoom(1));
-  setupCropInteraction();setupToolRail();setupResizeDrag();
+  setupCropInteraction();setupCropEmptyClickApply();setupToolRail();setupResizeDrag();
   $('#nlpdfUndo').addEventListener('click',()=>undoEdit().catch(console.error));
   $('#nlpdfRedo').addEventListener('click',()=>redoEdit().catch(console.error));
 
