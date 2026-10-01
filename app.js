@@ -46,6 +46,8 @@
     "Embassy": {
       "idColumn": "Record ID",
       "ops": [
+        {"id":"E030","values":{"Display Name EN":"Royal Thai Embassy in Vientiane, Lao PDR"}},
+        {"id":"E085","values":{"Display Name EN":"Royal Thai Consulate-General in Savannakhet, Lao PDR"}},
         {"id":"E057","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานเอกอัครราชทูต ณ กรุงวอชิงตัน ประเทศสหรัฐอเมริกา"}},
         {"id":"E091","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครชิคาโก ประเทศสหรัฐอเมริกา"}},
         {"id":"E092","values":{"Country / Territory TH":"ประเทศสหรัฐอเมริกา","Official Name TH":"สถานกงสุลใหญ่ ณ นครลอสแอนเจลิส ประเทศสหรัฐอเมริกา"}},

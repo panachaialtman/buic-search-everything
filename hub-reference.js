@@ -1,7 +1,7 @@
 /* Central Hub reference adapter for BUIC Search Everything.
-   Only the allowlisted country/nationality/program worksheets are changed.
-   Embassy records, communication templates, private case data and locally
-   imported workbooks are never transmitted to the Hub. */
+   Only allowlisted country/nationality/program/embassy reference worksheets are changed.
+   Communication templates, private case data and locally imported workbooks
+   are never transmitted to the Hub. */
 (() => {
   'use strict';
   const BASE = 'https://buic-central-hub.vercel.app';
@@ -18,6 +18,17 @@
     programThai: 'Major TH', additionalNotes: 'Additional / Notes',
     sourceProgramType: 'Program Type', creditSourceUrl: 'Credits Source URL',
     creditSourceStatus: 'Credits Status'
+  };
+  const FIELDS_EMBASSIES = {
+    officeType: 'Office Type', countryEnglish: 'Country / Territory EN',
+    countryThai: 'Country / Territory TH', cityEnglish: 'City EN', cityThai: 'City TH',
+    displayNameEnglish: 'Display Name EN', officeNameEnglish: 'Office Name EN',
+    addressEnglish: 'Address EN', officialNameThai: 'Official Name TH',
+    currentOfficeType: 'Current Office Type', currentCountryEnglish: 'Current Country / Territory EN',
+    currentCityEnglish: 'Current City EN', currentDisplayNameEnglish: 'Current Display Name EN',
+    currentOfficeNameEnglish: 'Current Office Name EN', currentAddressEnglish: 'Current Address EN',
+    currentOfficialNameThai: 'Current Official Name TH', webSourceUrl: 'Web Source URL',
+    reconciliationStatus: 'Reconciliation Status', reconciliationNotes: 'Reconciliation Notes'
   };
   let lastVersion = null;
   const normalized = text => String(text ?? '').trim().toLocaleLowerCase('en');
@@ -78,11 +89,12 @@
       }
     }
   }
-  function applyRemote(local, countries, nationalities, programs) {
+  function applyRemote(local, countries, nationalities, programs, embassies = null) {
     // Apply legacy workbook corrections first. Published Hub fields must take precedence.
     window.applyBUICReferencePatches?.(local);
     const sheetCountry = tableIndex(local.Countries, 'Countries');
     const sheetProgram = tableIndex(local.Faculty_Major, 'Faculty_Major');
+    const sheetEmbassy = embassies ? tableIndex(local.Embassy, 'Embassy') : null;
     const matchSet = (table, remote, label) => {
       const activeIndex = table.headers.indexOf('Active');
       const keys = [...table.ids.entries()].filter(([,row]) =>
@@ -101,6 +113,7 @@
     }
     matchSet(sheetCountry, countries, 'Country');
     matchSet(sheetProgram, programs, 'Program');
+    if (embassies) matchSet(sheetEmbassy, embassies, 'Embassy');
     for (const remote of countries) {
       updateFields(sheetCountry.ids.get(remote.recordId), sheetCountry.headers, FIELDS_COUNTRIES, remote);
     }
@@ -116,8 +129,14 @@
       if (creditIndex >= 0) row[creditIndex] = credit ?? '';
       // Source-status fields are imported, but unknown credits remain blank.
     }
+    if (embassies) {
+      for (const remote of embassies) {
+        updateFields(sheetEmbassy.ids.get(remote.recordId), sheetEmbassy.headers, FIELDS_EMBASSIES, remote);
+      }
+    }
     insertAliases(local.Country_Aliases, 'Country Record ID', countries, 'Country_Aliases');
     insertAliases(local.Faculty_Aliases, 'Faculty/Major Record ID', programs, 'Faculty_Aliases');
+    if (embassies) insertAliases(local.Embassy_Aliases, 'Embassy Record ID', embassies, 'Embassy_Aliases');
     return local;
   }
 
@@ -128,17 +147,19 @@
       const meta = await getJson(BASE + '/api/v1/meta', controller.signal);
       if (!meta?.available || !Number.isSafeInteger(meta.version)) return { status:'unpublished' };
       if (!force && lastVersion === meta.version) return { status:'unchanged', version:meta.version };
-      const responses = await Promise.all(['countries','nationalities','programs'].map(
+      const datasets = ['countries','nationalities','programs'];
+      if (Number(meta.datasets?.embassies || 0) > 0) datasets.push('embassies');
+      const responses = await Promise.all(datasets.map(
         name => getJson(BASE + '/api/v1/reference/' + name, controller.signal)
       ));
       for (let i=0; i<responses.length; i++) {
         if (responses[i].version !== meta.version ||
-            responses[i].dataset !== ['countries','nationalities','programs'][i] ||
+            responses[i].dataset !== datasets[i] ||
             !Array.isArray(responses[i].records)) {
           throw new Error('Hub reference datasets have different publication versions');
         }
       }
-      // Never mutate the active source until all three datasets pass validation.
+      // Never mutate the active source until every available dataset passes validation.
       const merged = applyRemote(structuredClone(sourceRows), ...responses.map(r => r.records));
       lastVersion = meta.version;
       return { status:'updated', version:meta.version, rows:merged };
