@@ -97,7 +97,7 @@ function workspaceMarkup(){
           '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfApplySpace" type="button">Make Space</button><button class="nlpdf-btn" id="nlpdfClearSpace" type="button">Undo Make Space</button></div>'+
           '<div class="nlpdf-note" id="nlpdfSpaceStatus">The saved signature determines the required clearance.</div>'+
         '</section>'+
-        '<section class="nlpdf-panel"><div class="nlpdf-note"><strong>Selection</strong><br>Click = one page · Ctrl/Cmd = add/remove · Shift = range · Backspace/Delete = remove selected document pages.</div></section>'+
+        '<section class="nlpdf-panel nlpdf-clear-panel"><button class="nlpdf-clear-all" id="nlpdfClearAll" type="button" disabled>Clear All</button><div class="nlpdf-note">Removes imported document pages only. Default assets and editor settings stay unchanged.</div></section>'+
       '</div>'+
       '<input class="nlpdf-file-input" id="nlpdfFileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.zip,application/pdf,image/jpeg,image/png,image/webp,application/zip" multiple>'+
       '<input class="nlpdf-asset-input" id="nlpdfAssetInput" type="file">'+
@@ -467,6 +467,7 @@ function updateControls(){
   const sel=selectedPages(),p=activePage(),i=p?state.pages.findIndex(x=>x.id===p.id):-1;
   ['nlpdfRotateRight','nlpdfDuplicate','nlpdfDelete'].forEach(id=>$('#'+id).disabled=!sel.length||state.busy);
   $('#nlpdfCreate').disabled=!state.pages.length||state.busy;
+  $('#nlpdfClearAll').disabled=!state.pages.length||state.busy;
   $('#nlpdfSelectionLabel').textContent=sel.length?sel.length+' selected · active page '+(i+1):'No page selected';$('#nlpdfPageCount').textContent=state.pages.length;$('#nlpdfFileCount').textContent=new Set(state.pages.map(p=>p.sourceKey)).size;
 }
 function selectPage(id,event={}){const i=state.pages.findIndex(p=>p.id===id);if(i<0)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}state.activeId=id;const multi=event.ctrlKey||event.metaKey;
@@ -476,6 +477,22 @@ function selectPage(id,event={}){const i=state.pages.findIndex(p=>p.id===id);if(
   renderAll();
 }
 function deleteSelected(){if(!state.selected.size)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}const ids=new Set(state.selected),old=state.pages.findIndex(p=>p.id===state.activeId);state.pages=state.pages.filter(p=>!ids.has(p.id));state.selected.clear();const n=state.pages[Math.min(Math.max(old,0),state.pages.length-1)];state.activeId=n?.id||'';if(n){state.selected.add(n.id);state.anchorIndex=state.pages.indexOf(n);}else state.anchorIndex=-1;if(!state.pages.some(p=>p.id===state.signaturePageId))state.signaturePageId=n?.id||'';renderAll();recordEdit();}
+function clearAllDocuments(){
+  if(!state.pages.length||state.busy)return;
+  if(state.cropMode){state.cropMode=false;state.cropDraft=null;state.cropBounds=null;}
+  state.pages=[];
+  state.selected.clear();
+  state.activeId='';
+  state.anchorIndex=-1;
+  state.signaturePageId='';
+  state.dragId='';
+  state.contentBounds=null;
+  showSnapGuides(false,false);
+  renderAll();
+  recordEdit();
+  setStatus('Cleared imported document pages · Default assets and settings kept');
+  toast('Document pages cleared. Default assets and settings were kept.');
+}
 function rotateSelected(d){if(state.cropMode)return;for(const p of state.pages)if(state.selected.has(p.id))p.rotation=((p.rotation||0)+d+360)%360;renderAll();recordEdit();}
 function duplicateSelected(){const ids=[...state.selected],newIds=[];for(const id of ids){const i=state.pages.findIndex(p=>p.id===id);if(i<0)continue;const p=state.pages[i],cp={...p,id:uid(),crop:{...p.crop},transform:{...p.transform}};state.pages.splice(i+1,0,cp);newIds.push(cp.id);}if(newIds.length){state.selected=new Set(newIds);state.activeId=newIds[newIds.length-1];state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);}renderAll();recordEdit();}
 function moveActive(d){const p=activePage();if(!p)return;const i=state.pages.indexOf(p),j=i+d;if(j<0||j>=state.pages.length)return;[state.pages[i],state.pages[j]]=[state.pages[j],state.pages[i]];state.anchorIndex=j;renderAll();recordEdit();}
@@ -988,7 +1005,7 @@ async function build(){
   $('#nlpdfSigSize').addEventListener('input',e=>{state.sig.widthPct=Number(e.target.value)/100;$('#nlpdfSigSizeValue').textContent=e.target.value+'%';state.sig.xPct=clamp(state.sig.xPct,0,1-state.sig.widthPct);savePrefs();renderSignature(Boolean($('#nlpdfUseSignature')?.checked&&(!activePage()||signatureApplies(activePage()))));if(activePage()?.makeSpace)renderActive();});
 
 
-  $('#nlpdfRotateRight').addEventListener('click',()=>rotateSelected(90));$('#nlpdfDuplicate').addEventListener('click',duplicateSelected);$('#nlpdfDelete').addEventListener('click',deleteSelected);
+  $('#nlpdfRotateRight').addEventListener('click',()=>rotateSelected(90));$('#nlpdfDuplicate').addEventListener('click',duplicateSelected);$('#nlpdfDelete').addEventListener('click',deleteSelected);$('#nlpdfClearAll').addEventListener('click',clearAllDocuments);
   $('#nlpdfStartCrop').addEventListener('click',startCrop);
   $('#nlpdfApplyCrop').addEventListener('click',applyCrop);
   $('#nlpdfCancelCrop').addEventListener('click',cancelCrop);
