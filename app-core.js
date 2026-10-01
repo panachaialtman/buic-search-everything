@@ -152,7 +152,14 @@
     const countryAliases = rowsToObjects(rowsBySheet.Country_Aliases || []);
     const faculty = rowsToObjects(rowsBySheet.Faculty_Major || []);
     const facultyAliases = rowsToObjects(rowsBySheet.Faculty_Aliases || []);
-    const embassy = rowsToObjects(rowsBySheet.Embassy || []);
+    const embassy = rowsToObjects(rowsBySheet.Embassy || []).map(r => {
+      const country = clean(r['Country / Territory EN']);
+      const display = clean(r['Display Name EN']);
+      if (normalize(country) === 'china' && /,\s*China$/i.test(display)) {
+        return { ...r, 'Display Name EN': display.replace(/,\s*China$/i, ', P.R. China') };
+      }
+      return r;
+    });
     const embassyAliases = rowsToObjects(rowsBySheet.Embassy_Aliases || []);
     const status = rowsToObjects(rowsBySheet.Data_Status || []);
     const settings = rowsToObjects(rowsBySheet.Settings || []);
