@@ -462,12 +462,44 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportModal [data-nlpdf-close]').last().click();
   });
 
-  await run('Page content selector stores a classification without changing the page UI yet',async()=>{
+  await run('Page Content is clickable, expandable, searchable, and shares linked document data',async()=>{
     await page.locator('#nlpdfFilmstrip [data-page-id]').first().click();
+    await page.locator('#nlpdfPageContentType').click();
     await page.locator('#nlpdfPageContentType').selectOption('passport');
     assert.equal(await page.locator('#nlpdfPageContentType').inputValue(),'passport');
-    assert.doesNotMatch(await page.locator('#nlpdfFilmstrip [data-page-id]').first().innerText(),/Passport/);
-    await page.locator('#nlpdfPageContentType').selectOption('');
+    assert.equal(await page.locator('#nlpdfContentPanel').isVisible(),true);
+    await page.locator('#nlpdfContentName').fill('Content Linked Name');
+    await page.locator('#nlpdfContentPassport').fill('PP998877');
+    await page.locator('#nlpdfContentLocation').fill('Goes, Netherlands');
+    await page.locator('#nlpdfContentNationality').click();
+    await page.locator('#nlpdfReferencePicker').waitFor({state:'visible'});
+    await page.locator('#nlpdfReferencePickerSearch').fill('Netherlands');
+    const countryResult=page.locator('#nlpdfReferencePickerResults [data-reference-result]').first();
+    assert.equal(await countryResult.count()>0,true,'country search should return a result');
+    await countryResult.click();
+    assert.match(await page.locator('#nlpdfContentNationality').innerText(),/Netherlands/i);
+    await page.locator('#nlpdfContentPanelToggle').click();
+    assert.equal(await page.locator('#nlpdfContentPanel').getAttribute('class').then(v=>v.includes('collapsed')),true);
+    await page.locator('#nlpdfContentPanelToggle').click();
+
+    await page.locator('#nlpdfPageContentType').selectOption('bu_application');
+    assert.equal(await page.locator('#nlpdfContentName').inputValue(),'Content Linked Name');
+    await page.locator('#nlpdfContentStudentId').fill('1666');
+    const facultyValue=await page.locator('#nlpdfContentFaculty option').evaluateAll(opts=>opts.find(o=>o.value)?.value||'');
+    if(facultyValue){
+      await page.locator('#nlpdfContentFaculty').selectOption(facultyValue);
+      const programValue=await page.locator('#nlpdfContentProgram option').evaluateAll(opts=>opts.find(o=>o.value)?.value||'');
+      if(programValue)await page.locator('#nlpdfContentProgram').selectOption(programValue);
+    }
+    await page.locator('#nlpdfContentSemester').selectOption('Second');
+    await page.locator('#nlpdfContentAcademicYear').selectOption('2026');
+
+    await page.locator('#nlpdfPageContentType').selectOption('visa_application');
+    assert.equal(await page.locator('#nlpdfContentName').inputValue(),'Content Linked Name');
+    await page.locator('#nlpdfContentEmbassy').click();
+    await page.locator('#nlpdfReferencePickerSearch').fill('Yangon');
+    const embassyResult=page.locator('#nlpdfReferencePickerResults [data-reference-result]').first();
+    if(await embassyResult.count())await embassyResult.click();
   });
 
   await run('Edit Letter uses selectable academic data, reusable dates, school memory, and Embassy search',async()=>{
@@ -478,6 +510,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportName').fill('Linked Name');
     await page.locator('#nlpdfExportPassport').fill('AB1234567');
     await page.locator('#nlpdfExportStudentId').fill('1690000000');
+    assert.equal(await page.locator('#nlpdfExportPdfName').inputValue(),'Linked Name_AB1234567_1690000000.pdf');
     await page.locator('#nlpdfExportLetterType').selectOption('exchange');
     await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
     await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
@@ -491,6 +524,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await page.locator('#nlpdfLetterPassport').inputValue(),'AB1234567');
     assert.equal(await page.locator('#nlpdfLetterStudentId').inputValue(),'1690000000');
     assert.equal(await page.locator('#nlpdfLetterDocumentNo').inputValue(),'0789');
+    assert.equal(await page.locator('#nlpdfLetterLocation').inputValue(),'Goes, Netherlands');
+    assert.match(await page.locator('#nlpdfLetterCountry').innerText(),/Netherlands/i);
     assert.equal(await page.locator('#nlpdfLetterFaculty').evaluate(el=>el.tagName),'SELECT');
     assert.equal(await page.locator('#nlpdfLetterAcademicYear').evaluate(el=>el.tagName),'SELECT');
     assert.equal(await page.locator('#nlpdfPackageManagerBtn').isVisible(),true);
