@@ -502,6 +502,33 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     if(await embassyResult.count())await embassyResult.click();
   });
 
+  await run('Content selector and metadata panel stay pinned while the A4 stage scrolls',async()=>{
+    await page.locator('#nlpdfPageContentType').selectOption('passport');
+    await page.locator('#nlpdfZoomFit').click();
+    for(let i=0;i<8;i++)await page.locator('#nlpdfZoomIn').click();
+    const stage=page.locator('#nlpdfStage');
+    const beforeSelector=await page.locator('.nlpdf-page-content-float').boundingBox();
+    const beforePanel=await page.locator('#nlpdfContentPanel').boundingBox();
+    assert(beforeSelector&&beforePanel);
+    const scrolled=await stage.evaluate(el=>{
+      el.scrollTop=Math.min(180,Math.max(0,el.scrollHeight-el.clientHeight));
+      el.scrollLeft=Math.min(90,Math.max(0,el.scrollWidth-el.clientWidth));
+      el.dispatchEvent(new Event('scroll'));
+      return {top:el.scrollTop,left:el.scrollLeft};
+    });
+    assert(scrolled.top>0||scrolled.left>0,'zoomed A4 stage should be scrollable');
+    await page.waitForTimeout(80);
+    const afterSelector=await page.locator('.nlpdf-page-content-float').boundingBox();
+    const afterPanel=await page.locator('#nlpdfContentPanel').boundingBox();
+    assert(afterSelector&&afterPanel);
+    assert(Math.abs(afterSelector.y-beforeSelector.y)<2,'Content selector should remain pinned vertically');
+    assert(Math.abs(afterSelector.x-beforeSelector.x)<2,'Content selector should remain pinned horizontally');
+    assert(Math.abs(afterPanel.y-beforePanel.y)<2,'Content panel should remain pinned vertically');
+    assert(Math.abs(afterPanel.x-beforePanel.x)<2,'Content panel should remain pinned horizontally');
+    await stage.evaluate(el=>{el.scrollTop=0;el.scrollLeft=0;el.dispatchEvent(new Event('scroll'));});
+    await page.locator('#nlpdfZoomFit').click();
+  });
+
   await run('Edit Letter uses selectable academic data, reusable dates, school memory, and Embassy search',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
