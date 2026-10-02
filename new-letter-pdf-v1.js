@@ -2084,7 +2084,7 @@ async function build(){
     if(el.id==='nlpdfContentAcademicYear'){state.linkedData.academicYear=el.value;rememberAcademicYear(el.value);recordEdit();return;}
   });
   $('#nlpdfContentPanelBody').addEventListener('click',e=>{if(e.target.closest('#nlpdfContentNationality'))openReferencePicker('country','content-country');if(e.target.closest('#nlpdfContentEmbassy'))openReferencePicker('embassy','content-embassy');});
-  $('[data-reference-close]').forEach(x=>x.addEventListener('click',closeReferencePicker));
+  $$('[data-reference-close]').forEach(x=>x.addEventListener('click',closeReferencePicker));
   $('#nlpdfReferencePickerSearch').addEventListener('input',e=>renderReferencePickerResults(e.target.value));
   $('#nlpdfReferencePickerResults').addEventListener('click',e=>{const b=e.target.closest('[data-reference-result]');if(b)selectReferencePickerRecord(b.dataset.referenceResult);});
   $('#nlpdfPackageManagerBtn').addEventListener('click',openPackageManager);
