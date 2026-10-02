@@ -459,6 +459,48 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportModal [data-nlpdf-close]').last().click();
   });
 
+  await run('Edit Letter uses highlighted fields, keeps highlights, and remembers package dates',async()=>{
+    const before=await page.evaluate(()=>window.__mockFiles.length);
+    await page.locator('#nlpdfCreate').click();
+    await page.locator('#nlpdfExportName').fill('Highlight QA');
+    await page.locator('#nlpdfExportLetterType').selectOption('exchange');
+    await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
+    await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
+    await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
+    await page.locator('#nlpdfEditLetter').click();
+    await page.locator('#nlpdfChooseDestination').click();
+    await page.locator('#nlpdfConfirmExport').click();
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+    assert.equal((await page.locator('#nlpdfLetterStudentType').inputValue()),'Exchange Bachelor');
+    assert((await page.locator('.nlpdf-letter-field').count())>0,'highlighted template fields should become form controls');
+    await page.locator('#nlpdfLetterSemester').selectOption('Second');
+    await page.locator('#nlpdfLetterAcademicYear').fill('2026');
+    await page.locator('#nlpdfLetterStartDate').fill('January 11, 2027');
+    await page.locator('#nlpdfLetterFinishDate').fill('May 31, 2027');
+    await page.locator('#nlpdfLetterOrientation').fill('January 4 - 8, 2027');
+    await page.locator('#nlpdfCreateEditedLetter').click();
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
+    const out=await page.evaluate(async before=>{
+      const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Highlight QA.docx');
+      if(!file)return null;
+      const zip=await JSZip.loadAsync(file.bytes);
+      const xml=await zip.file('word/document.xml').async('string');
+      const profiles=JSON.parse(localStorage.getItem('buic-letter-package-dates-v1')||'{}');
+      return {
+        finished:file.finished,
+        highlight:/<w:highlight\b[^>]*(?:w:val|val)="yellow"/i.test(xml),
+        profile:profiles['exchange|second|2026']||null
+      };
+    },before);
+    assert(out&&out.finished,'edited Word letter should be written');
+    assert.equal(out.highlight,true,'edited Word letter must keep yellow highlight markup');
+    assert.deepEqual(out.profile,{
+      startDate:'January 11, 2027',
+      finishDate:'May 31, 2027',
+      orientation:'January 4 - 8, 2027'
+    });
+  });
+
   await run('Export modal shows processing, then success only after write completes',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();

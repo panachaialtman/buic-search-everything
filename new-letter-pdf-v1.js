@@ -4,6 +4,7 @@
 const DB_NAME='buic-new-letter-pdf-assets-v1', DB_VERSION=1, STORE='assets';
 const PREF_KEY='buic-new-letter-pdf-prefs-v4';
 const NO_IEN_OVERRIDE_KEY='bu-ic-bachelor-no-ien-template-override-v1';
+const LETTER_PACKAGE_DATES_KEY='buic-letter-package-dates-v1';
 const A4={wMM:210,hMM:297,wPt:595.28,hPt:841.89};
 const state={
   pages:[], selected:new Set(), activeId:'', anchorIndex:-1, viewMode:'single',
@@ -145,7 +146,17 @@ function exportModalMarkup(){
 function letterEditorMarkup(){
   return '<section class="nlpdf-letter-editor hidden" id="nlpdfLetterEditor" aria-hidden="true">'+
     '<header class="nlpdf-letter-editor-head"><div><span class="eyebrow">LETTER EDITOR</span><h2 id="nlpdfLetterEditorTitle">Edit Letter</h2><span id="nlpdfLetterEditorContext"></span></div><button class="nlpdf-letter-editor-close" id="nlpdfCancelLetterEdit" type="button">Back to PDF Builder</button></header>'+
-    '<div class="nlpdf-letter-editor-body"><div class="nlpdf-letter-editor-note">Edit the text below. The original DOCX layout is kept; mixed formatting inside an edited paragraph may use that paragraph’s first text style.</div><div class="nlpdf-letter-blocks" id="nlpdfLetterBlocks"></div></div>'+
+    '<div class="nlpdf-letter-editor-body"><div class="nlpdf-letter-editor-note"><strong>Highlighted fields stay highlighted in the created Word letter</strong> so you can check them before sending. Package dates are remembered by Student type + Semester + Academic year.</div>'+
+      '<section class="nlpdf-letter-section"><div class="nlpdf-letter-section-head"><div><strong>Package</strong><span>Dates shared by this student type and intake.</span></div></div><div class="nlpdf-letter-package-grid">'+
+        '<label><span>Student type</span><input id="nlpdfLetterStudentType" readonly></label>'+
+        '<label><span>Semester</span><select id="nlpdfLetterSemester"><option value="">Select</option><option value="First">First</option><option value="Second">Second</option><option value="Summer">Summer</option></select></label>'+
+        '<label><span>Academic year</span><input id="nlpdfLetterAcademicYear" inputmode="numeric" placeholder="2026"></label>'+
+        '<label><span>Starting Date</span><input id="nlpdfLetterStartDate" placeholder="e.g. January 11, 2027"></label>'+
+        '<label><span>Finishing Date</span><input id="nlpdfLetterFinishDate" placeholder="e.g. May 31, 2027"></label>'+
+        '<label><span>Orientation</span><input id="nlpdfLetterOrientation" placeholder="e.g. January 4 - 8, 2027"></label>'+
+      '</div><div class="nlpdf-letter-package-status" id="nlpdfLetterPackageStatus">Package dates will be saved when the letter is created.</div></section>'+
+      '<section class="nlpdf-letter-section"><div class="nlpdf-letter-section-head"><div><strong>Letter fields</strong><span>Only fields highlighted in the selected Word template are shown here.</span></div><span class="nlpdf-highlight-chip">Highlight kept</span></div><div class="nlpdf-letter-blocks" id="nlpdfLetterBlocks"></div></section>'+
+    '</div>'+
     '<footer class="nlpdf-letter-editor-actions"><span id="nlpdfLetterEditorStatus">Letter has not been created yet.</span><button class="nlpdf-confirm" id="nlpdfCreateEditedLetter" type="button">Create Letter</button></footer>'+
   '</section>';
 }
@@ -955,6 +966,142 @@ function hideExportProgress(){
 async function allowExportProgressToPaint(){
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
 }
+function letterTypeLabel(type){
+  return ({
+    bachelor_no_ien:'Bachelor Degree No IEN',
+    bachelor:'Bachelor Degree',
+    current_no_ien:'Current No IEN',
+    exchange:'Exchange Bachelor',
+    master:'Master Degree',
+    doctor:'Doctor Degree',
+    visiting:'Visiting Student'
+  })[type]||type||'Student';
+}
+function normalizedLetterValue(value){return clean(value).toLowerCase().replace(/\s+/g,' ').replace(/[.:;,]+$/g,'');}
+function letterPackageProfiles(){
+  try{const value=JSON.parse(localStorage.getItem(LETTER_PACKAGE_DATES_KEY)||'{}');return value&&typeof value==='object'?value:{};}catch{return {};}
+}
+function letterPackageKey(type,semester,year){
+  return [clean(type).toLowerCase(),clean(semester).toLowerCase(),clean(year)].join('|');
+}
+function packageFieldElement(kind){
+  return ({
+    semester:'#nlpdfLetterSemester',
+    academicYear:'#nlpdfLetterAcademicYear',
+    startDate:'#nlpdfLetterStartDate',
+    finishDate:'#nlpdfLetterFinishDate',
+    orientation:'#nlpdfLetterOrientation'
+  })[kind]||'';
+}
+function packageFieldValue(kind){
+  const selector=packageFieldElement(kind);return selector?clean($(selector)?.value):'';
+}
+function setPackageField(kind,value){
+  const selector=packageFieldElement(kind),el=selector?$(selector):null;if(el&&clean(value))el.value=value;
+}
+function applySavedPackageDates(context){
+  const semester=packageFieldValue('semester'),year=packageFieldValue('academicYear');
+  if(!semester||!year){$('#nlpdfLetterPackageStatus').textContent='Choose Semester and Academic year to reuse saved package dates.';return false;}
+  const profile=letterPackageProfiles()[letterPackageKey(context.type,semester,year)];
+  if(!profile){$('#nlpdfLetterPackageStatus').textContent='No saved package dates for this combination yet. Current template values are kept.';return false;}
+  for(const kind of ['startDate','finishDate','orientation'])setPackageField(kind,profile[kind]);
+  $('#nlpdfLetterPackageStatus').textContent='Package dates loaded for '+letterTypeLabel(context.type)+' · '+semester+' · '+year+'.';
+  return true;
+}
+function savePackageDates(context){
+  const semester=packageFieldValue('semester'),year=packageFieldValue('academicYear');
+  if(!semester||!year)return;
+  const profiles=letterPackageProfiles();
+  profiles[letterPackageKey(context.type,semester,year)]={
+    startDate:packageFieldValue('startDate'),
+    finishDate:packageFieldValue('finishDate'),
+    orientation:packageFieldValue('orientation')
+  };
+  try{localStorage.setItem(LETTER_PACKAGE_DATES_KEY,JSON.stringify(profiles));}catch{}
+}
+function highlightedRun(run,ns){
+  const pr=[...run.children].find(x=>x.localName==='rPr');if(!pr)return false;
+  const h=[...pr.getElementsByTagNameNS(ns,'highlight')][0];
+  if(h){
+    const value=(h.getAttributeNS(ns,'val')||h.getAttribute('w:val')||h.getAttribute('val')||'yellow').toLowerCase();
+    if(value&&value!=='none'&&value!=='white')return true;
+  }
+  const shd=[...pr.getElementsByTagNameNS(ns,'shd')][0];
+  if(shd){
+    const fill=(shd.getAttributeNS(ns,'fill')||shd.getAttribute('w:fill')||shd.getAttribute('fill')||'').toUpperCase();
+    if(fill&&!['AUTO','FFFFFF','000000','NIL'].includes(fill))return true;
+  }
+  return false;
+}
+function ensureYellowHighlight(run,doc,ns){
+  let pr=[...run.children].find(x=>x.localName==='rPr');
+  if(!pr){pr=doc.createElementNS(ns,'w:rPr');run.insertBefore(pr,run.firstChild);}
+  let h=[...pr.getElementsByTagNameNS(ns,'highlight')][0];
+  if(!h){h=doc.createElementNS(ns,'w:highlight');pr.appendChild(h);}
+  h.setAttributeNS(ns,'w:val','yellow');
+}
+function inferLetterField(value,prefix,suffix,index){
+  const v=normalizedLetterValue(value),p=clean(prefix).toLowerCase(),q=clean(suffix).toLowerCase(),near=(p+' '+q).replace(/\s+/g,' ');
+  const exact=(re)=>re.test(v);
+  if(exact(/^(starting date|start date)$/)||/starting date\s*[:：]?\s*$|start date\s*[:：]?\s*$|\bfrom\s*$/.test(p))return {kind:'startDate',label:'Starting Date',package:true};
+  if(exact(/^(finishing date|finish date|end date)$/)||/finishing date\s*[:：]?\s*$|finish date\s*[:：]?\s*$|end date\s*[:：]?\s*$|\bto\s*$/.test(p))return {kind:'finishDate',label:'Finishing Date',package:true};
+  if(exact(/^orientation/ )||/orientation/.test(near))return {kind:'orientation',label:'Orientation',package:true};
+  if(exact(/^(semester|first|second|summer)$/)||/semester\s*[:：]?\s*$/.test(p))return {kind:'semester',label:'Semester',package:true};
+  if(exact(/^(academic year|year)$/)||/academic year\s*[:：]?\s*$/.test(p))return {kind:'academicYear',label:'Academic year',package:true};
+  if(exact(/^(name|student name|studentname|full name)$/))return {kind:'studentName',label:'Full name'};
+  if(exact(/passport|passportnum|passport number/ )||/passport(?:\s+no\.?|\s+number)?\s*[:：]?\s*$/.test(p))return {kind:'passport',label:'Passport number'};
+  if(exact(/^nationality$/)||/nationality\s*[:：]?\s*$/.test(p))return {kind:'nationality',label:'Nationality'};
+  if(exact(/theirschool|home university|school name/ )||/home university|home institution/.test(near))return {kind:'homeUniversity',label:'Home university / school'};
+  if(exact(/school'?s country|home country/ ))return {kind:'homeCountry',label:'Home university country'};
+  if(exact(/embassy|thai mission/ )||/royal thai embassy|royal thai consulate/.test(near))return {kind:'embassy',label:'Thai mission / Embassy'};
+  if(exact(/address/ )||/embassy address|address\s*[:：]?\s*$/.test(p))return {kind:'address',label:'Embassy address'};
+  if(exact(/^(major|program|program of study)$/)||/program of study|program\s*[:：]?\s*$|major\s*[:：]?\s*$/.test(p))return {kind:'program',label:'Program / Major'};
+  if(exact(/^(faculty|school|school \/ faculty)$/)||/faculty\s*[:：]?\s*$/.test(p))return {kind:'faculty',label:'School / Faculty'};
+  if(exact(/document no|letter no|reference no/ )||/document no|letter no|reference no/.test(near))return {kind:'documentNo',label:'Document / reference no.'};
+  if(exact(/letter date|date of letter/ )||/letter date|date of letter/.test(near))return {kind:'letterDate',label:'Letter date'};
+  if(exact(/^(country|country full name)$/)||/country\s*[:：]?\s*$/.test(p))return {kind:'country',label:'Country'};
+  const display=clean(value);
+  return {kind:'field_'+index,label:display.length&&display.length<=42?display:'Highlighted field '+index};
+}
+function collectHighlightedLetterFields(doc,ns){
+  const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')],occurrences=[];
+  paragraphs.forEach((paragraph,paragraphIndex)=>{
+    const runs=[...paragraph.getElementsByTagNameNS(ns,'r')].map(run=>{
+      const texts=[...run.getElementsByTagNameNS(ns,'t')],value=texts.map(t=>t.textContent||'').join('');
+      return {run,texts,value,highlighted:highlightedRun(run,ns)};
+    });
+    const full=runs.map(x=>x.value).join('');
+    let offset=0,group=null;
+    for(const item of runs){
+      const start=offset,end=start+item.value.length;offset=end;
+      if(item.highlighted&&clean(item.value)){
+        if(!group)group={paragraphIndex,runs:[],texts:[],value:'',start,end};
+        group.runs.push(item.run);group.texts.push(...item.texts);group.value+=item.value;group.end=end;
+      }else if(group){
+        group.prefix=full.slice(Math.max(0,group.start-90),group.start);
+        group.suffix=full.slice(group.end,Math.min(full.length,group.end+90));
+        occurrences.push(group);group=null;
+      }
+    }
+    if(group){
+      group.prefix=full.slice(Math.max(0,group.start-90),group.start);
+      group.suffix=full.slice(group.end,Math.min(full.length,group.end+90));
+      occurrences.push(group);
+    }
+  });
+  const groups=new Map();let serial=0;
+  for(const occurrence of occurrences){
+    const meta=inferLetterField(occurrence.value,occurrence.prefix,occurrence.suffix,++serial);
+    const key=meta.package?meta.kind:(['studentName','passport','nationality','homeUniversity','homeCountry','embassy','address','program','faculty','documentNo','letterDate','country'].includes(meta.kind)?meta.kind:'value:'+normalizedLetterValue(occurrence.value));
+    if(!groups.has(key))groups.set(key,{key,...meta,value:occurrence.value,occurrences:[]});
+    groups.get(key).occurrences.push(occurrence);
+  }
+  return [...groups.values()];
+}
+function renderLetterField(field,index){
+  const id='nlpdfLetterField_'+index;
+  return '<label class="nlpdf-letter-field"><span>'+esc(field.label)+'</span><input id="'+id+'" data-letter-field="'+esc(field.key)+'" value="'+esc(field.value)+'"><small>'+field.occurrences.length+' highlighted occurrence'+(field.occurrences.length===1?'':'s')+'</small></label>';
+}
 async function prepareLetterEditor(context){
   await ensureZip();
   const bytes=letterBytes(context.type);
@@ -965,46 +1112,63 @@ async function prepareLetterEditor(context){
   const doc=new DOMParser().parseFromString(xml,'application/xml');
   if(doc.querySelector('parsererror'))throw new Error('The selected Word template could not be read.');
   const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-  const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
-  const blocks=[];
-  paragraphs.forEach((paragraph,index)=>{
-    const texts=[...paragraph.getElementsByTagNameNS(ns,'t')];
-    const value=texts.map(t=>t.textContent||'').join('');
-    if(clean(value))blocks.push({index,texts,value});
-  });
-  context.editor={zip,doc,blocks};
+  const fields=collectHighlightedLetterFields(doc,ns);
+  context.editor={zip,doc,ns,fields};
   state.pendingLetter=context;
-  $('#nlpdfLetterEditorTitle').textContent='Edit '+context.letterName;
+  $('#nlpdfLetterEditorTitle').textContent='Edit '+letterTypeLabel(context.type);
   $('#nlpdfLetterEditorContext').textContent=(context.num?context.num+' · ':'')+context.name;
-  const host=$('#nlpdfLetterBlocks');
-  host.innerHTML=blocks.length?blocks.map((b,i)=>'<label class="nlpdf-letter-block"><span>Text '+(i+1)+'</span><textarea data-letter-block="'+b.index+'" rows="'+Math.min(5,Math.max(2,Math.ceil(b.value.length/90)))+'">'+esc(b.value)+'</textarea></label>').join(''):'<div class="nlpdf-letter-editor-empty">No editable text was found in this template.</div>';
-  $('#nlpdfCreateEditedLetter').disabled=!blocks.length;
-  $('#nlpdfLetterEditorStatus').textContent='Letter has not been created yet.';
+  $('#nlpdfLetterStudentType').value=letterTypeLabel(context.type);
+
+  const packageKinds=['semester','academicYear','startDate','finishDate','orientation'];
+  for(const kind of packageKinds){
+    const field=fields.find(x=>x.kind===kind);
+    if(field)setPackageField(kind,field.value);
+  }
+  if(!packageFieldValue('academicYear')){
+    const yearMatch=fields.map(x=>clean(x.value)).find(v=>/^20\d{2}$/.test(v));
+    if(yearMatch)setPackageField('academicYear',yearMatch);
+  }
+  const host=$('#nlpdfLetterBlocks'),editable=fields.filter(x=>!x.package);
+  host.innerHTML=editable.length?editable.map(renderLetterField).join(''):'<div class="nlpdf-letter-editor-empty">No additional highlighted fields were found. Package fields above can still be used when they exist in the template.</div>';
+
+  const syncProfile=()=>applySavedPackageDates(context);
+  $('#nlpdfLetterSemester').onchange=syncProfile;$('#nlpdfLetterAcademicYear').onchange=syncProfile;
+  applySavedPackageDates(context);
+  $('#nlpdfCreateEditedLetter').disabled=!fields.length;
+  $('#nlpdfLetterEditorStatus').textContent=fields.length?fields.length+' highlighted field group'+(fields.length===1?'':'s')+' ready.':'No highlighted fields found in this template.';
   $('#nlpdfLetterEditor').classList.remove('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','false');
 }
 function closeLetterEditor(){
   $('#nlpdfLetterEditor').classList.add('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','true');
   state.pendingLetter=null;
 }
+function fieldReplacement(field){
+  if(field.package)return packageFieldValue(field.kind)||field.value;
+  const input=$('[data-letter-field="'+CSS.escape(field.key)+'"]');
+  return input?input.value:field.value;
+}
 async function createEditedLetter(){
   const context=state.pendingLetter;if(!context?.editor||state.busy)return;
   state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
   try{
-    const {zip,doc,blocks}=context.editor;
-    for(const block of blocks){
-      const input=$('[data-letter-block="'+block.index+'"]');
-      const value=input?input.value:block.value;
-      if(!block.texts.length)continue;
-      block.texts[0].textContent=value;
-      if(/^\s|\s$/.test(value))block.texts[0].setAttribute('xml:space','preserve');
-      for(let i=1;i<block.texts.length;i++)block.texts[i].textContent='';
+    const {zip,doc,ns,fields}=context.editor;
+    for(const field of fields){
+      const value=fieldReplacement(field);
+      for(const occurrence of field.occurrences){
+        if(!occurrence.texts.length)continue;
+        occurrence.texts[0].textContent=value;
+        if(/^\s|\s$/.test(value))occurrence.texts[0].setAttribute('xml:space','preserve');
+        else occurrence.texts[0].removeAttribute('xml:space');
+        for(let i=1;i<occurrence.texts.length;i++)occurrence.texts[i].textContent='';
+        occurrence.runs.forEach(run=>ensureYellowHighlight(run,doc,ns));
+      }
     }
+    savePackageDates(context);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
     await writeFile(context.targetDir,context.letterName,new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
-    $('#nlpdfLetterEditorStatus').textContent='Letter created successfully.';
-    setStatus('Ready · Letter created');
-    toast('Letter created.');
+    $('#nlpdfLetterEditorStatus').textContent='Letter created successfully. Highlights were kept for checking.';
+    setStatus('Ready · Letter created');toast('Letter created · highlights kept.');
     await new Promise(resolve=>setTimeout(resolve,650));
     closeLetterEditor();
   }catch(err){
