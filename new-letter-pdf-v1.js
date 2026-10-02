@@ -10,7 +10,9 @@ const state={
   sources:new Map(), pdfJsDocs:new Map(), pdfLibDocs:new Map(), previewCache:new Map(),
   assets:{front:null,back:null,signature:null}, assetInfo:{front:null,back:null},
   busy:false, dragId:'', pendingAsset:'', destinationHandle:null,
-  zoom:1, safeArea:false, cropMode:false, cropDraft:null, renderEpoch:0, cropBounds:null, sigAspect:.32, signaturePageId:'', toolOpen:'', guides:{x:false,y:false}, contentBounds:null, history:{undo:[],redo:[],current:null,restoring:false},
+  zoom:1, safeArea:false, duplicateDetection:true, duplicateOnly:false, duplicateGroups:new Map(), duplicatePageHashes:new Map(), duplicateDismissed:new Set(), duplicateHashCache:new Map(), duplicateScanToken:0,
+  cropMode:false, cropDraft:null, renderEpoch:0, cropBounds:null, sigAspect:.32, signaturePageId:'', toolOpen:'', guides:{x:false,y:false}, contentBounds:null, history:{undo:[],redo:[],current:null,restoring:false},
+  editLetterRequested:false, pendingLetter:null,
   signatureUrl:'', sig:{xPct:.72,yPct:.80,widthPct:.22}
 };
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -48,14 +50,14 @@ async function dbPut(x){const db=await openDb();return new Promise((resolve,reje
 async function dbDelete(id){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>{db.close();reject(tx.error);};});}
 
 function prefs(){
-  try{const p=Object.assign({front:true,back:true,signature:false,sigScope:'all',sigWidth:.22,sigX:.72,sigY:.80,safeArea:false},JSON.parse(localStorage.getItem(PREF_KEY)||'{}'));if(p.sigScope==='last')p.sigScope='all';return p;}
-  catch{return {front:true,back:true,signature:false,sigScope:'all',sigWidth:.22,sigX:.72,sigY:.80,spaceMM:25,safeArea:false};}
+  try{const p=Object.assign({front:true,back:true,signature:false,sigScope:'all',sigWidth:.22,sigX:.72,sigY:.80,safeArea:false,duplicateDetection:true},JSON.parse(localStorage.getItem(PREF_KEY)||'{}'));if(p.sigScope==='last')p.sigScope='all';return p;}
+  catch{return {front:true,back:true,signature:false,sigScope:'all',sigWidth:.22,sigX:.72,sigY:.80,spaceMM:25,safeArea:false,duplicateDetection:true};}
 }
 function savePrefs(){
   try{localStorage.setItem(PREF_KEY,JSON.stringify({
     front:Boolean($('#nlpdfUseFront')?.checked),back:Boolean($('#nlpdfUseBack')?.checked),signature:Boolean($('#nlpdfUseSignature')?.checked),
     sigScope:$('#nlpdfSigScope')?.value||'all',sigWidth:state.sig.widthPct,sigX:state.sig.xPct,sigY:state.sig.yPct,
-    safeArea:Boolean($('#nlpdfSafeArea')?.checked)
+    safeArea:Boolean($('#nlpdfSafeArea')?.checked),duplicateDetection:Boolean($('#nlpdfDetectDuplicates')?.checked)
   }));}catch{}
 }
 
@@ -73,30 +75,28 @@ function workspaceMarkup(){
   return '<section class="new-letter-pdf-workspace" id="newLetterPdfWorkspace">'+
   '<div class="nlpdf-shell">'+
     '<aside class="nlpdf-sidebar">'+
-      '<div class="nlpdf-side-head"><div class="nlpdf-side-title"><span class="eyebrow">NEW LETTER</span><strong>PDF Builder</strong></div></div>'+
+      '<div class="nlpdf-side-head"><div class="nlpdf-side-title"><span class="eyebrow">NEW LETTER</span><strong>PDF Builder</strong></div><button class="nlpdf-add-new-file" id="nlpdfAddNewFile" type="button">+ Add new file</button></div>'+
       '<div class="nlpdf-side-scroll">'+
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default asset · Front / Back</strong><span>Locked paper stacks</span></div>'+
           assetRow('front','Front document',p.front)+assetRow('back','Back document',p.back)+'</section>'+ 
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Default asset · Signature</strong><span>Saved locally</span></div>'+assetRow('signature','Signature',p.signature,true)+
           '<div class="nlpdf-signature-controls"><select id="nlpdfSigScope" hidden aria-label="Signature scope"><option value="all">All document pages</option></select><div class="wide">'+rangeMarkup('Signature size','nlpdfSigSize',10,42,1,Math.round(p.sigWidth*100),'%')+'</div></div>'+
         '</section>'+
-        '<section class="nlpdf-panel" id="nlpdfCropPanel"><div class="nlpdf-panel-title"><strong>Crop tool</strong><span id="nlpdfActiveLabel">Select a page</span></div>'+
-          '<div class="nlpdf-note">Crop mode starts immediately. Drag the edges or corners of the crop boundary directly on the A4 sheet.</div>'+
-        '</section>'+
+        '<section class="nlpdf-panel" id="nlpdfCropPanel"><div class="nlpdf-panel-title"><strong>Crop tool</strong><span id="nlpdfActiveLabel">Select a page</span></div></section>'+
         '<section class="nlpdf-panel"><div class="nlpdf-panel-title"><strong>Position & scale</strong><span>Drag content<br>inside A4</span></div>'+
           rangeMarkup('Content scale','nlpdfContentScale',55,150,1,100,'%')+
           '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfCenterContent" type="button" disabled>↔ Center content</button></div>'+
         '</section>'+
-        '<section class="nlpdf-panel nlpdf-safe-strip" id="nlpdfSafePanel">'+
+        '<section class="nlpdf-panel nlpdf-safe-strip" id="nlpdfSafePanel"><div class="nlpdf-toolbar-toggles">'+
           '<label class="nlpdf-safe-toggle" title="Restrict content to A4 margins"><input id="nlpdfSafeArea" type="checkbox"><span><strong>Safe area</strong><small>25.4 mm margins</small></span></label>'+
-        '</section>'+
-        '<section class="nlpdf-panel" id="nlpdfSpacePanel"><div class="nlpdf-panel-title"><strong>Make Space</strong><span>Automatic signature clearance</span></div>'+
-          '<div class="nlpdf-note">Uniformly fit document content above the signature. No manual spacing or guessing needed.</div>'+
+          '<label class="nlpdf-safe-toggle nlpdf-duplicate-toggle" title="Warn when document pages have exactly matching rendered content"><input id="nlpdfDetectDuplicates" type="checkbox" checked><span><strong>Duplicate check</strong></span></label>'+
+          '<button class="nlpdf-which-duplicate hidden" id="nlpdfWhichDuplicate" type="button">Which duplicate</button>'+
+        '</div></section>'+
+        '<section class="nlpdf-panel" id="nlpdfSpacePanel">'+
           '<div class="nlpdf-scope"><label><input type="radio" name="nlpdfSpaceScope" value="current" checked>This page</label><label><input type="radio" name="nlpdfSpaceScope" value="all">Every page</label></div>'+
-          '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfApplySpace" type="button">Make Space</button><button class="nlpdf-btn" id="nlpdfClearSpace" type="button">Undo Make Space</button></div>'+
-          '<div class="nlpdf-note" id="nlpdfSpaceStatus">The saved signature determines the required clearance.</div>'+
+          '<div class="nlpdf-row"><button class="nlpdf-btn" id="nlpdfApplySpace" type="button">Make Space</button><button class="nlpdf-btn" id="nlpdfClearSpace" type="button">Undo</button></div>'+
         '</section>'+
-        '<section class="nlpdf-panel nlpdf-clear-panel"><button class="nlpdf-clear-all" id="nlpdfClearAll" type="button" disabled>Clear All</button><div class="nlpdf-note">Removes imported document pages only. Default assets and editor settings stay unchanged.</div></section>'+
+        '<section class="nlpdf-panel nlpdf-clear-panel"><button class="nlpdf-clear-all" id="nlpdfClearAll" type="button" disabled>Clear All</button></section>'+
       '</div>'+
       '<input class="nlpdf-file-input" id="nlpdfFileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.zip,application/pdf,image/jpeg,image/png,image/webp,application/zip" multiple>'+
       '<input class="nlpdf-asset-input" id="nlpdfAssetInput" type="file">'+
@@ -122,25 +122,32 @@ function workspaceMarkup(){
       '<aside class="nlpdf-filmstrip-wrap" id="nlpdfFilmstripWrap"><div class="nlpdf-filmstrip-head"><strong>Pages</strong><span>Front/Back are shown as stacks, not every default page</span></div><div class="nlpdf-filmstrip" id="nlpdfFilmstrip"></div></aside>'+
       '<button class="nlpdf-zoom-add" id="nlpdfAddFiles" type="button" aria-label="Add PDF, images or ZIP" title="Add PDF, images or ZIP">+</button>'+
       '<div class="nlpdf-zoom" id="nlpdfZoomControls"><button id="nlpdfZoomOut" type="button" aria-label="Zoom out">−</button><strong id="nlpdfZoomValue">100%</strong><button id="nlpdfZoomIn" type="button" aria-label="Zoom in">+</button><button id="nlpdfZoomFit" type="button">Fit A4</button></div>'+
-      '<footer class="nlpdf-footer"><div class="nlpdf-footer-stats"><div class="nlpdf-footer-stat"><strong id="nlpdfPageCount">0</strong><span>Document pages</span></div><div class="nlpdf-footer-stat"><strong id="nlpdfFileCount">0</strong><span>Source files</span></div></div><div class="nlpdf-footer-center" id="nlpdfStatus">Ready · Files stay in this browser</div><div class="nlpdf-footer-actions"><button class="nlpdf-create-folder" id="nlpdfCreateFolderOnly" type="button">Create Folder</button><button class="nlpdf-create" id="nlpdfCreate" type="button" disabled>Create PDF</button></div></footer>'+
+      '<footer class="nlpdf-footer"><div class="nlpdf-footer-stats"><div class="nlpdf-footer-stat"><strong id="nlpdfPageCount">0</strong><span>Document pages</span></div><div class="nlpdf-footer-stat"><strong id="nlpdfFileCount">0</strong><span>Source files</span></div></div><div class="nlpdf-footer-center" id="nlpdfStatus">Ready · Files stay in this browser</div><div class="nlpdf-footer-actions"><button class="nlpdf-create" id="nlpdfCreate" type="button" disabled>Create Package</button></div></footer>'+
     '</main>'+
   '</div></section>'+
   exportModalMarkup();
 }
 function exportModalMarkup(){
   return '<div class="nlpdf-modal" id="nlpdfExportModal" aria-hidden="true"><div class="nlpdf-modal-backdrop" data-nlpdf-close></div><section class="nlpdf-modal-card" role="dialog" aria-modal="true">'+
-    '<div class="nlpdf-modal-head"><div><span class="eyebrow">FINAL REVIEW</span><h2>Create PDF</h2></div><button class="nlpdf-close" type="button" data-nlpdf-close>×</button></div>'+
+    '<div class="nlpdf-modal-head"><div><span class="eyebrow">FINAL REVIEW</span><h2>Create Package</h2></div><button class="nlpdf-close" type="button" data-nlpdf-close>×</button></div>'+
     '<div class="nlpdf-modal-body">'+
       '<div class="nlpdf-modal-grid"><label class="nlpdf-modal-field"><span>Student number</span><input id="nlpdfExportNumber" placeholder="3408"></label><label class="nlpdf-modal-field"><span>Student name</span><input id="nlpdfExportName" placeholder="Miss ABC"></label>'+
-      '<label class="nlpdf-modal-field full"><span>Letter type</span><select id="nlpdfExportLetterType"><option value="bachelor_no_ien">Bachelor Degree No IEN</option><option value="bachelor">Bachelor Degree</option><option value="current_no_ien">Current No IEN</option><option value="exchange">Exchange Bachelor</option><option value="master">Master Degree</option><option value="doctor">Doctor Degree</option></select></label>'+
+      '<div class="nlpdf-modal-field full"><span>Letter type</span><div class="nlpdf-letter-type-row"><select id="nlpdfExportLetterType"><option value="bachelor_no_ien">Bachelor Degree No IEN</option><option value="bachelor">Bachelor Degree</option><option value="current_no_ien">Current No IEN</option><option value="exchange">Exchange Bachelor</option><option value="master">Master Degree</option><option value="doctor">Doctor Degree</option></select><button class="nlpdf-edit-letter" id="nlpdfEditLetter" type="button">Edit letter</button></div><small class="nlpdf-letter-requirement hidden" id="nlpdfLetterRequirement">Select Letter below to continue with Edit letter.</small></div>'+
       '<label class="nlpdf-modal-field full"><span>PDF filename</span><input id="nlpdfExportPdfName"></label></div>'+
-      '<div class="nlpdf-output-choice"><label class="nlpdf-choice"><input type="radio" name="nlpdfOutputMode" value="pdf" checked><div><strong>PDF only</strong><span>Creates Documents_Name.pdf in the selected destination.</span></div></label><label class="nlpdf-choice"><input type="radio" name="nlpdfOutputMode" value="package"><div><strong>Folder + Letter + PDF</strong><span>Creates Number Name / Letter_Name.docx + Documents_Name.pdf.</span></div></label></div>'+
-      '<div class="nlpdf-final-preview"><div class="nlpdf-final-row"><span>Folder</span><strong id="nlpdfFinalFolder">—</strong></div><div class="nlpdf-final-row"><span>Letter</span><strong id="nlpdfFinalLetter">—</strong></div><div class="nlpdf-final-row"><span>PDF</span><strong id="nlpdfFinalPdf">Documents_Miss ABC.pdf</strong></div><div class="nlpdf-final-row"><span>Pages</span><strong id="nlpdfFinalPages">0 document pages</strong></div></div>'+
-      '<div class="nlpdf-destination"><div><strong id="nlpdfDestinationName">No destination selected</strong><span id="nlpdfDestinationHelp">Choose where the final output should be created.</span></div><button class="nlpdf-dest-btn" id="nlpdfChooseDestination" type="button">Choose destination</button></div>'+
+      '<div class="nlpdf-output-choice" role="group" aria-label="Create outputs"><label class="nlpdf-choice"><input type="checkbox" name="nlpdfOutput" value="folder"><div><strong>Folder</strong></div></label><label class="nlpdf-choice"><input type="checkbox" name="nlpdfOutput" value="pdf" checked><div><strong>PDF</strong></div></label><label class="nlpdf-choice"><input type="checkbox" name="nlpdfOutput" value="letter"><div><strong>Letter</strong></div></label></div>'+
+      '<div class="nlpdf-final-preview"><div class="nlpdf-final-row"><span>Folder</span><strong id="nlpdfFinalFolder">Not created</strong></div><div class="nlpdf-final-row"><span>Letter</span><strong id="nlpdfFinalLetter">Not created</strong></div><div class="nlpdf-final-row"><span>PDF</span><strong id="nlpdfFinalPdf">Documents_Miss ABC.pdf</strong></div><div class="nlpdf-final-row"><span>Pages</span><strong id="nlpdfFinalPages">0 document pages</strong></div></div>'+
+      '<div class="nlpdf-destination"><div><strong id="nlpdfDestinationName">No destination selected</strong><span id="nlpdfDestinationHelp">Choose where the selected outputs should be created.</span></div><button class="nlpdf-dest-btn" id="nlpdfChooseDestination" type="button">Choose destination</button></div>'+
     '</div>'+
     '<div class="nlpdf-export-progress hidden" id="nlpdfExportProgress" role="status" aria-live="polite"><div class="nlpdf-export-progress-spinner" aria-hidden="true"></div><div class="nlpdf-export-progress-title" id="nlpdfProgressTitle">Creating in progress…</div><div class="nlpdf-export-progress-detail" id="nlpdfProgressDetail">Preparing documents.</div><div class="nlpdf-export-progress-track"><div id="nlpdfProgressFill"></div></div><div class="nlpdf-export-progress-counter" id="nlpdfProgressCounter"></div></div>'+
-    '<div class="nlpdf-modal-actions"><button class="nlpdf-cancel" type="button" data-nlpdf-close>Cancel</button><button class="nlpdf-confirm" id="nlpdfConfirmExport" type="button">Create PDF</button></div>'+
-  '</section></div>';
+    '<div class="nlpdf-modal-actions"><button class="nlpdf-cancel" type="button" data-nlpdf-close>Cancel</button><button class="nlpdf-confirm" id="nlpdfConfirmExport" type="button">Create Package</button></div>'+
+  '</section></div>'+letterEditorMarkup();
+}
+function letterEditorMarkup(){
+  return '<section class="nlpdf-letter-editor hidden" id="nlpdfLetterEditor" aria-hidden="true">'+
+    '<header class="nlpdf-letter-editor-head"><div><span class="eyebrow">LETTER EDITOR</span><h2 id="nlpdfLetterEditorTitle">Edit Letter</h2><span id="nlpdfLetterEditorContext"></span></div><button class="nlpdf-letter-editor-close" id="nlpdfCancelLetterEdit" type="button">Back to PDF Builder</button></header>'+
+    '<div class="nlpdf-letter-editor-body"><div class="nlpdf-letter-editor-note">Edit the text below. The original DOCX layout is kept; mixed formatting inside an edited paragraph may use that paragraph’s first text style.</div><div class="nlpdf-letter-blocks" id="nlpdfLetterBlocks"></div></div>'+
+    '<footer class="nlpdf-letter-editor-actions"><span id="nlpdfLetterEditorStatus">Letter has not been created yet.</span><button class="nlpdf-confirm" id="nlpdfCreateEditedLetter" type="button">Create Letter</button></footer>'+
+  '</section>';
 }
 
 
@@ -210,7 +217,7 @@ async function restoreSnapshot(next){
       }
     }
     renderAssets();refreshSignatureUrl();savePrefs();
-    await updateAssetInfo();await renderAll();updateControls();
+    await updateAssetInfo();await renderAll();updateControls();await scanDuplicates();
   }finally{hist.restoring=false;updateHistoryButtons();}
 }
 async function undoEdit(){
@@ -307,7 +314,7 @@ async function addFiles(files){
     await ensurePdfLibs();let added=0;
     for(const f of list){try{added+=await importFile(f);}catch(err){console.error(err);toast(err.message||('Could not import '+f.name));}}
     if(!state.activeId&&state.pages[0]){state.activeId=state.pages[0].id;state.selected.add(state.activeId);state.anchorIndex=0;}if($('#nlpdfSigScope')?.value==='page'&&!state.signaturePageId)state.signaturePageId=state.activeId;
-    await renderAll();recordEdit();setStatus('Added '+added+' page'+(added===1?'':'s')+'.');
+    await renderAll();recordEdit();setStatus('Added '+added+' page'+(added===1?'':'s')+'.');state.duplicateDismissed.clear();scanDuplicates().catch(console.error);
   }finally{state.busy=false;updateControls();}
 }
 
@@ -454,7 +461,7 @@ function syncPageControls(){
   $('#nlpdfContentScaleValue').textContent=(p?Math.round((p.transform?.scale||1)*100):100)+'%';
   $('#nlpdfCenterContent').disabled=disabled||state.cropMode;
 
-  $('#nlpdfSpaceStatus').textContent=p?.makeSpace?'Make Space active on this page.':'Reserve space automatically above the signature.';
+  const spaceStatus=$('#nlpdfSpaceStatus');if(spaceStatus)spaceStatus.textContent=p?.makeSpace?'Make Space active on this page.':'';
 }
 
 function updateControls(){
@@ -471,7 +478,7 @@ function selectPage(id,event={}){const i=state.pages.findIndex(p=>p.id===id);if(
   else{state.selected.clear();state.selected.add(id);state.anchorIndex=i;}
   renderAll();
 }
-function deleteSelected(){if(!state.selected.size)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}const ids=new Set(state.selected),old=state.pages.findIndex(p=>p.id===state.activeId);state.pages=state.pages.filter(p=>!ids.has(p.id));state.selected.clear();const n=state.pages[Math.min(Math.max(old,0),state.pages.length-1)];state.activeId=n?.id||'';if(n){state.selected.add(n.id);state.anchorIndex=state.pages.indexOf(n);}else state.anchorIndex=-1;if(!state.pages.some(p=>p.id===state.signaturePageId))state.signaturePageId=n?.id||'';renderAll();recordEdit();}
+function deleteSelected(){if(!state.selected.size)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}const ids=new Set(state.selected),old=state.pages.findIndex(p=>p.id===state.activeId);state.pages=state.pages.filter(p=>!ids.has(p.id));state.selected.clear();const n=state.pages[Math.min(Math.max(old,0),state.pages.length-1)];state.activeId=n?.id||'';if(n){state.selected.add(n.id);state.anchorIndex=state.pages.indexOf(n);}else state.anchorIndex=-1;if(!state.pages.some(p=>p.id===state.signaturePageId))state.signaturePageId=n?.id||'';renderAll();recordEdit();scanDuplicates().catch(console.error);}
 function clearAllDocuments(){
   if(!state.pages.length||state.busy)return;
   if(state.cropMode){state.cropMode=false;state.cropDraft=null;state.cropBounds=null;}
@@ -486,10 +493,11 @@ function clearAllDocuments(){
   renderAll();
   recordEdit();
   setStatus('Cleared imported document pages · Default assets and settings kept');
+  state.duplicateGroups=new Map();state.duplicatePageHashes=new Map();state.duplicateOnly=false;updateDuplicateControls();
   toast('Document pages cleared. Default assets and settings were kept.');
 }
 function rotateSelected(d){if(state.cropMode)return;for(const p of state.pages)if(state.selected.has(p.id))p.rotation=((p.rotation||0)+d+360)%360;renderAll();recordEdit();}
-function duplicateSelected(){const ids=[...state.selected],newIds=[];for(const id of ids){const i=state.pages.findIndex(p=>p.id===id);if(i<0)continue;const p=state.pages[i],cp={...p,id:uid(),crop:{...p.crop},transform:{...p.transform}};state.pages.splice(i+1,0,cp);newIds.push(cp.id);}if(newIds.length){state.selected=new Set(newIds);state.activeId=newIds[newIds.length-1];state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);}renderAll();recordEdit();}
+function duplicateSelected(){const ids=[...state.selected],newIds=[];for(const id of ids){const i=state.pages.findIndex(p=>p.id===id);if(i<0)continue;const p=state.pages[i],cp={...p,id:uid(),crop:{...p.crop},transform:{...p.transform}};state.pages.splice(i+1,0,cp);newIds.push(cp.id);}if(newIds.length){state.selected=new Set(newIds);state.activeId=newIds[newIds.length-1];state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);}renderAll();recordEdit();state.duplicateDismissed.clear();scanDuplicates().catch(console.error);}
 function moveActive(d){const p=activePage();if(!p)return;const i=state.pages.indexOf(p),j=i+d;if(j<0||j>=state.pages.length)return;[state.pages[i],state.pages[j]]=[state.pages[j],state.pages[i]];state.anchorIndex=j;renderAll();recordEdit();}
 function reorder(a,b){
   if(!a||!b||a===b)return;
@@ -629,20 +637,88 @@ function setupBackgroundZoom(){
 }
 
 
+/* Exact visual duplicate detection. Warnings never delete pages. */
+async function sha256Hex(bytes){
+  const digest=await crypto.subtle.digest('SHA-256',bytes);
+  return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function duplicateFingerprint(p){
+  const cacheKey=p.kind+':'+p.sourceKey+':'+p.sourcePage;
+  if(state.duplicateHashCache.has(cacheKey))return state.duplicateHashCache.get(cacheKey);
+  const canvas=await sourceRaster(p);
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  const prefix=new TextEncoder().encode(canvas.width+'x'+canvas.height+':');
+  const bytes=new Uint8Array(prefix.length+pixels.length);bytes.set(prefix);bytes.set(pixels,prefix.length);
+  const hash=await sha256Hex(bytes);
+  state.duplicateHashCache.set(cacheKey,hash);
+  return hash;
+}
+function duplicateHashForPage(id){return state.duplicatePageHashes.get(id)||'';}
+function duplicatePageIds(){return new Set(state.duplicatePageHashes.keys());}
+function updateDuplicateControls(){
+  const button=$('#nlpdfWhichDuplicate');
+  if(!button)return;
+  const count=state.duplicatePageHashes.size;
+  button.classList.toggle('hidden',!state.duplicateDetection||!count);
+  button.textContent=state.duplicateOnly?'Show all':'Which duplicate';
+  button.title=count?count+' page'+(count===1?'':'s')+' share duplicate content':'';
+}
+async function scanDuplicates(){
+  const token=++state.duplicateScanToken;
+  if(!state.duplicateDetection||state.pages.length<2){
+    state.duplicateGroups=new Map();state.duplicatePageHashes=new Map();state.duplicateOnly=false;updateDuplicateControls();
+    if(state.viewMode==='grid')renderGrid();else renderFilmstrip();
+    return;
+  }
+  const byHash=new Map();
+  for(const p of state.pages){
+    const hash=await duplicateFingerprint(p);
+    if(token!==state.duplicateScanToken)return;
+    if(!byHash.has(hash))byHash.set(hash,[]);
+    byHash.get(hash).push(p.id);
+  }
+  const groups=new Map([...byHash].filter(([hash,ids])=>ids.length>1&&!state.duplicateDismissed.has(hash)));
+  const pageHashes=new Map();
+  for(const [hash,ids] of groups)for(const id of ids)pageHashes.set(id,hash);
+  state.duplicateGroups=groups;state.duplicatePageHashes=pageHashes;
+  if(state.duplicateOnly&&!pageHashes.size)state.duplicateOnly=false;
+  updateDuplicateControls();
+  if(state.viewMode==='grid')await renderGrid();else await renderFilmstrip();
+}
+function dismissDuplicate(hash){
+  if(!hash)return;
+  state.duplicateDismissed.add(hash);
+  const ids=state.duplicateGroups.get(hash)||[];
+  state.duplicateGroups.delete(hash);
+  for(const id of ids)state.duplicatePageHashes.delete(id);
+  if(state.duplicateOnly&&!state.duplicatePageHashes.size)state.duplicateOnly=false;
+  updateDuplicateControls();
+  if(state.viewMode==='grid')renderGrid();else renderFilmstrip();
+}
+function toggleDuplicateOnly(){
+  if(!state.duplicatePageHashes.size)return;
+  state.duplicateOnly=!state.duplicateOnly;
+  updateDuplicateControls();
+  if(state.viewMode==='grid')renderGrid();else renderFilmstrip();
+}
+
 /* Stack / thumbnails */
 function stackMeta(which){const a=state.assets[which],info=state.assetInfo[which],enabled=$('#'+(which==='front'?'nlpdfUseFront':'nlpdfUseBack'))?.checked;return a&&enabled?{which,name:a.name,count:info?.pageCount||1}:null;}
 function stackMini(m){return '<article class="nlpdf-page-card" data-stack="'+m.which+'"><div class="nlpdf-stack-mini"><i></i><i></i><i>'+esc(m.which==='front'?'Front':'Back')+'</i><b>'+m.count+'</b></div><div class="nlpdf-page-meta"><strong>Default '+(m.which==='front'?'Front':'Back')+'</strong><span>'+m.count+' page'+(m.count===1?'':'s')+' · locked</span></div></article>';}
 function stackGrid(m){return '<article class="nlpdf-grid-card nlpdf-stack-card" data-stack="'+m.which+'"><div class="nlpdf-stack-thumb"><span class="nlpdf-stack-sheet"></span><span class="nlpdf-stack-sheet"></span><span class="nlpdf-stack-sheet"><strong>Default '+(m.which==='front'?'Front':'Back')+'</strong></span><span class="nlpdf-stack-count">'+m.count+' page'+(m.count===1?'':'s')+'</span></div><div class="nlpdf-grid-meta"><strong>'+esc(m.name)+'</strong><span>Locked default asset</span></div></article>';}
 async function thumbCanvas(p,w=140,h=198){const c=document.createElement('canvas');await drawPageToCanvas(p,c,w,h);return c;}
 async function renderFilmstrip(){
-  const s=$('#nlpdfFilmstrip'),front=stackMeta('front'),back=stackMeta('back');
-  s.innerHTML=(front?stackMini(front):'')+state.pages.map((p,i)=>'<article class="nlpdf-page-card '+(state.selected.has(p.id)?'selected ':'')+(state.activeId===p.id?'active':'')+'" data-page-id="'+p.id+'" draggable="true"><div class="nlpdf-thumb"><span class="nlpdf-page-index">'+(i+1)+'</span><span class="nlpdf-loading"></span></div><div class="nlpdf-page-meta"><strong>'+esc(p.fileName)+'</strong><span>Page '+(i+1)+'</span></div></article>').join('')+(back?stackMini(back):'');
-  for(const p of state.pages){const h=s.querySelector('[data-page-id="'+CSS.escape(p.id)+'"] .nlpdf-thumb');if(!h)continue;thumbCanvas(p,140,198).then(c=>h.appendChild(c)).catch(()=>{});}
+  const s=$('#nlpdfFilmstrip'),front=stackMeta('front'),back=stackMeta('back'),dups=duplicatePageIds();
+  const visible=state.duplicateOnly?state.pages.filter(p=>dups.has(p.id)):state.pages;
+  s.innerHTML=(state.duplicateOnly?'':(front?stackMini(front):''))+visible.map(p=>{const i=state.pages.indexOf(p),hash=duplicateHashForPage(p.id);return '<article class="nlpdf-page-card '+(state.selected.has(p.id)?'selected ':'')+(state.activeId===p.id?'active ':'')+(hash?'duplicate-warning':'')+'" data-page-id="'+p.id+'" draggable="true"><div class="nlpdf-thumb"><span class="nlpdf-page-index">'+(i+1)+'</span>'+(hash?'<button class="nlpdf-dup-dismiss" type="button" data-duplicate-dismiss="'+hash+'" title="Dismiss this duplicate warning">Dismiss</button>':'')+'<span class="nlpdf-loading"></span></div><div class="nlpdf-page-meta"><strong>'+esc(p.fileName)+'</strong><span>Page '+(i+1)+(hash?' · duplicate':'')+'</span></div></article>';}).join('')+(state.duplicateOnly?'':(back?stackMini(back):''));
+  for(const p of visible){const h=s.querySelector('[data-page-id="'+CSS.escape(p.id)+'"] .nlpdf-thumb');if(!h)continue;thumbCanvas(p,140,198).then(c=>h.appendChild(c)).catch(()=>{});}
 }
 async function renderGrid(){
-  const g=$('#nlpdfGrid'),front=stackMeta('front'),back=stackMeta('back');
-  g.innerHTML=(front?stackGrid(front):'')+state.pages.map((p,i)=>'<article class="nlpdf-grid-card '+(state.selected.has(p.id)?'selected ':'')+(state.activeId===p.id?'active':'')+'" data-page-id="'+p.id+'" draggable="true"><div class="nlpdf-grid-thumb"><span class="nlpdf-page-index">'+(i+1)+'</span></div><div class="nlpdf-grid-meta"><strong>'+esc(p.fileName)+'</strong><span>Document page '+(i+1)+'</span></div></article>').join('')+(back?stackGrid(back):'');
-  for(const p of state.pages){const h=g.querySelector('[data-page-id="'+CSS.escape(p.id)+'"] .nlpdf-grid-thumb');if(!h)continue;thumbCanvas(p,260,368).then(c=>h.appendChild(c)).catch(()=>{});}
+  const g=$('#nlpdfGrid'),front=stackMeta('front'),back=stackMeta('back'),dups=duplicatePageIds();
+  const visible=state.duplicateOnly?state.pages.filter(p=>dups.has(p.id)):state.pages;
+  g.innerHTML=(state.duplicateOnly?'':(front?stackGrid(front):''))+visible.map(p=>{const i=state.pages.indexOf(p),hash=duplicateHashForPage(p.id);return '<article class="nlpdf-grid-card '+(state.selected.has(p.id)?'selected ':'')+(state.activeId===p.id?'active ':'')+(hash?'duplicate-warning':'')+'" data-page-id="'+p.id+'" draggable="true"><div class="nlpdf-grid-thumb"><span class="nlpdf-page-index">'+(i+1)+'</span>'+(hash?'<button class="nlpdf-dup-dismiss" type="button" data-duplicate-dismiss="'+hash+'" title="Dismiss this duplicate warning">Dismiss</button>':'')+'</div><div class="nlpdf-grid-meta"><strong>'+esc(p.fileName)+'</strong><span>Document page '+(i+1)+(hash?' · duplicate':'')+'</span></div></article>';}).join('')+(state.duplicateOnly?'':(back?stackGrid(back):''));
+  for(const p of visible){const h=g.querySelector('[data-page-id="'+CSS.escape(p.id)+'"] .nlpdf-grid-thumb');if(!h)continue;thumbCanvas(p,260,368).then(c=>h.appendChild(c)).catch(()=>{});}
 }
 async function renderAll(){updateControls();const tasks=[renderActive()];if(state.viewMode==='grid')tasks.push(renderGrid());else tasks.push(renderFilmstrip());await Promise.allSettled(tasks);}
 
@@ -825,7 +901,13 @@ function letterBytes(key){const t=(key==='bachelor_no_ien'?customNoIenTemplate()
 async function writeFile(dir,name,data){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();await w.write(data);await w.close();}
 function caseNumber(){return clean($('#caseStudentNumber')?.value)||clean($('#studentNumber')?.value);}
 function caseName(){return clean($('#caseStudentName')?.value)||clean($('#studentName')?.value);}
+function selectedOutputs(){
+  const values=new Set($$('input[name="nlpdfOutput"]:checked').map(x=>x.value));
+  return {folder:values.has('folder'),pdf:values.has('pdf'),letter:values.has('letter'),any:values.size>0};
+}
 function openExport(){
+  state.editLetterRequested=false;
+  $('#nlpdfEditLetter').classList.remove('active');
   $('#nlpdfExportNumber').value=caseNumber();$('#nlpdfExportName').value=caseName();$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();
   $('#nlpdfFinalPages').textContent=state.pages.length+' document page'+(state.pages.length===1?'':'s')+(stackMeta('front')?' + front':'')+(stackMeta('back')?' + back':'');
   $('#nlpdfExportModal').classList.add('open');$('#nlpdfExportModal').setAttribute('aria-hidden','false');
@@ -834,11 +916,26 @@ function closeExport(){$('#nlpdfExportModal').classList.remove('open');$('#nlpdf
 function syncExportPreview(){
   const num=safePath($('#nlpdfExportNumber').value)||'3408',name=safePath($('#nlpdfExportName').value)||'Miss ABC',pdf=$('#nlpdfExportPdfName');
   if(pdf.dataset.auto==='1'||!clean(pdf.value))pdf.value='Documents_'+name+'.pdf';
-  const mode=$('input[name="nlpdfOutputMode"]:checked')?.value||'pdf';$('#nlpdfFinalFolder').textContent=mode==='package'?num+' '+name:'Not created';$('#nlpdfFinalLetter').textContent=mode==='package'?'Letter_'+name+'.docx':'Not created';$('#nlpdfFinalPdf').textContent=pdf.value;$('#nlpdfConfirmExport').textContent=mode==='package'?'Create Package':'Create PDF';
+  const outputs=selectedOutputs();
+  $('#nlpdfFinalFolder').textContent=outputs.folder?num+' '+name:'Not created';
+  $('#nlpdfFinalLetter').textContent=outputs.letter?'Letter_'+name+'.docx':'Not created';
+  $('#nlpdfFinalPdf').textContent=outputs.pdf?pdf.value:'Not created';
+  const needsLetter=state.editLetterRequested&&!outputs.letter;
+  $('#nlpdfLetterRequirement').classList.toggle('hidden',!needsLetter);
+  $('#nlpdfEditLetter').classList.toggle('active',state.editLetterRequested);
+  const confirm=$('#nlpdfConfirmExport');
+  confirm.textContent='Create Package';
+  confirm.disabled=state.busy||!outputs.any||needsLetter;
+}
+function requestLetterEdit(){
+  state.editLetterRequested=true;
+  syncExportPreview();
+  if(!selectedOutputs().letter){toast('Select Letter to continue with Edit letter.');return;}
+  toast('Letter will open for editing before it is created.');
 }
 async function chooseDestination(){
   if(!window.showDirectoryPicker){toast('Folder selection requires Chrome or Edge.');return false;}
-  try{state.destinationHandle=await window.showDirectoryPicker({mode:'readwrite'});$('#nlpdfDestinationName').textContent=state.destinationHandle.name||'Selected folder';$('#nlpdfDestinationHelp').textContent='Output will be created here for this export.';return true;}catch(err){if(err?.name!=='AbortError')toast(err.message||'Could not select destination.');return false;}
+  try{state.destinationHandle=await window.showDirectoryPicker({mode:'readwrite'});$('#nlpdfDestinationName').textContent=state.destinationHandle.name||'Selected folder';$('#nlpdfDestinationHelp').textContent='Selected outputs will be created here.';return true;}catch(err){if(err?.name!=='AbortError')toast(err.message||'Could not select destination.');return false;}
 }
 function exportProgress(title,detail='',done=0,total=0,mode='active'){
   const layer=$('#nlpdfExportProgress'),heading=$('#nlpdfProgressTitle'),body=$('#nlpdfProgressDetail');
@@ -858,52 +955,106 @@ function hideExportProgress(){
 async function allowExportProgressToPaint(){
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
 }
-
+async function prepareLetterEditor(context){
+  await ensureZip();
+  const bytes=letterBytes(context.type);
+  const zip=await window.JSZip.loadAsync(bytes);
+  const xmlFile=zip.file('word/document.xml');
+  if(!xmlFile)throw new Error('The selected Word template has no editable document body.');
+  const xml=await xmlFile.async('string');
+  const doc=new DOMParser().parseFromString(xml,'application/xml');
+  if(doc.querySelector('parsererror'))throw new Error('The selected Word template could not be read.');
+  const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
+  const blocks=[];
+  paragraphs.forEach((paragraph,index)=>{
+    const texts=[...paragraph.getElementsByTagNameNS(ns,'t')];
+    const value=texts.map(t=>t.textContent||'').join('');
+    if(clean(value))blocks.push({index,texts,value});
+  });
+  context.editor={zip,doc,blocks};
+  state.pendingLetter=context;
+  $('#nlpdfLetterEditorTitle').textContent='Edit '+context.letterName;
+  $('#nlpdfLetterEditorContext').textContent=(context.num?context.num+' · ':'')+context.name;
+  const host=$('#nlpdfLetterBlocks');
+  host.innerHTML=blocks.length?blocks.map((b,i)=>'<label class="nlpdf-letter-block"><span>Text '+(i+1)+'</span><textarea data-letter-block="'+b.index+'" rows="'+Math.min(5,Math.max(2,Math.ceil(b.value.length/90)))+'">'+esc(b.value)+'</textarea></label>').join(''):'<div class="nlpdf-letter-editor-empty">No editable text was found in this template.</div>';
+  $('#nlpdfCreateEditedLetter').disabled=!blocks.length;
+  $('#nlpdfLetterEditorStatus').textContent='Letter has not been created yet.';
+  $('#nlpdfLetterEditor').classList.remove('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','false');
+}
+function closeLetterEditor(){
+  $('#nlpdfLetterEditor').classList.add('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','true');
+  state.pendingLetter=null;
+}
+async function createEditedLetter(){
+  const context=state.pendingLetter;if(!context?.editor||state.busy)return;
+  state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
+  try{
+    const {zip,doc,blocks}=context.editor;
+    for(const block of blocks){
+      const input=$('[data-letter-block="'+block.index+'"]');
+      const value=input?input.value:block.value;
+      if(!block.texts.length)continue;
+      block.texts[0].textContent=value;
+      if(/^\s|\s$/.test(value))block.texts[0].setAttribute('xml:space','preserve');
+      for(let i=1;i<block.texts.length;i++)block.texts[i].textContent='';
+    }
+    zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
+    const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
+    await writeFile(context.targetDir,context.letterName,new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+    $('#nlpdfLetterEditorStatus').textContent='Letter created successfully.';
+    setStatus('Ready · Letter created');
+    toast('Letter created.');
+    await new Promise(resolve=>setTimeout(resolve,650));
+    closeLetterEditor();
+  }catch(err){
+    console.error(err);$('#nlpdfLetterEditorStatus').textContent=err?.message||'Could not create letter.';toast(err?.message||'Could not create letter.');
+  }finally{state.busy=false;$('#nlpdfCreateEditedLetter').disabled=false;updateControls();}
+}
 async function confirmExport(){
   if(state.busy)return;
-  const name=safePath($('#nlpdfExportName').value);
-  const num=safePath($('#nlpdfExportNumber').value);
-  const mode=$('input[name="nlpdfOutputMode"]:checked')?.value||'pdf';
-  if(!name){toast('Enter the student name.');$('#nlpdfExportName').focus();return;}
-  if(mode==='package'&&!num){toast('Enter the student number.');$('#nlpdfExportNumber').focus();return;}
-  if(!state.destinationHandle){
-    const ok=await chooseDestination();if(!ok)return;
-  }
-  state.busy=true;
-  $('#nlpdfConfirmExport').disabled=true;
-  exportProgress('Creating in progress…','Preparing your PDF documents.',0,state.pages.length);
-  setStatus('Creating PDF in progress…');
-  updateControls();
-  await allowExportProgressToPaint();
+  const name=safePath($('#nlpdfExportName').value),num=safePath($('#nlpdfExportNumber').value),outputs=selectedOutputs();
+  if(!outputs.any){toast('Select Folder, PDF, or Letter.');return;}
+  if(state.editLetterRequested&&!outputs.letter){syncExportPreview();return;}
+  if((outputs.pdf||outputs.letter)&&!name){toast('Enter the student name.');$('#nlpdfExportName').focus();return;}
+  if(outputs.folder&&!num){toast('Enter the student number.');$('#nlpdfExportNumber').focus();return;}
+  if(!state.destinationHandle){const ok=await chooseDestination();if(!ok)return;}
+  state.busy=true;$('#nlpdfConfirmExport').disabled=true;
+  exportProgress('Creating in progress…','Preparing selected outputs.',0,outputs.pdf?state.pages.length:0);
+  setStatus('Creating package…');updateControls();await allowExportProgressToPaint();
+  let handoff=null;
   try{
-    const bytes=await buildPdf((phase,done,total)=>exportProgress('Creating in progress…',phase,done,total));
-    let pdfName=safeFile($('#nlpdfExportPdfName').value||('Documents_'+name+'.pdf'));
-    if(!/\.pdf$/i.test(pdfName))pdfName+='.pdf';
-    exportProgress('Creating in progress…','Writing files to the selected folder…',state.pages.length,state.pages.length);
-    await allowExportProgressToPaint();
-    if(mode==='package'){
-      const folder=await state.destinationHandle.getDirectoryHandle(num+' '+name,{create:true});
-      await writeFile(folder,'Letter_'+name+'.docx',new Blob([letterBytes($('#nlpdfExportLetterType').value)],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
-      await writeFile(folder,pdfName,new Blob([bytes],{type:'application/pdf'}));
-    }else{
-      await writeFile(state.destinationHandle,pdfName,new Blob([bytes],{type:'application/pdf'}));
+    let targetDir=state.destinationHandle;
+    if(outputs.folder){
+      exportProgress('Creating in progress…','Creating student folder.',0,outputs.pdf?state.pages.length:0);
+      targetDir=await state.destinationHandle.getDirectoryHandle(num+' '+name,{create:true});
     }
-    exportProgress('Successfully created','The files are fully saved in your selected destination.',state.pages.length,state.pages.length,'success');
-    setStatus('Ready · Export complete');
-    toast(mode==='package'?'Folder + Letter + PDF created.':'PDF created.');
-    await new Promise(resolve=>setTimeout(resolve,950));
-    closeExport();
+    if(outputs.pdf){
+      const bytes=await buildPdf((phase,done,total)=>exportProgress('Creating in progress…',phase,done,total));
+      let pdfName=safeFile($('#nlpdfExportPdfName').value||('Documents_'+name+'.pdf'));if(!/\.pdf$/i.test(pdfName))pdfName+='.pdf';
+      exportProgress('Creating in progress…','Writing PDF…',state.pages.length,state.pages.length);
+      await writeFile(targetDir,pdfName,new Blob([bytes],{type:'application/pdf'}));
+    }
+    if(outputs.letter){
+      const letterName='Letter_'+name+'.docx',type=$('#nlpdfExportLetterType').value;
+      if(state.editLetterRequested)handoff={num,name,type,letterName,targetDir};
+      else{
+        exportProgress('Creating in progress…','Writing letter…',outputs.pdf?state.pages.length:0,outputs.pdf?state.pages.length:0);
+        await writeFile(targetDir,letterName,new Blob([letterBytes(type)],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+      }
+    }
+    if(handoff){
+      hideExportProgress();closeExport();state.busy=false;updateControls();
+      await prepareLetterEditor(handoff);
+      return;
+    }
+    exportProgress('Successfully created','Selected outputs are fully saved.',outputs.pdf?state.pages.length:0,outputs.pdf?state.pages.length:0,'success');
+    setStatus('Ready · Export complete');toast('Package created.');
+    await new Promise(resolve=>setTimeout(resolve,850));closeExport();
   }catch(err){
-    console.error(err);
-    exportProgress('Could not create PDF',err?.message||'The export did not complete.',0,0,'error');
-    setStatus('Export failed');
-    toast(err?.message||'Could not create output.');
-    await new Promise(resolve=>setTimeout(resolve,1600));
+    console.error(err);exportProgress('Could not create package',err?.message||'The export did not complete.',0,0,'error');setStatus('Export failed');toast(err?.message||'Could not create output.');await new Promise(resolve=>setTimeout(resolve,1500));
   }finally{
-    hideExportProgress();
-    state.busy=false;
-    $('#nlpdfConfirmExport').disabled=false;
-    updateControls();
+    if(!handoff){hideExportProgress();state.busy=false;$('#nlpdfConfirmExport').disabled=false;updateControls();syncExportPreview();}
   }
 }
 
@@ -1009,6 +1160,7 @@ function setupDrop(el){
 function setupPageContainer(el){
   const lastTap={id:'',at:0};
   el.addEventListener('click',e=>{
+    const dismiss=e.target.closest('[data-duplicate-dismiss]');if(dismiss){e.preventDefault();e.stopPropagation();dismissDuplicate(dismiss.dataset.duplicateDismiss);return;}
     const card=e.target.closest('[data-page-id]');if(!card)return;
     const id=card.dataset.pageId,now=Date.now();
     const doubleTap=(el.id==='nlpdfGrid'&&lastTap.id===id&&now-lastTap.at<550);
@@ -1113,9 +1265,9 @@ async function build(){
   const docs=$('#workspaceDocuments'),legacy=docs?.querySelector('.document-workspace-grid');if(!docs||!legacy)return;
   docs.classList.add('nlpdf-primary');if(!$('#newLetterPdfWorkspace'))legacy.insertAdjacentHTML('afterend',workspaceMarkup());
   await ensurePdfLibs();await loadAssets();
-  const p=prefs();state.safeArea=Boolean(p.safeArea);$('#nlpdfSafeArea').checked=state.safeArea;$('#nlpdfSigScope').value='all';$('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);$('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
+  const p=prefs();state.safeArea=Boolean(p.safeArea);state.duplicateDetection=p.duplicateDetection!==false;$('#nlpdfSafeArea').checked=state.safeArea;$('#nlpdfDetectDuplicates').checked=state.duplicateDetection;$('#nlpdfSigScope').value='all';$('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);$('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
 
-  $('#nlpdfCreateFolderOnly').addEventListener('click',()=>$('#documentsCreateFolder')?.click());
+  $('#nlpdfAddNewFile').addEventListener('click',()=>$('#nlpdfFileInput').click());
   $('#nlpdfAddFiles').addEventListener('click',()=>$('#nlpdfFileInput').click());$('#nlpdfFileInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
   $$('[data-asset-import]').forEach(b=>b.addEventListener('click',()=>{state.pendingAsset=b.dataset.assetImport;const i=$('#nlpdfAssetInput');i.accept=state.pendingAsset==='signature'?'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp':'application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp';i.click();}));
   $$('[data-asset-remove]').forEach(b=>b.addEventListener('click',()=>removeAsset(b.dataset.assetRemove).catch(err=>toast(err.message))));
@@ -1142,6 +1294,12 @@ async function build(){
   $('#nlpdfSafeArea').addEventListener('change',e=>{
     state.safeArea=e.target.checked;savePrefs();renderAll();recordEdit();
   });
+  $('#nlpdfDetectDuplicates').addEventListener('change',e=>{
+    state.duplicateDetection=e.target.checked;state.duplicateOnly=false;savePrefs();
+    if(!state.duplicateDetection){state.duplicateGroups=new Map();state.duplicatePageHashes=new Map();updateDuplicateControls();renderFilmstrip();renderGrid();}
+    else scanDuplicates().catch(console.error);
+  });
+  $('#nlpdfWhichDuplicate').addEventListener('click',toggleDuplicateOnly);
   $('#nlpdfApplySpace').addEventListener('click',()=>applySpace(false));
   $('#nlpdfClearSpace').addEventListener('click',()=>applySpace(true));
   $('#nlpdfZoomOut').addEventListener('click',()=>setZoom(state.zoom-.1));
@@ -1193,10 +1351,12 @@ async function build(){
   });
   $('#nlpdfCreate').addEventListener('click',openExport);
   $$('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
+  $('#nlpdfEditLetter').addEventListener('click',requestLetterEdit);
+  $('#nlpdfCancelLetterEdit').addEventListener('click',closeLetterEditor);$('#nlpdfCreateEditedLetter').addEventListener('click',createEditedLetter);
   ['nlpdfExportNumber','nlpdfExportName'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(id==='nlpdfExportName')$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();}));
-  $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutputMode"]').forEach(x=>x.addEventListener('change',syncExportPreview));
+  $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutput"]').forEach(x=>x.addEventListener('change',syncExportPreview));
 
-  renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();resetHistory();
+  renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();resetHistory();updateDuplicateControls();
 }
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>build().catch(console.error),{once:true});else build().catch(console.error);

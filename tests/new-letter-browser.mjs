@@ -122,25 +122,14 @@ try{
     assert.equal(await page.locator('#nlpdfSigSize').isVisible(),true);
     assert.equal(await page.locator('.nlpdf-signature-controls .nlpdf-field').count(),0);
   });
-  await run('Create Folder and Create PDF are adjacent in the fixed footer',async()=>{
-    assert.deepEqual(await page.locator('.nlpdf-footer-actions > button').evaluateAll(nodes=>nodes.map(n=>n.id)),['nlpdfCreateFolderOnly','nlpdfCreate']);
-    assert.equal(await page.locator('.nlpdf-side-head #nlpdfCreateFolderOnly').count(),0);
-    const folder=await page.locator('#nlpdfCreateFolderOnly').boundingBox();
-    const pdf=await page.locator('#nlpdfCreate').boundingBox();
-    const footer=await page.locator('.nlpdf-footer').boundingBox();
-    assert(folder&&pdf&&footer);
-    assert(pdf.x>folder.x+folder.width-3);
-    assert(folder.y>=footer.y-2&&pdf.y>=footer.y-2);
-    assert(folder.y+folder.height<=footer.y+footer.height+2);
-    assert(pdf.y+pdf.height<=footer.y+footer.height+2);
+  await run('Footer has one Create Package action and header has Add new file',async()=>{
+    assert.deepEqual(await page.locator('.nlpdf-footer-actions > button').evaluateAll(nodes=>nodes.map(n=>n.id)),['nlpdfCreate']);
+    assert.equal(await page.locator('#nlpdfCreateFolderOnly').count(),0);
+    assert.equal(await page.locator('#nlpdfAddNewFile').isVisible(),true);
+    assert.match(await text('#nlpdfAddNewFile'),/Add new file/);
+    assert.match(await text('#nlpdfCreate'),/Create Package/);
   });
-  await run('Footer Create Folder opens the existing folder setup',async()=>{
-    await page.locator('#nlpdfCreateFolderOnly').click();
-    assert.equal(await page.locator('#letterModal').getAttribute('aria-hidden'),'false');
-    await page.locator('#letterModal button[data-close-letter]').first().click();
-    assert.equal(await page.locator('#letterModal').getAttribute('aria-hidden'),'true');
-  });
-  await run('Add Files button imports two images and updates page count',async()=>{
+  await run('Add Files imports two images and exact duplicates warn without deleting',async()=>{
     await page.locator('#nlpdfAddFiles').click();
     await page.locator('#nlpdfFileInput').setInputFiles([
       {name:'photo-a.png',mimeType:'image/png',buffer:png},
@@ -150,6 +139,13 @@ try{
     assert.equal(await count(),2);
     assert.equal(await visible('#nlpdfTransformLayer'),true);
     assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').count(),2);
+    await page.waitForFunction(()=>document.querySelectorAll('#nlpdfFilmstrip .duplicate-warning').length===2,{timeout:15000});
+    assert.equal(await page.locator('#nlpdfWhichDuplicate').isVisible(),true);
+    await page.locator('#nlpdfWhichDuplicate').click();
+    assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').count(),2);
+    await page.locator('#nlpdfFilmstrip .nlpdf-dup-dismiss').first().click();
+    await page.waitForFunction(()=>document.querySelectorAll('#nlpdfFilmstrip .duplicate-warning').length===0);
+    assert.equal(await count(),2,'duplicate warning must never delete pages');
   });
   await run('Whole A4 stage drag-and-drop imports an additional file',async()=>{
     await page.evaluate(async encoded=>{
@@ -449,6 +445,20 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await visible('#nlpdfStage'),true);
   });
 
+  await run('Create Package uses independent Folder/PDF/Letter selections and Edit letter requires Letter',async()=>{
+    await page.locator('#nlpdfCreate').click();
+    assert.equal(await page.locator('input[name="nlpdfOutput"]').count(),3);
+    assert.equal(await page.locator('input[name="nlpdfOutput"][value="pdf"]').isChecked(),true);
+    assert.equal(await page.locator('input[name="nlpdfOutput"][value="folder"]').isChecked(),false);
+    assert.equal(await page.locator('input[name="nlpdfOutput"][value="letter"]').isChecked(),false);
+    await page.locator('#nlpdfEditLetter').click();
+    assert.equal(await page.locator('#nlpdfConfirmExport').isDisabled(),true);
+    assert.equal(await page.locator('#nlpdfLetterRequirement').isVisible(),true);
+    await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
+    assert.equal(await page.locator('#nlpdfConfirmExport').isDisabled(),false);
+    await page.locator('#nlpdfExportModal [data-nlpdf-close]').last().click();
+  });
+
   await run('Export modal shows processing, then success only after write completes',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
@@ -473,7 +483,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfCreate').click();
     await page.locator('#nlpdfExportName').fill('QA Student');
     await page.locator('#nlpdfExportNumber').fill('9012');
-    await page.locator('input[name="nlpdfOutputMode"][value="package"]').check();
+    await page.locator('input[name="nlpdfOutput"][value="folder"]').check();
+    await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
     assert.match(await text('#nlpdfFinalFolder'),/9012 QA Student/);
     assert.match(await text('#nlpdfFinalLetter'),/Letter_QA Student\.docx/);
     await page.locator('#nlpdfConfirmExport').click();
