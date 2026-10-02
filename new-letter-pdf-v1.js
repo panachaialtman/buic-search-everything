@@ -117,7 +117,6 @@ function workspaceMarkup(){
       '</div>'+
       '<section class="nlpdf-stage" id="nlpdfStage"><div class="nlpdf-drop-overlay">Drop PDF, images, or ZIP anywhere here</div>'+
         '<label class="nlpdf-page-content-float"><span>Content</span><select id="nlpdfPageContentType"><option value="">—</option><option value="passport">Passport</option><option value="receipt">Receipt</option><option value="bu_application">BU Application</option><option value="visa_application">Visa Application</option></select></label>'+
-        '<button class="nlpdf-package-manager-fab" id="nlpdfPackageManagerBtn" type="button">Package dates</button>'+
         '<div class="nlpdf-paper" id="nlpdfPaper"><canvas id="nlpdfCanvas" width="840" height="1188"></canvas><div id="nlpdfTransformLayer" class="nlpdf-transform-layer hidden"><i data-resize="nw"></i><i data-resize="ne"></i><i data-resize="sw"></i><i data-resize="se"></i></div><div id="nlpdfSnapX" class="nlpdf-snap-guide x hidden"></div><div id="nlpdfSnapY" class="nlpdf-snap-guide y hidden"></div><div class="nlpdf-safe-guide hidden" id="nlpdfSafeGuide"></div><div class="nlpdf-crop-layer hidden" id="nlpdfCropLayer"><div class="nlpdf-crop-region" id="nlpdfCropRegion"><i data-crop-handle="nw"></i><i data-crop-handle="n"></i><i data-crop-handle="ne"></i><i data-crop-handle="e"></i><i data-crop-handle="se"></i><i data-crop-handle="s"></i><i data-crop-handle="sw"></i><i data-crop-handle="w"></i></div></div><div class="nlpdf-paper-hint" id="nlpdfPaperHint"><div><strong>Blank A4</strong><span>Drop files onto the workspace or click “Add files / ZIP”.<br>Select a page to crop, move, scale, or make space.</span></div></div><span class="nlpdf-paper-badge hidden" id="nlpdfPaperBadge"></span><img class="nlpdf-signature-preview hidden" id="nlpdfSignaturePreview" alt="Signature"></div>'+
         '<div class="nlpdf-crop-actions hidden" id="nlpdfCropActions" role="group" aria-label="Crop actions"><button class="nlpdf-crop-apply" id="nlpdfApplyCrop" type="button">✓ Accept crop</button><button class="nlpdf-crop-cancel" id="nlpdfCancelCrop" type="button">Cancel</button></div>'+
       '</section>'+
@@ -179,6 +178,7 @@ function letterEditorMarkup(){
         '<section class="nlpdf-letter-form-section" id="nlpdfLetterExtraSection"><div class="nlpdf-letter-form-title"><strong>Other letter details</strong><span>Only recognized editable topics from this template are shown.</span></div><div class="nlpdf-letter-form-grid" id="nlpdfLetterExtraFields"></div></section>'+
       '</div>'+
     '</div>'+
+    '<button class="nlpdf-package-manager-fab nlpdf-letter-package-fab" id="nlpdfPackageManagerBtn" type="button">Package dates</button>'+
     '<footer class="nlpdf-letter-editor-actions"><span id="nlpdfLetterEditorStatus">Review the fields before creating the letter.</span><button class="nlpdf-confirm" id="nlpdfCreateEditedLetter" type="button">Create Letter</button></footer>'+
   '</section>';
 }
@@ -518,7 +518,7 @@ function updateControls(){
   const sel=selectedPages(),p=activePage(),i=p?state.pages.findIndex(x=>x.id===p.id):-1;
   ['nlpdfRotateRight','nlpdfDuplicate','nlpdfDelete'].forEach(id=>$('#'+id).disabled=!sel.length||state.busy);
   const cropTool=$('[data-tool="crop"]', $('#nlpdfToolRail'));if(cropTool)cropTool.disabled=!p||state.busy;
-  $('#nlpdfCreate').disabled=!state.pages.length||state.busy;
+  $('#nlpdfCreate').disabled=state.busy;
   $('#nlpdfClearAll').disabled=!state.pages.length||state.busy;
   $('#nlpdfSelectionLabel').textContent=sel.length?sel.length+' selected · active page '+(i+1):'No page selected';$('#nlpdfPageCount').textContent=state.pages.length;$('#nlpdfFileCount').textContent=new Set(state.pages.map(p=>p.sourceKey)).size;
 }
@@ -1797,17 +1797,17 @@ async function build(){
   });
   $('#nlpdfPageContentType').addEventListener('change',e=>{const p=activePage();if(!p)return;p.contentType=e.target.value;renderFilmstrip();if(state.viewMode==='grid')renderGrid();recordEdit();});
   $('#nlpdfPackageManagerBtn').addEventListener('click',openPackageManager);
-  $('[data-package-close]').forEach(x=>x.addEventListener('click',closePackageManager));
+  $$('[data-package-close]').forEach(x=>x.addEventListener('click',closePackageManager));
   $('#nlpdfPkgNew').addEventListener('click',resetPackageProfileForm);$('#nlpdfPkgSave').addEventListener('click',savePackageProfile);
   $('#nlpdfPackageProfileList').addEventListener('click',e=>{const edit=e.target.closest('[data-pkg-edit]'),del=e.target.closest('[data-pkg-delete]');if(edit)editPackageProfile(edit.dataset.pkgEdit);if(del&&confirm('Delete this package-date profile?'))deletePackageProfile(del.dataset.pkgDelete);});
   window.addEventListener('buic-reference-data-updated',()=>{if(state.pendingLetter&&!$('#nlpdfLetterEditor').classList.contains('hidden')){populateCentralSelects(state.pendingLetter);renderLetterFormValues(state.pendingLetter);}});
 
   $('#nlpdfCreate').addEventListener('click',openExport);
-  $('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
+  $$('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
   $('#nlpdfEditLetter').addEventListener('click',requestLetterEdit);
   $('#nlpdfCancelLetterEdit').addEventListener('click',closeLetterEditor);$('#nlpdfCreateEditedLetter').addEventListener('click',createEditedLetter);
   ['nlpdfExportNumber','nlpdfExportName','nlpdfExportPassport','nlpdfExportStudentId'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(id==='nlpdfExportName')$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();}));
-  $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$('input[name="nlpdfOutput"]').forEach(x=>x.addEventListener('change',syncExportPreview));
+  $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutput"]').forEach(x=>x.addEventListener('change',syncExportPreview));
 
   renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();resetHistory();updateDuplicateControls();renderPackageProfileList();
 }

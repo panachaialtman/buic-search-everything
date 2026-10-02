@@ -60,6 +60,8 @@ try{
     assert.deepEqual(errors,[]);
     assert.equal(await count(),0);
     assert.equal(await visible('#nlpdfCreate'),true);
+    assert.equal(await page.locator('#nlpdfCreate').isEnabled(),true,'Create Package should be available even before document pages are imported');
+    assert.equal(await page.locator('#nlpdfPackageManagerBtn').isVisible(),false,'Package dates should only appear inside Letter Edit');
     assert.equal(await visible('#nlpdfFilmstripWrap'),true);
   });
   await run('Crop starts immediately while Make Space keeps its flyout',async()=>{
@@ -467,21 +469,6 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfPageContentType').selectOption('');
   });
 
-  await run('Package dates are managed as reusable type + semester + year profiles',async()=>{
-    await page.locator('#nlpdfPackageManagerBtn').click();
-    await page.locator('#nlpdfPackageManager').waitFor({state:'visible'});
-    await page.locator('#nlpdfPkgType').selectOption('exchange');
-    await page.locator('#nlpdfPkgSemester').selectOption('Second');
-    await page.locator('#nlpdfPkgYear').fill('2026');
-    await page.locator('#nlpdfPkgStart').fill('January 11, 2027');
-    await page.locator('#nlpdfPkgFinish').fill('May 31, 2027');
-    await page.locator('#nlpdfPkgOrientation').fill('January 4 - 8, 2027');
-    await page.locator('#nlpdfPkgSave').click();
-    assert.match(await page.locator('#nlpdfPackageProfileList').innerText(),/Exchange Bachelor/);
-    assert.match(await page.locator('#nlpdfPackageProfileList').innerText(),/January 11, 2027/);
-    await page.locator('[data-package-close]').last().click();
-  });
-
   await run('Edit Letter is a clean data form using separated identity, Central data, and saved package dates',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
@@ -503,6 +490,18 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await page.locator('#nlpdfLetterPassport').inputValue(),'AB1234567');
     assert.equal(await page.locator('#nlpdfLetterStudentId').inputValue(),'1690000000');
     assert.equal(await page.locator('#nlpdfLetterDocumentNo').inputValue(),'0789');
+    assert.equal(await page.locator('#nlpdfPackageManagerBtn').isVisible(),true,'Package dates should be available in Letter Edit');
+    await page.locator('#nlpdfPackageManagerBtn').click();
+    await page.locator('#nlpdfPackageManager').waitFor({state:'visible'});
+    await page.locator('#nlpdfPkgType').selectOption('exchange');
+    await page.locator('#nlpdfPkgSemester').selectOption('Second');
+    await page.locator('#nlpdfPkgYear').fill('2026');
+    await page.locator('#nlpdfPkgStart').fill('January 11, 2027');
+    await page.locator('#nlpdfPkgFinish').fill('May 31, 2027');
+    await page.locator('#nlpdfPkgOrientation').fill('January 4 - 8, 2027');
+    await page.locator('#nlpdfPkgSave').click();
+    assert.match(await page.locator('#nlpdfPackageProfileList').innerText(),/Exchange Bachelor/);
+    await page.locator('[data-package-close]').last().click();
     await page.locator('#nlpdfLetterSemester').selectOption('Second');
     await page.locator('#nlpdfLetterAcademicYear').fill('2026');
     await page.locator('#nlpdfLetterAcademicYear').press('Tab');
