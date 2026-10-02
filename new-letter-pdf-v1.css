@@ -1307,3 +1307,279 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
   #workspaceDocuments.nlpdf-primary .nlpdf-package-settings-fab{right:12px}
   #workspaceDocuments.nlpdf-primary .nlpdf-package-settings{right:12px;width:calc(100vw - 24px)}
 }
+
+
+/* V18 — clean letter form, saved package profiles, page content labels */
+#workspaceDocuments.nlpdf-primary .nlpdf-page-content-float{
+  position:absolute;
+  z-index:32;
+  right:16px;
+  top:14px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-height:34px;
+  padding:5px 7px 5px 10px;
+  border:1px solid var(--line-strong);
+  border-radius:10px;
+  background:color-mix(in srgb,var(--surface) 94%,transparent);
+  box-shadow:0 6px 18px rgba(16,25,39,.10);
+  backdrop-filter:blur(8px);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-page-content-float>span{
+  color:var(--muted);
+  font-size:8.5px;
+  font-weight:800;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-page-content-float select{
+  height:26px;
+  max-width:145px;
+  border:0;
+  background:transparent;
+  color:var(--text);
+  font:inherit;
+  font-size:9.5px;
+  font-weight:800;
+  outline:0;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-fab{
+  position:absolute;
+  z-index:32;
+  right:16px;
+  bottom:16px;
+  height:36px;
+  padding:0 12px;
+  border:1px solid var(--line-strong);
+  border-radius:10px;
+  background:color-mix(in srgb,var(--surface) 94%,transparent);
+  color:var(--text);
+  box-shadow:0 6px 18px rgba(16,25,39,.10);
+  font:inherit;
+  font-size:9.5px;
+  font-weight:850;
+  cursor:pointer;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-fab:hover{
+  border-color:var(--accent);
+  color:var(--accent);
+  background:var(--accent-soft);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager{
+  position:fixed;
+  z-index:110;
+  inset:0;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager.hidden{display:none!important}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-backdrop{
+  position:absolute;inset:0;background:rgba(20,27,38,.34);backdrop-filter:blur(3px);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-card{
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:min(1040px,calc(100vw - 48px));
+  max-height:min(760px,calc(100vh - 48px));
+  transform:translate(-50%,-50%);
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr) auto;
+  border:1px solid var(--line-strong);
+  border-radius:16px;
+  background:var(--surface);
+  box-shadow:0 24px 80px rgba(16,25,39,.24);
+  overflow:hidden;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  padding:16px 18px 13px;
+  border-bottom:1px solid var(--line);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-head .eyebrow{
+  display:block;color:var(--accent-2);font-size:8px;font-weight:850;letter-spacing:.12em;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-head h2{
+  margin:2px 0 3px;font-size:18px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-head p{
+  margin:0;color:var(--muted);font-size:9px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-head>button{
+  width:30px;height:30px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:18px;cursor:pointer;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-body{
+  min-height:0;
+  overflow:auto;
+  padding:14px 16px;
+  display:grid;
+  grid-template-columns:minmax(0,1.4fr) minmax(320px,.8fr);
+  gap:14px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-list{
+  display:grid;
+  align-content:start;
+  gap:8px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-row{
+  display:grid;
+  grid-template-columns:180px minmax(0,1fr) auto;
+  gap:12px;
+  align-items:center;
+  padding:10px 11px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:var(--surface-2);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-when{
+  display:grid;gap:2px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-when strong{font-size:10px}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-when span{color:var(--muted);font-size:8.5px}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-dates{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-dates span{
+  display:grid;gap:1px;font-size:8.5px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-dates b{
+  color:var(--muted);font-size:7.5px;text-transform:uppercase;letter-spacing:.04em;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-actions{
+  display:flex;gap:5px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-actions button{
+  height:29px;padding:0 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text);font:inherit;font-size:8px;font-weight:800;cursor:pointer;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-empty{
+  padding:34px 20px;border:1px dashed var(--line-strong);border-radius:11px;color:var(--muted);text-align:center;font-size:9px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor{
+  align-self:start;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--surface);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor label{
+  display:grid;gap:4px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor label>span{
+  color:var(--muted);font-size:8px;font-weight:800;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor input,
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor select{
+  width:100%;height:36px;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:var(--surface-2);color:var(--text);font:inherit;font-size:9.5px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-actions{
+  display:flex;justify-content:flex-end;gap:8px;padding:11px 16px;border-top:1px solid var(--line);
+}
+
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-body{
+  padding:18px 20px 86px;
+  background:var(--bg);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form{
+  width:min(980px,100%);
+  margin:0 auto;
+  display:grid;
+  gap:12px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-section{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:13px;
+  background:var(--surface);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-title{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:11px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-title strong{font-size:12px}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-title span{color:var(--muted);font-size:8.5px}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid label{
+  display:grid;
+  gap:4px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid label.wide{
+  grid-column:1/-1;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid label>span{
+  color:var(--muted);
+  font-size:8px;
+  font-weight:800;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid input,
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid select,
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid textarea{
+  width:100%;
+  box-sizing:border-box;
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:0 9px;
+  background:var(--surface-2);
+  color:var(--text);
+  font:inherit;
+  font-size:10.5px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid input,
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid select{height:38px}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid textarea{
+  padding:8px 9px;
+  resize:vertical;
+  line-height:1.4;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid input:focus,
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid select:focus{
+  outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid input[readonly],
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid textarea[readonly]{
+  background:var(--surface);
+  color:var(--muted);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-package-result{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-package-result>div{
+  padding:9px 10px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:var(--surface-2);
+  display:grid;
+  gap:2px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-package-result span{
+  color:var(--muted);font-size:7.5px;font-weight:800;text-transform:uppercase;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-package-result strong{font-size:10px}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-identity-grid{
+  grid-template-columns:1fr 1fr;
+}
+@media(max-width:850px){
+  #workspaceDocuments.nlpdf-primary .nlpdf-package-manager-body{grid-template-columns:1fr}
+  #workspaceDocuments.nlpdf-primary .nlpdf-package-profile-row{grid-template-columns:1fr}
+}
+@media(max-width:650px){
+  #workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid,
+  #workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor,
+  #workspaceDocuments.nlpdf-primary .nlpdf-package-identity-grid{grid-template-columns:1fr}
+  #workspaceDocuments.nlpdf-primary .nlpdf-letter-package-result,
+  #workspaceDocuments.nlpdf-primary .nlpdf-package-profile-dates{grid-template-columns:1fr}
+}

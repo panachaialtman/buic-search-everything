@@ -116,6 +116,8 @@ function workspaceMarkup(){
         '<div class="nlpdf-view-toggle"><button class="active" id="nlpdfSingleView" type="button">Single</button><button id="nlpdfGridView" type="button">Grid</button></div>'+
       '</div>'+
       '<section class="nlpdf-stage" id="nlpdfStage"><div class="nlpdf-drop-overlay">Drop PDF, images, or ZIP anywhere here</div>'+
+        '<label class="nlpdf-page-content-float"><span>Content</span><select id="nlpdfPageContentType"><option value="">—</option><option value="passport">Passport</option><option value="receipt">Receipt</option><option value="bu_application">BU Application</option><option value="visa_application">Visa Application</option></select></label>'+
+        '<button class="nlpdf-package-manager-fab" id="nlpdfPackageManagerBtn" type="button">Package dates</button>'+
         '<div class="nlpdf-paper" id="nlpdfPaper"><canvas id="nlpdfCanvas" width="840" height="1188"></canvas><div id="nlpdfTransformLayer" class="nlpdf-transform-layer hidden"><i data-resize="nw"></i><i data-resize="ne"></i><i data-resize="sw"></i><i data-resize="se"></i></div><div id="nlpdfSnapX" class="nlpdf-snap-guide x hidden"></div><div id="nlpdfSnapY" class="nlpdf-snap-guide y hidden"></div><div class="nlpdf-safe-guide hidden" id="nlpdfSafeGuide"></div><div class="nlpdf-crop-layer hidden" id="nlpdfCropLayer"><div class="nlpdf-crop-region" id="nlpdfCropRegion"><i data-crop-handle="nw"></i><i data-crop-handle="n"></i><i data-crop-handle="ne"></i><i data-crop-handle="e"></i><i data-crop-handle="se"></i><i data-crop-handle="s"></i><i data-crop-handle="sw"></i><i data-crop-handle="w"></i></div></div><div class="nlpdf-paper-hint" id="nlpdfPaperHint"><div><strong>Blank A4</strong><span>Drop files onto the workspace or click “Add files / ZIP”.<br>Select a page to crop, move, scale, or make space.</span></div></div><span class="nlpdf-paper-badge hidden" id="nlpdfPaperBadge"></span><img class="nlpdf-signature-preview hidden" id="nlpdfSignaturePreview" alt="Signature"></div>'+
         '<div class="nlpdf-crop-actions hidden" id="nlpdfCropActions" role="group" aria-label="Crop actions"><button class="nlpdf-crop-apply" id="nlpdfApplyCrop" type="button">✓ Accept crop</button><button class="nlpdf-crop-cancel" id="nlpdfCancelCrop" type="button">Cancel</button></div>'+
       '</section>'+
@@ -126,15 +128,20 @@ function workspaceMarkup(){
       '<footer class="nlpdf-footer"><div class="nlpdf-footer-stats"><div class="nlpdf-footer-stat"><strong id="nlpdfPageCount">0</strong><span>Document pages</span></div><div class="nlpdf-footer-stat"><strong id="nlpdfFileCount">0</strong><span>Source files</span></div></div><div class="nlpdf-footer-center" id="nlpdfStatus">Ready · Files stay in this browser</div><div class="nlpdf-footer-actions"><button class="nlpdf-create" id="nlpdfCreate" type="button" disabled>Create Package</button></div></footer>'+
     '</main>'+
   '</div></section>'+
-  exportModalMarkup();
+  packageManagerMarkup()+exportModalMarkup();
 }
 function exportModalMarkup(){
   return '<div class="nlpdf-modal" id="nlpdfExportModal" aria-hidden="true"><div class="nlpdf-modal-backdrop" data-nlpdf-close></div><section class="nlpdf-modal-card" role="dialog" aria-modal="true">'+
     '<div class="nlpdf-modal-head"><div><span class="eyebrow">FINAL REVIEW</span><h2>Create Package</h2></div><button class="nlpdf-close" type="button" data-nlpdf-close>×</button></div>'+
     '<div class="nlpdf-modal-body">'+
-      '<div class="nlpdf-modal-grid"><label class="nlpdf-modal-field"><span>Student number</span><input id="nlpdfExportNumber" placeholder="3408"></label><label class="nlpdf-modal-field"><span>Student name</span><input id="nlpdfExportName" placeholder="Miss ABC"></label>'+
-      '<div class="nlpdf-modal-field full"><span>Letter type</span><div class="nlpdf-letter-type-row"><select id="nlpdfExportLetterType"><option value="bachelor_no_ien">Bachelor Degree No IEN</option><option value="bachelor">Bachelor Degree</option><option value="current_no_ien">Current No IEN</option><option value="exchange">Exchange Bachelor</option><option value="master">Master Degree</option><option value="doctor">Doctor Degree</option></select><button class="nlpdf-edit-letter" id="nlpdfEditLetter" type="button">Edit letter</button></div><small class="nlpdf-letter-requirement hidden" id="nlpdfLetterRequirement">Select Letter below to continue with Edit letter.</small></div>'+
-      '<label class="nlpdf-modal-field full"><span>PDF filename</span><input id="nlpdfExportPdfName"></label></div>'+
+      '<div class="nlpdf-modal-grid nlpdf-package-identity-grid">'+
+        '<label class="nlpdf-modal-field"><span>Document Number</span><input id="nlpdfExportNumber" placeholder="3408"></label>'+
+        '<label class="nlpdf-modal-field"><span>Student name</span><input id="nlpdfExportName" placeholder="Mr. Example"></label>'+
+        '<label class="nlpdf-modal-field"><span>Passport number</span><input id="nlpdfExportPassport" placeholder="AB1234567"></label>'+
+        '<label class="nlpdf-modal-field"><span>Student ID</span><input id="nlpdfExportStudentId" placeholder="1690000000"></label>'+
+        '<div class="nlpdf-modal-field full"><span>Letter type</span><div class="nlpdf-letter-type-row"><select id="nlpdfExportLetterType"><option value="bachelor_no_ien">Bachelor Degree No IEN</option><option value="bachelor">Bachelor Degree</option><option value="current_no_ien">Current No IEN</option><option value="exchange">Exchange Bachelor</option><option value="master">Master Degree</option><option value="doctor">Doctor Degree</option></select><button class="nlpdf-edit-letter" id="nlpdfEditLetter" type="button">Edit letter</button></div><small class="nlpdf-letter-requirement hidden" id="nlpdfLetterRequirement">Select Letter below to continue with Edit letter.</small></div>'+
+        '<label class="nlpdf-modal-field full"><span>PDF filename</span><input id="nlpdfExportPdfName"></label>'+
+      '</div>'+
       '<div class="nlpdf-output-choice" role="group" aria-label="Create outputs"><label class="nlpdf-choice"><input type="checkbox" name="nlpdfOutput" value="folder"><div><strong>Folder</strong></div></label><label class="nlpdf-choice"><input type="checkbox" name="nlpdfOutput" value="pdf" checked><div><strong>PDF</strong></div></label><label class="nlpdf-choice"><input type="checkbox" name="nlpdfOutput" value="letter"><div><strong>Letter</strong></div></label></div>'+
       '<div class="nlpdf-final-preview"><div class="nlpdf-final-row"><span>Folder</span><strong id="nlpdfFinalFolder">Not created</strong></div><div class="nlpdf-final-row"><span>Letter</span><strong id="nlpdfFinalLetter">Not created</strong></div><div class="nlpdf-final-row"><span>PDF</span><strong id="nlpdfFinalPdf">Documents_Miss ABC.pdf</strong></div><div class="nlpdf-final-row"><span>Pages</span><strong id="nlpdfFinalPages">0 document pages</strong></div></div>'+
       '<div class="nlpdf-destination"><div><strong id="nlpdfDestinationName">No destination selected</strong><span id="nlpdfDestinationHelp">Choose where the selected outputs should be created.</span></div><button class="nlpdf-dest-btn" id="nlpdfChooseDestination" type="button">Choose destination</button></div>'+
@@ -146,20 +153,51 @@ function exportModalMarkup(){
 function letterEditorMarkup(){
   return '<section class="nlpdf-letter-editor hidden" id="nlpdfLetterEditor" aria-hidden="true">'+
     '<header class="nlpdf-letter-editor-head"><div><span class="eyebrow">LETTER EDITOR</span><h2 id="nlpdfLetterEditorTitle">Edit Letter</h2><span id="nlpdfLetterEditorContext"></span></div><button class="nlpdf-letter-editor-close" id="nlpdfCancelLetterEdit" type="button">Back to PDF Builder</button></header>'+
-    '<div class="nlpdf-letter-editor-body"><div class="nlpdf-letter-document-shell"><div class="nlpdf-letter-document" id="nlpdfLetterDocument"></div></div></div>'+
-    '<button class="nlpdf-package-settings-fab" id="nlpdfPackageSettingsBtn" type="button">Package dates</button>'+
-    '<aside class="nlpdf-package-settings hidden" id="nlpdfPackageSettings" aria-hidden="true"><div class="nlpdf-package-settings-head"><div><span class="eyebrow">PACKAGE SETTINGS</span><strong>Academic dates</strong></div><button type="button" id="nlpdfClosePackageSettings">×</button></div>'+
-      '<div class="nlpdf-letter-package-grid">'+
-        '<label><span>Student type</span><input id="nlpdfLetterStudentType" readonly></label>'+
-        '<label><span>Semester</span><select id="nlpdfLetterSemester"><option value="">Select</option><option value="First">First</option><option value="Second">Second</option><option value="Summer">Summer</option></select></label>'+
-        '<label><span>Academic year</span><input id="nlpdfLetterAcademicYear" inputmode="numeric" placeholder="2026"></label>'+
-        '<label><span>Starting Date</span><input id="nlpdfLetterStartDate" placeholder="e.g. January 11, 2027"></label>'+
-        '<label><span>Finishing Date</span><input id="nlpdfLetterFinishDate" placeholder="e.g. May 31, 2027"></label>'+
-        '<label><span>Orientation</span><input id="nlpdfLetterOrientation" placeholder="e.g. January 4 - 8, 2027"></label>'+
-      '</div><div class="nlpdf-letter-package-status" id="nlpdfLetterPackageStatus">Package dates are stored by Student type + Semester + Academic year.</div>'+
-    '</aside>'+
-    '<footer class="nlpdf-letter-editor-actions"><span id="nlpdfLetterEditorStatus">Letter has not been created yet.</span><button class="nlpdf-confirm" id="nlpdfCreateEditedLetter" type="button">Create Letter</button></footer>'+
+    '<div class="nlpdf-letter-editor-body nlpdf-letter-form-body">'+
+      '<div class="nlpdf-letter-form" id="nlpdfLetterForm">'+
+        '<section class="nlpdf-letter-form-section"><div class="nlpdf-letter-form-title"><strong>Student</strong><span>Package information can be left blank if it is not needed.</span></div><div class="nlpdf-letter-form-grid">'+
+          '<label><span>Student name</span><input id="nlpdfLetterName" data-form-key="studentName"></label>'+
+          '<label><span>Passport number</span><input id="nlpdfLetterPassport" data-form-key="passport"></label>'+
+          '<label><span>Student ID</span><input id="nlpdfLetterStudentId" data-form-key="studentId"></label>'+
+          '<label><span>Document Number</span><input id="nlpdfLetterDocumentNo" data-form-key="documentNo"></label>'+
+          '<label><span>Nationality / Country</span><select id="nlpdfLetterCountry"></select></label>'+
+          '<label><span>Student location</span><input id="nlpdfLetterLocation" data-form-key="recipientLocation"></label>'+
+        '</div></section>'+
+        '<section class="nlpdf-letter-form-section"><div class="nlpdf-letter-form-title"><strong>Academic</strong><span>Program and faculty are linked to Search Everything data.</span></div><div class="nlpdf-letter-form-grid">'+
+          '<label class="wide"><span>Program / Major</span><select id="nlpdfLetterProgram"></select></label>'+
+          '<label><span>School / Faculty</span><input id="nlpdfLetterFaculty" readonly></label>'+
+          '<label><span>Student type</span><input id="nlpdfLetterStudentType" readonly></label>'+
+          '<label><span>Semester</span><select id="nlpdfLetterSemester"><option value="">Select</option><option value="First">First</option><option value="Second">Second</option><option value="Summer">Summer</option></select></label>'+
+          '<label><span>Academic year</span><input id="nlpdfLetterAcademicYear" inputmode="numeric" placeholder="2026"></label>'+
+        '</div>'+
+        '<div class="nlpdf-letter-package-result" id="nlpdfLetterPackageResult"><div><span>Starting Date</span><strong id="nlpdfLetterStartDate">—</strong></div><div><span>Finishing Date</span><strong id="nlpdfLetterFinishDate">—</strong></div><div><span>Orientation</span><strong id="nlpdfLetterOrientation">—</strong></div></div>'+
+        '<div class="nlpdf-letter-package-status" id="nlpdfLetterPackageStatus">Choose Semester and Academic year to use a saved package-date profile.</div></section>'+
+        '<section class="nlpdf-letter-form-section"><div class="nlpdf-letter-form-title"><strong>Embassy</strong><span>Mission name and address come directly from Search Everything.</span></div><div class="nlpdf-letter-form-grid">'+
+          '<label class="wide"><span>Thai Embassy / Consulate</span><select id="nlpdfLetterEmbassy"></select></label>'+
+          '<label class="wide"><span>Embassy address</span><textarea id="nlpdfLetterEmbassyAddress" rows="4" readonly></textarea></label>'+
+        '</div></section>'+
+        '<section class="nlpdf-letter-form-section" id="nlpdfLetterExtraSection"><div class="nlpdf-letter-form-title"><strong>Other letter details</strong><span>Only recognized editable topics from this template are shown.</span></div><div class="nlpdf-letter-form-grid" id="nlpdfLetterExtraFields"></div></section>'+
+      '</div>'+
+    '</div>'+
+    '<footer class="nlpdf-letter-editor-actions"><span id="nlpdfLetterEditorStatus">Review the fields before creating the letter.</span><button class="nlpdf-confirm" id="nlpdfCreateEditedLetter" type="button">Create Letter</button></footer>'+
   '</section>';
+}
+
+function packageManagerMarkup(){
+  return '<div class="nlpdf-package-manager hidden" id="nlpdfPackageManager" aria-hidden="true"><div class="nlpdf-package-manager-backdrop" data-package-close></div><section class="nlpdf-package-manager-card">'+
+    '<div class="nlpdf-package-manager-head"><div><span class="eyebrow">PACKAGE DATES</span><h2>Saved academic date profiles</h2><p>Student type + Semester + Academic year determines the dates used in letters.</p></div><button type="button" data-package-close>×</button></div>'+
+    '<div class="nlpdf-package-manager-body"><div class="nlpdf-package-profile-list" id="nlpdfPackageProfileList"></div>'+
+      '<div class="nlpdf-package-profile-editor"><input type="hidden" id="nlpdfPkgOriginalKey">'+
+        '<label><span>Student type</span><select id="nlpdfPkgType"><option value="bachelor_no_ien">Bachelor Degree No IEN</option><option value="bachelor">Bachelor Degree</option><option value="current_no_ien">Current No IEN</option><option value="exchange">Exchange Bachelor</option><option value="master">Master Degree</option><option value="doctor">Doctor Degree</option><option value="visiting">Visiting Student</option></select></label>'+
+        '<label><span>Semester</span><select id="nlpdfPkgSemester"><option value="First">First</option><option value="Second">Second</option><option value="Summer">Summer</option></select></label>'+
+        '<label><span>Academic year</span><input id="nlpdfPkgYear" inputmode="numeric" placeholder="2026"></label>'+
+        '<label><span>Starting Date</span><input id="nlpdfPkgStart" placeholder="January 11, 2027"></label>'+
+        '<label><span>Finishing Date</span><input id="nlpdfPkgFinish" placeholder="May 31, 2027"></label>'+
+        '<label><span>Orientation</span><input id="nlpdfPkgOrientation" placeholder="January 4 - 8, 2027"></label>'+
+      '</div>'+
+    '</div>'+
+    '<div class="nlpdf-package-manager-actions"><button class="nlpdf-cancel" id="nlpdfPkgNew" type="button">New</button><button class="nlpdf-confirm" id="nlpdfPkgSave" type="button">Save profile</button></div>'+
+  '</section></div>';
 }
 
 /* Unified editor history: snapshots contain edits/settings but not PDF binary buffers. */
@@ -304,12 +342,12 @@ async function importFile(file){
   if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)){
     const bytes=new Uint8Array(await file.arrayBuffer()),doc=await window.pdfjsLib.getDocument({data:bytes.slice()}).promise;
     state.sources.set(key,{key,fileName:file.name,kind:'pdf',bytes});state.pdfJsDocs.set(key,doc);
-    for(let n=1;n<=doc.numPages;n++)state.pages.push({id:uid(),sourceKey:key,fileName:file.name,kind:'pdf',sourcePage:n,rotation:0,crop:defaultCrop(),transform:defaultTransform(),spaceMM:0});
+    for(let n=1;n<=doc.numPages;n++)state.pages.push({id:uid(),sourceKey:key,fileName:file.name,kind:'pdf',sourcePage:n,rotation:0,crop:defaultCrop(),transform:defaultTransform(),spaceMM:0,contentType:''});
     return doc.numPages;
   }
   if(/^image\//.test(file.type)||/\.(jpe?g|png|webp)$/i.test(file.name)){
     const im=await normalizeImage(file);state.sources.set(key,{key,fileName:file.name,kind:'image',bytes:im.bytes,mime:im.mime,previewUrl:im.previewUrl});
-    state.pages.push({id:uid(),sourceKey:key,fileName:file.name,kind:'image',sourcePage:1,rotation:0,crop:defaultCrop(),transform:defaultTransform(),spaceMM:0,previewUrl:im.previewUrl});return 1;
+    state.pages.push({id:uid(),sourceKey:key,fileName:file.name,kind:'image',sourcePage:1,rotation:0,crop:defaultCrop(),transform:defaultTransform(),spaceMM:0,contentType:'',previewUrl:im.previewUrl});return 1;
   }
   throw new Error(file.name+' is not supported.');
 }
@@ -473,6 +511,7 @@ function syncPageControls(){
   $('#nlpdfCenterContent').disabled=disabled||state.cropMode;
 
   const spaceStatus=$('#nlpdfSpaceStatus');if(spaceStatus)spaceStatus.textContent=p?.makeSpace?'Make Space active on this page.':'';
+  const contentType=$('#nlpdfPageContentType');if(contentType){contentType.disabled=!p;contentType.value=p?.contentType||'';}
 }
 
 function updateControls(){
@@ -719,6 +758,7 @@ function stackMeta(which){const a=state.assets[which],info=state.assetInfo[which
 function stackMini(m){return '<article class="nlpdf-page-card" data-stack="'+m.which+'"><div class="nlpdf-stack-mini"><i></i><i></i><i>'+esc(m.which==='front'?'Front':'Back')+'</i><b>'+m.count+'</b></div><div class="nlpdf-page-meta"><strong>Default '+(m.which==='front'?'Front':'Back')+'</strong><span>'+m.count+' page'+(m.count===1?'':'s')+' · locked</span></div></article>';}
 function stackGrid(m){return '<article class="nlpdf-grid-card nlpdf-stack-card" data-stack="'+m.which+'"><div class="nlpdf-stack-thumb"><span class="nlpdf-stack-sheet"></span><span class="nlpdf-stack-sheet"></span><span class="nlpdf-stack-sheet"><strong>Default '+(m.which==='front'?'Front':'Back')+'</strong></span><span class="nlpdf-stack-count">'+m.count+' page'+(m.count===1?'':'s')+'</span></div><div class="nlpdf-grid-meta"><strong>'+esc(m.name)+'</strong><span>Locked default asset</span></div></article>';}
 async function thumbCanvas(p,w=140,h=198){const c=document.createElement('canvas');await drawPageToCanvas(p,c,w,h);return c;}
+function pageContentLabel(value){return ({passport:'Passport',receipt:'Receipt',bu_application:'BU Application',visa_application:'Visa Application'})[value]||'';}
 async function renderFilmstrip(){
   const s=$('#nlpdfFilmstrip'),front=stackMeta('front'),back=stackMeta('back'),dups=duplicatePageIds();
   const visible=state.duplicateOnly?state.pages.filter(p=>dups.has(p.id)):state.pages;
@@ -912,35 +952,37 @@ function letterBytes(key){const t=(key==='bachelor_no_ien'?customNoIenTemplate()
 async function writeFile(dir,name,data){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();await w.write(data);await w.close();}
 function caseNumber(){return clean($('#caseStudentNumber')?.value)||clean($('#studentNumber')?.value);}
 function caseName(){return clean($('#caseStudentName')?.value)||clean($('#studentName')?.value);}
+function splitCaseIdentity(raw){
+  const value=clean(raw),parts=value.split('_');
+  if(parts.length>=3){const studentId=clean(parts.pop()),passport=clean(parts.pop()),name=clean(parts.join('_'));return {name,passport,studentId};}
+  return {name:value,passport:'',studentId:''};
+}
 function selectedOutputs(){
   const values=new Set($$('input[name="nlpdfOutput"]:checked').map(x=>x.value));
   return {folder:values.has('folder'),pdf:values.has('pdf'),letter:values.has('letter'),any:values.size>0};
 }
 function openExport(){
-  state.editLetterRequested=false;
-  $('#nlpdfEditLetter').classList.remove('active');
-  $('#nlpdfExportNumber').value=caseNumber();$('#nlpdfExportName').value=caseName();$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();
+  state.editLetterRequested=false;$('#nlpdfEditLetter').classList.remove('active');
+  const parsed=splitCaseIdentity(caseName());
+  $('#nlpdfExportNumber').value=caseNumber();$('#nlpdfExportName').value=parsed.name;$('#nlpdfExportPassport').value=parsed.passport;$('#nlpdfExportStudentId').value=parsed.studentId;
+  $('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();
   $('#nlpdfFinalPages').textContent=state.pages.length+' document page'+(state.pages.length===1?'':'s')+(stackMeta('front')?' + front':'')+(stackMeta('back')?' + back':'');
   $('#nlpdfExportModal').classList.add('open');$('#nlpdfExportModal').setAttribute('aria-hidden','false');
 }
 function closeExport(){$('#nlpdfExportModal').classList.remove('open');$('#nlpdfExportModal').setAttribute('aria-hidden','true');}
 function syncExportPreview(){
-  const num=safePath($('#nlpdfExportNumber').value)||'3408',name=safePath($('#nlpdfExportName').value)||'Miss ABC',pdf=$('#nlpdfExportPdfName');
-  if(pdf.dataset.auto==='1'||!clean(pdf.value))pdf.value='Documents_'+name+'.pdf';
-  const outputs=selectedOutputs();
-  $('#nlpdfFinalFolder').textContent=outputs.folder?num+' '+name:'Not created';
-  $('#nlpdfFinalLetter').textContent=outputs.letter?'Letter_'+name+'.docx':'Not created';
+  const num=safePath($('#nlpdfExportNumber').value),name=safePath($('#nlpdfExportName').value),stem=name||'Student',pdf=$('#nlpdfExportPdfName');
+  if(pdf.dataset.auto==='1'||!clean(pdf.value))pdf.value='Documents_'+stem+'.pdf';
+  const outputs=selectedOutputs(),folderName=[num,name].filter(Boolean).join(' ')||'Student';
+  $('#nlpdfFinalFolder').textContent=outputs.folder?folderName:'Not created';
+  $('#nlpdfFinalLetter').textContent=outputs.letter?'Letter_'+stem+'.docx':'Not created';
   $('#nlpdfFinalPdf').textContent=outputs.pdf?pdf.value:'Not created';
   const needsLetter=state.editLetterRequested&&!outputs.letter;
-  $('#nlpdfLetterRequirement').classList.toggle('hidden',!needsLetter);
-  $('#nlpdfEditLetter').classList.toggle('active',state.editLetterRequested);
-  const confirm=$('#nlpdfConfirmExport');
-  confirm.textContent='Create Package';
-  confirm.disabled=state.busy||!outputs.any||needsLetter;
+  $('#nlpdfLetterRequirement').classList.toggle('hidden',!needsLetter);$('#nlpdfEditLetter').classList.toggle('active',state.editLetterRequested);
+  const confirm=$('#nlpdfConfirmExport');confirm.textContent='Create Package';confirm.disabled=state.busy||!outputs.any||needsLetter;
 }
 function requestLetterEdit(){
-  state.editLetterRequested=!state.editLetterRequested;
-  syncExportPreview();
+  state.editLetterRequested=!state.editLetterRequested;syncExportPreview();
   if(!state.editLetterRequested){toast('Edit letter turned off.');return;}
   if(!selectedOutputs().letter){toast('Select Letter to continue with Edit letter.');return;}
   toast('Edit letter turned on.');
@@ -1127,6 +1169,8 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/(?:commence|started)\s+on\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})/,'startDate','Starting Date',1,{package:true});
     addRegexOccurrence(fields,rec,/Orientation[^.]*?(?:on|during)\s+(.+?)(?:\s*$)/,'orientation','Orientation',1,{package:true});
     addRegexOccurrence(fields,rec,/Passport\s+No\.\s*([A-Za-z0-9]+)/i,'passport','Passport number');
+    addRegexOccurrence(fields,rec,/Student\s*ID(?:\s*No\.)?\s*[:：]?\s*([A-Za-z0-9-]+)/i,'studentId','Student ID');
+    addRegexOccurrence(fields,rec,/รหัสนักศึกษา\s*[:：]?\s*([0-9-]+)/,'studentId','รหัสนักศึกษา');
     addRegexOccurrence(fields,rec,/I am writing to inform you that\s+([^,]+),/,'studentName','Student name');
     addRegexOccurrence(fields,rec,/,\s+(?:an?\s+)?([^,]+?)\s+Citizen\b/,'nationalityEn','Nationality',1,{reference:'country'});
     addRegexOccurrence(fields,rec,/student at\s+([^,]+),/i,'homeUniversity','Home university / school');
@@ -1178,34 +1222,57 @@ function semanticLetterModel(doc,ns){
       break;
     }
   }
+  for(let i=0;i<records.length;i++){
+    if(clean(records[i].full)!=='The Consul')continue;
+    let addressIndex=0;
+    for(let j=i+1;j<Math.min(records.length,i+8);j++){
+      const rec=records[j],trim=clean(rec.full);if(/^Dear Consul/i.test(trim))break;
+      const ranges=highlightedRanges(rec);if(!ranges.length)continue;
+      for(const range of ranges){
+        if(rec.occurrences.some(o=>Math.max(range.start,o.start)<Math.min(range.end,o.end)))continue;
+        if(addressIndex===0)addOccurrence(fields,rec,'embassy','Thai mission / Embassy',range.start,range.end,{reference:'embassy'});
+        else if(addressIndex<=4)addOccurrence(fields,rec,'embassyAddress'+addressIndex,'Embassy address '+addressIndex,range.start,range.end);
+        addressIndex++;
+      }
+    }
+  }
   return {records,fields:[...fields.values()],pages:Math.max(1,...records.map(r=>r.pageIndex+1))};
 }
-function paragraphCss(record){
-  const align=record.jc==='center'?'center':record.jc==='right'?'right':record.jc==='both'?'justify':'left';
-  return 'text-align:'+align+';';
-}
-function runStaticHtml(run){
-  let style='';
-  const pr=[...run.run.children].find(x=>x.localName==='rPr'),ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-  if(pr){
-    if(pr.getElementsByTagNameNS(ns,'b').length)style+='font-weight:700;';
-    if(pr.getElementsByTagNameNS(ns,'i').length)style+='font-style:italic;';
-    if(pr.getElementsByTagNameNS(ns,'u').length)style+='text-decoration:underline;';
-    const sz=pr.getElementsByTagNameNS(ns,'sz')[0]?.getAttributeNS(ns,'val');if(sz)style+='font-size:'+(Number(sz)/2)+'pt;';
+function addressLines(address){
+  const raw=clean(address);if(!raw)return[];
+  let parts=raw.split(/\r?\n|\s*\|\s*/).map(clean).filter(Boolean);
+  if(parts.length===1&&raw.includes(','))parts=raw.split(',').map(clean).filter(Boolean);
+  if(parts.length===5)return [[parts[0],parts[1]].join(', '),parts[2],[parts[3],parts[4]].join(', ')];
+  if(parts.length>4){
+    const out=[];let current='';
+    for(const part of parts){
+      const next=current?current+', '+part:part;
+      if(current&&next.length>42&&out.length<3){out.push(current);current=part;}else current=next;
+    }
+    if(current)out.push(current);return out.slice(0,4);
   }
-  if(run.highlighted)style+='background:#fff176;';
-  return '<span'+(style?' style="'+style+'"':'')+'>'+esc(run.value)+'</span>';
+  return parts.slice(0,4);
+}
+function embassyValues(r){
+  const address=clean(r['Current Address EN'])||clean(r['Address EN']);
+  return {
+    id:clean(r['Record ID']),embassy:clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Current Office Name EN'])||clean(r['Office Name EN']),
+    embassyOffice:clean(r['Current Office Name EN'])||clean(r['Office Name EN']),
+    embassyThai:clean(r['Current Official Name TH'])||clean(r['Official Name TH']),
+    embassyCountry:clean(r['Current Country / Territory EN'])||clean(r['Country / Territory EN']),
+    embassyCity:clean(r['Current City EN'])||clean(r['City EN']),address,lines:addressLines(address)
+  };
 }
 function fieldCurrentValue(context,field){
-  if(field.kind==='academicYearThai')return packageAcademicYearThai()||field.value;
-  if(field.package)return packageFieldValue(field.kind)||field.value;
+  if(field.kind==='academicYearThai')return packageAcademicYearThai()||context.values.academicYearThai||field.value;
+  if(field.package)return context.values[field.kind]||packageFieldValue(field.kind)||field.value;
   return context.values[field.key]??field.value;
 }
 function semesterNumber(v){return ({First:'1',Second:'2',Summer:'3'})[v]||v;}
 function occurrenceValue(context,field,occ){
   const value=fieldCurrentValue(context,field);
   if(occ.format==='semesterNumber')return semesterNumber(value);
-  if(occ.format==='thaiYear')return packageAcademicYearThai()||value;
+  if(occ.format==='thaiYear')return packageAcademicYearThai()||context.values.academicYearThai||value;
   return value;
 }
 function bestCountryRecord(value){
@@ -1217,79 +1284,125 @@ function bestFacultyRecord(value){
 function bestEmbassyRecord(value){
   const v=normalizedLetterValue(value);return (centralReference().embassy||[]).find(r=>Object.values(embassyValues(r)).some(x=>typeof x==='string'&&normalizedLetterValue(x)===v));
 }
-function renderRefSelect(field,context,refKind){
-  const refs=centralReference();let rows=[],labelFn,match;
-  if(refKind==='country'){rows=refs.countries||[];labelFn=r=>{const x=countryValues(r);return x.nationalityEn||x.countryEn;};match=bestCountryRecord(fieldCurrentValue(context,field));}
-  if(refKind==='faculty'){rows=refs.faculty||[];labelFn=r=>{const x=facultyValues(r);return x.programEn||x.facultyEn;};match=bestFacultyRecord(fieldCurrentValue(context,field));}
-  if(refKind==='embassy'){rows=refs.embassy||[];labelFn=r=>embassyValues(r).embassy;match=bestEmbassyRecord(fieldCurrentValue(context,field));}
-  const opts=rows.map(r=>'<option value="'+esc(clean(r['Record ID']))+'" '+(match&&clean(match['Record ID'])===clean(r['Record ID'])?'selected':'')+'>'+esc(labelFn(r))+'</option>').join('');
-  return '<select class="nlpdf-inline-field nlpdf-inline-select" data-letter-ref="'+refKind+'" data-letter-key="'+esc(field.key)+'" aria-label="'+esc(field.label)+'"><option value="">'+esc(fieldCurrentValue(context,field))+'</option>'+opts+'</select>';
-}
-function renderInlineField(field,context,occ){
-  if(field.reference)return renderRefSelect(field,context,field.reference);
-  const value=occurrenceValue(context,field,occ);
-  const readonly=field.package?' readonly data-package-inline="1"':'';
-  return '<input class="nlpdf-inline-field '+(field.package?'is-package':'')+'" data-letter-key="'+esc(field.key)+'" value="'+esc(value)+'" aria-label="'+esc(field.label)+'" title="'+esc(field.label)+'"'+readonly+'>';
-}
-function renderParagraph(record,context){
-  if(record.pageBreak)return '';
-  const occs=[...record.occurrences].sort((a,b)=>a.start-b.start);
-  if(!occs.length)return '<p class="nlpdf-doc-paragraph" style="'+paragraphCss(record)+'">'+record.runs.map(runStaticHtml).join('')+'</p>';
-  let html='',cursor=0;
-  for(const occ of occs){
-    if(occ.start>cursor)html+=esc(record.full.slice(cursor,occ.start));
-    html+=renderInlineField(occ.field,context,occ);
-    cursor=occ.end;
-  }
-  if(cursor<record.full.length)html+=esc(record.full.slice(cursor));
-  return '<p class="nlpdf-doc-paragraph" style="'+paragraphCss(record)+'">'+html+'</p>';
-}
-function renderLetterDocument(context){
-  const host=$('#nlpdfLetterDocument');if(!host)return;
-  const pages=[];
-  for(let page=0;page<context.editor.model.pages;page++){
-    const content=context.editor.model.records.filter(r=>r.pageIndex===page).map(r=>renderParagraph(r,context)).join('');
-    pages.push('<article class="nlpdf-letter-page"><div class="nlpdf-letter-page-header"><div class="nlpdf-letter-bu-mark">BANGKOK<br>UNIVERSITY</div><div class="nlpdf-letter-bu-address">BANGKOK UNIVERSITY<br>9/1 Moo 5 Phahonyothin Rd. Klong Nueng<br>Klong Luang Pathum Thani 12120</div><div class="nlpdf-letter-bu-address thai">มหาวิทยาลัยกรุงเทพ<br>9/1 หมู่ที่ 5 ถนนพหลโยธิน อำเภอคลองหลวง<br>จังหวัดปทุมธานี 12120</div></div><div class="nlpdf-letter-page-body">'+content+'</div></article>');
-  }
-  host.innerHTML=pages.join('');
-}
-function syncLetterControls(context,key,value){
-  context.values[key]=value;
-  $$('[data-letter-key="'+CSS.escape(key)+'"]','#nlpdfLetterDocument').forEach(el=>{if(el.tagName==='SELECT')return;if(document.activeElement!==el)el.value=value;});
-}
-function applyReferenceRecord(context,kind,id){
+function option(value,label,selected=false){return '<option value="'+esc(value)+'" '+(selected?'selected':'')+'>'+esc(label)+'</option>';}
+function populateCentralSelects(context){
   const refs=centralReference();
-  if(kind==='country'){
-    const r=(refs.countries||[]).find(x=>clean(x['Record ID'])===id);if(!r)return;const x=countryValues(r);
-    for(const k of ['nationalityEn','nationalityTh','countryEn','countryTh'])if(x[k])syncLetterControls(context,k,x[k]);
-  }else if(kind==='faculty'){
-    const r=(refs.faculty||[]).find(x=>clean(x['Record ID'])===id);if(!r)return;const x=facultyValues(r);
-    for(const k of ['programEn','programTh','facultyEn','facultyTh'])if(x[k])syncLetterControls(context,k,x[k]);
-  }else if(kind==='embassy'){
-    const r=(refs.embassy||[]).find(x=>clean(x['Record ID'])===id);if(!r)return;const x=embassyValues(r);
-    for(const k of ['embassy','embassyThai','embassyCountry'])if(x[k])syncLetterControls(context,k,x[k]);
-    x.lines.slice(0,4).forEach((line,i)=>syncLetterControls(context,'embassyAddress'+(i+1),line));
-  }
-  renderLetterDocument(context);
+  const country=$('#nlpdfLetterCountry'),program=$('#nlpdfLetterProgram'),embassy=$('#nlpdfLetterEmbassy');
+  const countrySeed=context.values.nationalityEn||context.values.countryEn||context.values.nationalityTh||context.values.countryTh||'';
+  const countryMatch=bestCountryRecord(countrySeed);
+  country.innerHTML='<option value="">'+esc(countrySeed||'Select nationality / country')+'</option>'+(refs.countries||[]).map(r=>{const x=countryValues(r),label=[x.nationalityEn,x.countryEn].filter(Boolean).join(' · ');return option(x.id,label,countryMatch&&x.id===countryValues(countryMatch).id);}).join('');
+  const programSeed=context.values.programEn||context.values.facultyEn||'';
+  const facultyMatch=bestFacultyRecord(programSeed);
+  program.innerHTML='<option value="">'+esc(programSeed||'Select program / major')+'</option>'+(refs.faculty||[]).map(r=>{const x=facultyValues(r),label=[x.programEn,x.facultyEn].filter(Boolean).join(' · ');return option(x.id,label,facultyMatch&&x.id===facultyValues(facultyMatch).id);}).join('');
+  const embassySeed=context.values.embassy||context.values.embassyThai||'';
+  const embassyMatch=bestEmbassyRecord(embassySeed);
+  embassy.innerHTML='<option value="">'+esc(embassySeed||'Select Thai Embassy / Consulate')+'</option>'+(refs.embassy||[]).map(r=>{const x=embassyValues(r);return option(x.id,x.embassy,embassyMatch&&x.id===embassyValues(embassyMatch).id);}).join('');
+  if(facultyMatch)applyProgramRecord(context,facultyMatch,false);
+  if(countryMatch)applyCountryRecord(context,countryMatch,false);
+  if(embassyMatch)applyEmbassyRecord(context,embassyMatch,false);
+}
+function syncFormText(context,key,value){
+  context.values[key]=value;
+  const id=({studentName:'nlpdfLetterName',passport:'nlpdfLetterPassport',studentId:'nlpdfLetterStudentId',documentNo:'nlpdfLetterDocumentNo',recipientLocation:'nlpdfLetterLocation'})[key];
+  if(id&&$('#'+id)&&document.activeElement!==$('#'+id))$('#'+id).value=value||'';
+}
+function applyCountryRecord(context,r,rerender=true){
+  if(!r)return;const x=countryValues(r);
+  for(const k of ['nationalityEn','nationalityTh','countryEn','countryTh'])if(x[k])context.values[k]=x[k];
+  if(rerender)renderLetterFormValues(context);
+}
+function applyProgramRecord(context,r,rerender=true){
+  if(!r)return;const x=facultyValues(r);
+  for(const k of ['programEn','programTh','facultyEn','facultyTh'])if(x[k])context.values[k]=x[k];
+  if(rerender)renderLetterFormValues(context);
+}
+function applyEmbassyRecord(context,r,rerender=true){
+  if(!r)return;const x=embassyValues(r);
+  for(const k of ['embassy','embassyThai','embassyCountry'])if(x[k])context.values[k]=x[k];
+  for(let i=1;i<=4;i++)context.values['embassyAddress'+i]=x.lines[i-1]||'';
+  context.values.embassyAddress=x.address;
+  if(rerender)renderLetterFormValues(context);
+}
+function packageFieldElement(kind){return ({semester:'#nlpdfLetterSemester',academicYear:'#nlpdfLetterAcademicYear',startDate:'#nlpdfLetterStartDate',finishDate:'#nlpdfLetterFinishDate',orientation:'#nlpdfLetterOrientation'})[kind]||'';}
+function packageFieldValue(kind){
+  const el=$(packageFieldElement(kind));if(!el)return'';
+  return clean('value' in el?el.value:el.textContent==='—'?'':el.textContent);
+}
+function setPackageField(kind,value){
+  const el=$(packageFieldElement(kind));if(!el)return;
+  if('value' in el)el.value=value??'';else el.textContent=clean(value)||'—';
+}
+function packageAcademicYearThai(){const y=Number(packageFieldValue('academicYear'));return Number.isFinite(y)&&y>1900?String(y+543):packageFieldValue('academicYear');}
+function canonicalSemester(value){
+  const v=clean(value).toLowerCase();return v==='first'?'First':v==='second'?'Second':v==='summer'?'Summer':clean(value);
+}
+function packageProfileParts(key,profile={}){
+  const parts=String(key||'').split('|');
+  return {key,type:profile.type||parts[0]||'',semester:canonicalSemester(profile.semester||parts[1]||''),year:profile.year||parts[2]||'',startDate:profile.startDate||'',finishDate:profile.finishDate||'',orientation:profile.orientation||''};
+}
+function packageProfileEntries(){
+  return Object.entries(letterPackageProfiles()).map(([key,p])=>packageProfileParts(key,p)).sort((a,b)=>String(b.year).localeCompare(String(a.year))||a.type.localeCompare(b.type)||a.semester.localeCompare(b.semester));
+}
+function renderPackageProfileList(){
+  const host=$('#nlpdfPackageProfileList');if(!host)return;
+  const rows=packageProfileEntries();
+  host.innerHTML=rows.length?rows.map(p=>'<article class="nlpdf-package-profile-row"><div class="nlpdf-package-profile-when"><strong>'+esc(letterTypeLabel(p.type))+'</strong><span>'+esc(p.semester)+' · '+esc(p.year)+'</span></div><div class="nlpdf-package-profile-dates"><span><b>Start</b>'+esc(p.startDate||'—')+'</span><span><b>Finish</b>'+esc(p.finishDate||'—')+'</span><span><b>Orientation</b>'+esc(p.orientation||'—')+'</span></div><div class="nlpdf-package-profile-actions"><button type="button" data-pkg-edit="'+esc(p.key)+'">Edit</button><button type="button" data-pkg-delete="'+esc(p.key)+'">Delete</button></div></article>').join(''):'<div class="nlpdf-package-profile-empty">No package-date profiles saved yet.</div>';
+}
+function resetPackageProfileForm(){
+  $('#nlpdfPkgOriginalKey').value='';$('#nlpdfPkgType').value='bachelor_no_ien';$('#nlpdfPkgSemester').value='First';$('#nlpdfPkgYear').value='';$('#nlpdfPkgStart').value='';$('#nlpdfPkgFinish').value='';$('#nlpdfPkgOrientation').value='';
+}
+function editPackageProfile(key){
+  const p=packageProfileParts(key,letterPackageProfiles()[key]||{});
+  $('#nlpdfPkgOriginalKey').value=key;$('#nlpdfPkgType').value=p.type;$('#nlpdfPkgSemester').value=p.semester;$('#nlpdfPkgYear').value=p.year;$('#nlpdfPkgStart').value=p.startDate;$('#nlpdfPkgFinish').value=p.finishDate;$('#nlpdfPkgOrientation').value=p.orientation;
+}
+function savePackageProfile(){
+  const type=$('#nlpdfPkgType').value,semester=$('#nlpdfPkgSemester').value,year=clean($('#nlpdfPkgYear').value);
+  if(!type||!semester||!year){toast('Student type, Semester, and Academic year are required.');return;}
+  const profiles=letterPackageProfiles(),old=$('#nlpdfPkgOriginalKey').value,key=letterPackageKey(type,semester,year);
+  if(old&&old!==key)delete profiles[old];
+  profiles[key]={type,semester,year,startDate:clean($('#nlpdfPkgStart').value),finishDate:clean($('#nlpdfPkgFinish').value),orientation:clean($('#nlpdfPkgOrientation').value)};
+  localStorage.setItem(LETTER_PACKAGE_DATES_KEY,JSON.stringify(profiles));renderPackageProfileList();resetPackageProfileForm();toast('Package-date profile saved.');
+}
+function deletePackageProfile(key){
+  const profiles=letterPackageProfiles();delete profiles[key];localStorage.setItem(LETTER_PACKAGE_DATES_KEY,JSON.stringify(profiles));renderPackageProfileList();resetPackageProfileForm();toast('Package-date profile deleted.');
+}
+function openPackageManager(){renderPackageProfileList();$('#nlpdfPackageManager').classList.remove('hidden');$('#nlpdfPackageManager').setAttribute('aria-hidden','false');}
+function closePackageManager(){$('#nlpdfPackageManager').classList.add('hidden');$('#nlpdfPackageManager').setAttribute('aria-hidden','true');}
+function applySavedPackageDates(context){
+  const semester=packageFieldValue('semester'),year=packageFieldValue('academicYear');
+  const profile=letterPackageProfiles()[letterPackageKey(context.type,semester,year)];
+  if(!semester||!year){setPackageField('startDate','');setPackageField('finishDate','');setPackageField('orientation','');$('#nlpdfLetterPackageStatus').textContent='Choose Semester and Academic year to use a saved package-date profile.';return false;}
+  if(!profile){$('#nlpdfLetterPackageStatus').textContent='No saved profile for '+letterTypeLabel(context.type)+' · '+semester+' · '+year+'. Add it from Package dates in PDF Builder.';return false;}
+  setPackageField('startDate',profile.startDate);setPackageField('finishDate',profile.finishDate);setPackageField('orientation',profile.orientation);
+  context.values.startDate=profile.startDate||context.values.startDate||'';context.values.finishDate=profile.finishDate||context.values.finishDate||'';context.values.orientation=profile.orientation||context.values.orientation||'';
+  context.values.semester=semester;context.values.academicYear=year;context.values.academicYearThai=String(Number(year)+543);
+  $('#nlpdfLetterPackageStatus').textContent='Using saved package profile.';
+  return true;
+}
+function recognizedExtraFields(context){
+  const covered=new Set(['studentName','passport','studentId','documentNo','recipientLocation','nationalityEn','nationalityTh','countryEn','countryTh','programEn','programTh','facultyEn','facultyTh','embassy','embassyThai','embassyCountry','embassyAddress','embassyAddress1','embassyAddress2','embassyAddress3','embassyAddress4','semester','academicYear','academicYearThai','startDate','finishDate','orientation']);
+  return context.editor.model.fields.filter(f=>!covered.has(f.kind)&&!covered.has(f.key)&&!f.package);
+}
+function renderLetterExtras(context){
+  const host=$('#nlpdfLetterExtraFields'),section=$('#nlpdfLetterExtraSection');if(!host||!section)return;
+  const extras=recognizedExtraFields(context);section.classList.toggle('hidden',!extras.length);
+  host.innerHTML=extras.map((f,i)=>'<label><span>'+esc(f.label||f.kind)+'</span><input data-letter-extra="'+esc(f.key)+'" value="'+esc(context.values[f.key]??f.value??'')+'"></label>').join('');
+}
+function renderLetterFormValues(context){
+  syncFormText(context,'studentName',context.values.studentName||context.name||'');
+  syncFormText(context,'passport',context.values.passport||context.passport||'');
+  syncFormText(context,'studentId',context.values.studentId||context.studentId||'');
+  syncFormText(context,'documentNo',context.values.documentNo||context.num||'');
+  syncFormText(context,'recipientLocation',context.values.recipientLocation||'');
+  $('#nlpdfLetterFaculty').value=context.values.facultyEn||'';
+  $('#nlpdfLetterEmbassyAddress').value=context.values.embassyAddress||[1,2,3,4].map(i=>context.values['embassyAddress'+i]).filter(Boolean).join('\n');
+  renderLetterExtras(context);
 }
 function inferInitialPackage(context){
-  const fields=context.editor.model.fields;
-  const semester=fields.find(f=>f.kind==='semester')?.value;
-  if(semester)setPackageField('semester',/^1$/.test(semester)?'First':/^2$/.test(semester)?'Second':/^3$/.test(semester)?'Summer':semester);
-  const year=fields.find(f=>f.kind==='academicYear')?.value||fields.find(f=>f.kind==='academicYearThai')?.value;
+  const fields=context.editor.model.fields,sem=fields.find(f=>f.kind==='semester')?.value,year=fields.find(f=>f.kind==='academicYear')?.value||fields.find(f=>f.kind==='academicYearThai')?.value;
+  setPackageField('semester',/^1$/.test(sem)?'First':/^2$/.test(sem)?'Second':/^3$/.test(sem)?'Summer':sem||'');
   if(year)setPackageField('academicYear',Number(year)>2500?String(Number(year)-543):year);
-  for(const kind of ['startDate','finishDate','orientation']){const f=fields.find(x=>x.kind===kind);if(f)setPackageField(kind,f.value);}
-}
-function syncPackageValuesToContext(context){
-  for(const kind of ['semester','academicYear','startDate','finishDate','orientation'])context.values[kind]=packageFieldValue(kind);
-  context.values.academicYearThai=packageAcademicYearThai();
-  renderLetterDocument(context);
-}
-function openPackageSettings(){
-  const panel=$('#nlpdfPackageSettings');panel.classList.remove('hidden');panel.setAttribute('aria-hidden','false');
-}
-function closePackageSettings(){
-  const panel=$('#nlpdfPackageSettings');panel.classList.add('hidden');panel.setAttribute('aria-hidden','true');
+  for(const kind of ['startDate','finishDate','orientation']){const f=fields.find(x=>x.kind===kind);if(f&&!packageFieldValue(kind))setPackageField(kind,f.value);}
 }
 async function prepareLetterEditor(context){
   await ensureZip();const bytes=letterBytes(context.type),zip=await window.JSZip.loadAsync(bytes),xmlFile=zip.file('word/document.xml');
@@ -1298,23 +1411,25 @@ async function prepareLetterEditor(context){
   const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main',model=semanticLetterModel(doc,ns);
   context.editor={zip,doc,ns,model};context.values={};state.pendingLetter=context;
   for(const field of model.fields)context.values[field.key]=field.value;
-  $('#nlpdfLetterEditorTitle').textContent='Edit '+letterTypeLabel(context.type);$('#nlpdfLetterEditorContext').textContent=(context.num?context.num+' · ':'')+context.name;$('#nlpdfLetterStudentType').value=letterTypeLabel(context.type);
-  inferInitialPackage(context);applySavedPackageDates(context);syncPackageValuesToContext(context);renderLetterDocument(context);
-  const body=$('#nlpdfLetterDocument');
-  body.oninput=e=>{const el=e.target.closest('[data-letter-key]');if(!el||el.tagName==='SELECT'||el.hasAttribute('readonly'))return;syncLetterControls(context,el.dataset.letterKey,el.value);};
-  body.onchange=e=>{const el=e.target.closest('[data-letter-ref]');if(!el)return;applyReferenceRecord(context,el.dataset.letterRef,el.value);};
-  body.onclick=e=>{if(e.target.closest('[data-package-inline]'))openPackageSettings();};
-  $('#nlpdfPackageSettingsBtn').onclick=openPackageSettings;$('#nlpdfClosePackageSettings').onclick=closePackageSettings;
-  const packageChanged=()=>{syncPackageValuesToContext(context);};
-  for(const id of ['nlpdfLetterStartDate','nlpdfLetterFinishDate','nlpdfLetterOrientation'])$('#'+id).oninput=packageChanged;
-  $('#nlpdfLetterSemester').onchange=()=>{if(!applySavedPackageDates(context))packageChanged();};
-  $('#nlpdfLetterAcademicYear').onchange=()=>{if(!applySavedPackageDates(context))packageChanged();};
-  $('#nlpdfCreateEditedLetter').disabled=!model.fields.length;
-  $('#nlpdfLetterEditorStatus').textContent=model.fields.length+' linked editable topic'+(model.fields.length===1?'':'s')+' identified. Unrecognized highlighted text stays unchanged.';
+  if(context.name)context.values.studentName=context.name;if(context.passport)context.values.passport=context.passport;if(context.studentId)context.values.studentId=context.studentId;if(context.num)context.values.documentNo=context.num;
+  $('#nlpdfLetterEditorTitle').textContent='Edit '+letterTypeLabel(context.type);$('#nlpdfLetterEditorContext').textContent=[context.num,context.name,context.passport,context.studentId].filter(Boolean).join(' · ');$('#nlpdfLetterStudentType').value=letterTypeLabel(context.type);
+  inferInitialPackage(context);populateCentralSelects(context);renderLetterFormValues(context);applySavedPackageDates(context);
+  $('#nlpdfLetterName').oninput=e=>syncFormText(context,'studentName',e.target.value);
+  $('#nlpdfLetterPassport').oninput=e=>syncFormText(context,'passport',e.target.value);
+  $('#nlpdfLetterStudentId').oninput=e=>syncFormText(context,'studentId',e.target.value);
+  $('#nlpdfLetterDocumentNo').oninput=e=>syncFormText(context,'documentNo',e.target.value);
+  $('#nlpdfLetterLocation').oninput=e=>syncFormText(context,'recipientLocation',e.target.value);
+  $('#nlpdfLetterCountry').onchange=e=>applyCountryRecord(context,(centralReference().countries||[]).find(r=>clean(r['Record ID'])===e.target.value));
+  $('#nlpdfLetterProgram').onchange=e=>applyProgramRecord(context,(centralReference().faculty||[]).find(r=>clean(r['Record ID'])===e.target.value));
+  $('#nlpdfLetterEmbassy').onchange=e=>applyEmbassyRecord(context,(centralReference().embassy||[]).find(r=>clean(r['Record ID'])===e.target.value));
+  $('#nlpdfLetterSemester').onchange=()=>{context.values.semester=packageFieldValue('semester');applySavedPackageDates(context);};
+  $('#nlpdfLetterAcademicYear').oninput=()=>{context.values.academicYear=packageFieldValue('academicYear');context.values.academicYearThai=packageAcademicYearThai();};
+  $('#nlpdfLetterAcademicYear').onchange=()=>applySavedPackageDates(context);
+  $('#nlpdfLetterExtraFields').oninput=e=>{const el=e.target.closest('[data-letter-extra]');if(el)context.values[el.dataset.letterExtra]=el.value;};
+  $('#nlpdfCreateEditedLetter').disabled=!model.fields.length;$('#nlpdfLetterEditorStatus').textContent=model.fields.length+' recognized editable topic'+(model.fields.length===1?'':'s')+'. Highlighted text that is not recognized is left untouched.';
   $('#nlpdfLetterEditor').classList.remove('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','false');
 }
-function closeLetterEditor(){closePackageSettings();$('#nlpdfLetterEditor').classList.add('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','true');state.pendingLetter=null;}
-function fieldReplacement(context,field,occ){return occurrenceValue(context,field,occ);}
+function closeLetterEditor(){$('#nlpdfLetterEditor').classList.add('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','true');state.pendingLetter=null;}
 function replaceOccurrence(occ,value,doc,ns){
   const parts=occ.parts;if(!parts.length)return;
   parts.forEach((part,i)=>{
@@ -1330,26 +1445,24 @@ async function createEditedLetter(){
   const context=state.pendingLetter;if(!context?.editor||state.busy)return;
   state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
   try{
-    const {zip,doc,ns,model}=context.editor;
-    const all=[];
+    applySavedPackageDates(context);
+    const {zip,doc,ns,model}=context.editor,all=[];
     for(const field of model.fields)for(const occ of field.occurrences)all.push({field,occ});
     all.sort((a,b)=>b.occ.record.index-a.occ.record.index||b.occ.start-a.occ.start);
-    for(const item of all)replaceOccurrence(item.occ,fieldReplacement(context,item.field,item.occ),doc,ns);
-    savePackageDates(context);zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
+    for(const {field,occ} of all)replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);
+    zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
     await writeFile(context.targetDir,context.letterName,new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
-    $('#nlpdfLetterEditorStatus').textContent='Letter created successfully. Editable values remain highlighted for checking.';setStatus('Ready · Letter created');toast('Letter created · highlights kept.');
+    $('#nlpdfLetterEditorStatus').textContent='Letter created successfully. Edited values remain highlighted for checking.';setStatus('Ready · Letter created');toast('Letter created · highlights kept.');
     await new Promise(resolve=>setTimeout(resolve,650));closeLetterEditor();
   }catch(err){console.error(err);$('#nlpdfLetterEditorStatus').textContent=err?.message||'Could not create letter.';toast(err?.message||'Could not create letter.');}
   finally{state.busy=false;$('#nlpdfCreateEditedLetter').disabled=false;updateControls();}
 }
 async function confirmExport(){
   if(state.busy)return;
-  const name=safePath($('#nlpdfExportName').value),num=safePath($('#nlpdfExportNumber').value),outputs=selectedOutputs();
+  const name=safePath($('#nlpdfExportName').value),num=safePath($('#nlpdfExportNumber').value),passport=clean($('#nlpdfExportPassport').value),studentId=clean($('#nlpdfExportStudentId').value),outputs=selectedOutputs(),stem=name||'Student';
   if(!outputs.any){toast('Select Folder, PDF, or Letter.');return;}
   if(state.editLetterRequested&&!outputs.letter){syncExportPreview();return;}
-  if((outputs.pdf||outputs.letter)&&!name){toast('Enter the student name.');$('#nlpdfExportName').focus();return;}
-  if(outputs.folder&&!num){toast('Enter the student number.');$('#nlpdfExportNumber').focus();return;}
   if(!state.destinationHandle){const ok=await chooseDestination();if(!ok)return;}
   state.busy=true;$('#nlpdfConfirmExport').disabled=true;
   exportProgress('Creating in progress…','Preparing selected outputs.',0,outputs.pdf?state.pages.length:0);
@@ -1359,17 +1472,18 @@ async function confirmExport(){
     let targetDir=state.destinationHandle;
     if(outputs.folder){
       exportProgress('Creating in progress…','Creating student folder.',0,outputs.pdf?state.pages.length:0);
-      targetDir=await state.destinationHandle.getDirectoryHandle(num+' '+name,{create:true});
+      const folderName=[num,name].filter(Boolean).join(' ')||'Student';
+      targetDir=await state.destinationHandle.getDirectoryHandle(folderName,{create:true});
     }
     if(outputs.pdf){
       const bytes=await buildPdf((phase,done,total)=>exportProgress('Creating in progress…',phase,done,total));
-      let pdfName=safeFile($('#nlpdfExportPdfName').value||('Documents_'+name+'.pdf'));if(!/\.pdf$/i.test(pdfName))pdfName+='.pdf';
+      let pdfName=safeFile($('#nlpdfExportPdfName').value||('Documents_'+stem+'.pdf'));if(!/\.pdf$/i.test(pdfName))pdfName+='.pdf';
       exportProgress('Creating in progress…','Writing PDF…',state.pages.length,state.pages.length);
       await writeFile(targetDir,pdfName,new Blob([bytes],{type:'application/pdf'}));
     }
     if(outputs.letter){
-      const letterName='Letter_'+name+'.docx',type=$('#nlpdfExportLetterType').value;
-      if(state.editLetterRequested)handoff={num,name,type,letterName,targetDir};
+      const letterName='Letter_'+stem+'.docx',type=$('#nlpdfExportLetterType').value;
+      if(state.editLetterRequested)handoff={num,name,passport,studentId,type,letterName,targetDir};
       else{
         exportProgress('Creating in progress…','Writing letter…',outputs.pdf?state.pages.length:0,outputs.pdf?state.pages.length:0);
         await writeFile(targetDir,letterName,new Blob([letterBytes(type)],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
@@ -1681,14 +1795,21 @@ async function build(){
       e.preventDefault();deleteSelected();
     }
   });
+  $('#nlpdfPageContentType').addEventListener('change',e=>{const p=activePage();if(!p)return;p.contentType=e.target.value;renderFilmstrip();if(state.viewMode==='grid')renderGrid();recordEdit();});
+  $('#nlpdfPackageManagerBtn').addEventListener('click',openPackageManager);
+  $('[data-package-close]').forEach(x=>x.addEventListener('click',closePackageManager));
+  $('#nlpdfPkgNew').addEventListener('click',resetPackageProfileForm);$('#nlpdfPkgSave').addEventListener('click',savePackageProfile);
+  $('#nlpdfPackageProfileList').addEventListener('click',e=>{const edit=e.target.closest('[data-pkg-edit]'),del=e.target.closest('[data-pkg-delete]');if(edit)editPackageProfile(edit.dataset.pkgEdit);if(del&&confirm('Delete this package-date profile?'))deletePackageProfile(del.dataset.pkgDelete);});
+  window.addEventListener('buic-reference-data-updated',()=>{if(state.pendingLetter&&!$('#nlpdfLetterEditor').classList.contains('hidden')){populateCentralSelects(state.pendingLetter);renderLetterFormValues(state.pendingLetter);}});
+
   $('#nlpdfCreate').addEventListener('click',openExport);
-  $$('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
+  $('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
   $('#nlpdfEditLetter').addEventListener('click',requestLetterEdit);
   $('#nlpdfCancelLetterEdit').addEventListener('click',closeLetterEditor);$('#nlpdfCreateEditedLetter').addEventListener('click',createEditedLetter);
-  ['nlpdfExportNumber','nlpdfExportName'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(id==='nlpdfExportName')$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();}));
-  $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutput"]').forEach(x=>x.addEventListener('change',syncExportPreview));
+  ['nlpdfExportNumber','nlpdfExportName','nlpdfExportPassport','nlpdfExportStudentId'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(id==='nlpdfExportName')$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();}));
+  $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$('input[name="nlpdfOutput"]').forEach(x=>x.addEventListener('change',syncExportPreview));
 
-  renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();resetHistory();updateDuplicateControls();
+  renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();resetHistory();updateDuplicateControls();renderPackageProfileList();
 }
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>build().catch(console.error),{once:true});else build().catch(console.error);
