@@ -685,6 +685,16 @@ function fitPaper(){
 function setZoom(next){state.zoom=clamp(Math.round(next*100)/100,.5,3);fitPaper();}
 
 /* Drag background horizontally to zoom: moving outward zooms in on either side. */
+function syncStageFloatingControls(){
+  const stage=$('#nlpdfStage');if(!stage)return;
+  stage.style.setProperty('--nlpdf-stage-scroll-x',stage.scrollLeft+'px');
+  stage.style.setProperty('--nlpdf-stage-scroll-y',stage.scrollTop+'px');
+}
+function setupStageFloatingControls(){
+  const stage=$('#nlpdfStage');if(!stage)return;
+  stage.addEventListener('scroll',syncStageFloatingControls,{passive:true});
+  syncStageFloatingControls();
+}
 function setupBackgroundZoom(){
   const stage=$('#nlpdfStage'),paper=$('#nlpdfPaper');
   let drag=null;
@@ -2034,7 +2044,7 @@ async function build(){
 
   $('#nlpdfSingleView').addEventListener('click',()=>setView('single'));$('#nlpdfGridView').addEventListener('click',()=>setView('grid'));
 
-  setupDrop($('#nlpdfStage'));setupDrop($('#nlpdfGridStage'));setupPageContainer($('#nlpdfFilmstrip'));setupPageContainer($('#nlpdfGrid'));setupContentDrag();setupSignatureDrag();setupBackgroundZoom();
+  setupDrop($('#nlpdfStage'));setupDrop($('#nlpdfGridStage'));setupPageContainer($('#nlpdfFilmstrip'));setupPageContainer($('#nlpdfGrid'));setupContentDrag();setupSignatureDrag();setupStageFloatingControls();setupBackgroundZoom();
   if(window.ResizeObserver)new ResizeObserver(()=>fitPaper()).observe($('#nlpdfStage'));
   window.addEventListener('resize',fitPaper);
   document.addEventListener('keydown',e=>{
