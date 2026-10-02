@@ -1597,3 +1597,218 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
 #workspaceDocuments.nlpdf-primary .nlpdf-stage .nlpdf-package-manager-fab{
   display:none!important;
 }
+
+
+/* V20 — larger Letter Edit, selectable academic data, searchable embassies */
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-editor-head{
+  min-height:82px;
+  padding:14px 24px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-editor-head .eyebrow{
+  font-size:10px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-editor-head h2{
+  font-size:24px;
+  line-height:1.15;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-editor-head span:last-child{
+  font-size:11px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-editor-close{
+  height:40px;
+  padding:0 15px;
+  font-size:11px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form{
+  width:min(1080px,100%);
+  gap:15px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-section{
+  padding:18px;
+  border-radius:15px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-title{
+  margin-bottom:14px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-title strong{
+  font-size:15px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-title span{
+  font-size:10px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid{
+  gap:12px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid label>span{
+  font-size:10px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid input,
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid select{
+  height:44px;
+  padding:0 11px;
+  font-size:13px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid textarea{
+  min-height:92px;
+  padding:10px 11px;
+  font-size:13px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-package-result{
+  gap:10px;
+  margin-top:13px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-package-result>div{
+  min-height:48px;
+  padding:10px 12px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-package-result span{
+  font-size:8.5px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-package-result strong{
+  font-size:12px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-package-status{
+  margin-top:9px;
+  font-size:10px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-editor-actions{
+  min-height:68px;
+  padding:11px 22px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-editor-actions>span{
+  font-size:11px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-editor-actions .nlpdf-confirm{
+  height:42px;
+  min-width:130px;
+  font-size:12px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-fabs{
+  position:fixed;
+  z-index:104;
+  right:22px;
+  bottom:78px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-fabs .nlpdf-package-manager-fab{
+  position:static!important;
+  right:auto!important;
+  bottom:auto!important;
+  height:40px;
+  font-size:10px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-school-manager-fab{
+  border-color:var(--line-strong)!important;
+  color:var(--text)!important;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-school-manager-fab:hover{
+  color:var(--accent)!important;
+  border-color:var(--accent)!important;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-embassy-search{
+  position:relative;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-embassy-results{
+  position:absolute;
+  z-index:125;
+  top:48px;
+  left:0;
+  right:0;
+  max-height:330px;
+  overflow:auto;
+  padding:6px;
+  border:1px solid var(--line-strong);
+  border-radius:11px;
+  background:var(--surface);
+  box-shadow:0 16px 42px rgba(16,25,39,.18);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-embassy-results.hidden{
+  display:none!important;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-embassy-results button{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(150px,.9fr) minmax(120px,.7fr) minmax(220px,1.4fr);
+  gap:10px;
+  align-items:center;
+  padding:10px 11px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:var(--text);
+  text-align:left;
+  cursor:pointer;
+  font:inherit;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-embassy-results button:hover{
+  background:var(--accent-soft);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-embassy-results strong{
+  font-size:11px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-embassy-results span{
+  font-size:10px;
+  color:var(--text);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-embassy-results small{
+  font-size:9.5px;
+  color:var(--muted);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-embassy-empty{
+  padding:16px 12px;
+  color:var(--muted);
+  text-align:center;
+  font-size:10px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-card{
+  width:min(1120px,calc(100vw - 48px));
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-head h2{
+  font-size:21px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-head p{
+  font-size:10px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-manager-body{
+  grid-template-columns:minmax(0,1.55fr) minmax(360px,.8fr);
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-row{
+  grid-template-columns:200px minmax(0,1fr) auto;
+  padding:12px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-when strong{
+  font-size:11px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-when span,
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-dates span{
+  font-size:9.5px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-dates b{
+  font-size:8px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor{
+  gap:11px;
+  padding:14px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor label>span{
+  font-size:9px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor input,
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor select{
+  height:40px;
+  padding:0 9px;
+  font-size:11px;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-package-profile-editor label.wide{
+  grid-column:1/-1;
+}
+#workspaceDocuments.nlpdf-primary .nlpdf-school-row{
+  grid-template-columns:minmax(220px,1fr) 1px auto;
+}
+@media(max-width:760px){
+  #workspaceDocuments.nlpdf-primary .nlpdf-letter-fabs{right:12px}
+  #workspaceDocuments.nlpdf-primary .nlpdf-embassy-results button{grid-template-columns:1fr}
+  #workspaceDocuments.nlpdf-primary .nlpdf-package-manager-body{grid-template-columns:1fr}
+}
