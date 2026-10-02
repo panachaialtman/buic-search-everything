@@ -629,6 +629,9 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
     await page.locator('#nlpdfExportName').fill('QA Student');
+    await page.locator('#nlpdfExportPassport').fill('QA1234567');
+    await page.locator('#nlpdfExportStudentId').fill('1690999999');
+    assert.equal(await page.locator('#nlpdfExportPdfName').inputValue(),'QA Student_QA1234567_1690999999.pdf');
     await page.locator('#nlpdfExportNumber').fill('9012');
     await page.locator('input[name="nlpdfOutput"][value="folder"]').check();
     await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
@@ -645,7 +648,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
       };
     },before);
     assert(out.files.find(x=>x.name==='Letter_QA Student.docx'&&x.finished&&x.length>100));
-    assert(out.files.find(x=>x.name==='Documents_QA Student.pdf'&&x.finished&&x.length>100));
+    assert(out.files.find(x=>x.name==='QA Student_QA1234567_1690999999.pdf'&&x.finished&&x.length>100));
     assert.equal(out.pageCount,7,'5 document pages + 1 front + 1 back');
     await page.waitForTimeout(1000);
     assert.equal(await visible('#nlpdfExportModal'),false);
