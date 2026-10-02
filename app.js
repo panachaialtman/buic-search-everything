@@ -215,7 +215,7 @@
 
   function loadCore() {
     const core = document.createElement('script');
-    core.src = 'app-core.js?v=20260930-workspace-v9';
+    core.src = 'app-core.js?v=20261002-letter-editor-v1';
     core.async = false;
     core.onload = () => {
       const enhancement = document.createElement('script');

@@ -445,21 +445,22 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await visible('#nlpdfStage'),true);
   });
 
-  await run('Create Package uses independent Folder/PDF/Letter selections and Edit letter requires Letter',async()=>{
+  await run('Edit letter is a real on/off toggle and only locks package while enabled without Letter',async()=>{
     await page.locator('#nlpdfCreate').click();
     assert.equal(await page.locator('input[name="nlpdfOutput"]').count(),3);
-    assert.equal(await page.locator('input[name="nlpdfOutput"][value="pdf"]').isChecked(),true);
-    assert.equal(await page.locator('input[name="nlpdfOutput"][value="folder"]').isChecked(),false);
-    assert.equal(await page.locator('input[name="nlpdfOutput"][value="letter"]').isChecked(),false);
     await page.locator('#nlpdfEditLetter').click();
     assert.equal(await page.locator('#nlpdfConfirmExport').isDisabled(),true);
     assert.equal(await page.locator('#nlpdfLetterRequirement').isVisible(),true);
+    await page.locator('#nlpdfEditLetter').click();
+    assert.equal(await page.locator('#nlpdfConfirmExport').isDisabled(),false);
+    assert.equal(await page.locator('#nlpdfLetterRequirement').isVisible(),false);
+    await page.locator('#nlpdfEditLetter').click();
     await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
     assert.equal(await page.locator('#nlpdfConfirmExport').isDisabled(),false);
     await page.locator('#nlpdfExportModal [data-nlpdf-close]').last().click();
   });
 
-  await run('Edit Letter uses highlighted fields, keeps highlights, and remembers package dates',async()=>{
+  await run('Edit Letter renders document pages with linked semantic controls and package-date settings',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
     await page.locator('#nlpdfExportName').fill('Highlight QA');
@@ -472,9 +473,20 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfConfirmExport').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
     assert.equal((await page.locator('#nlpdfLetterStudentType').inputValue()),'Exchange Bachelor');
-    assert((await page.locator('.nlpdf-letter-field').count())>0,'highlighted template fields should become form controls');
+    assert((await page.locator('.nlpdf-letter-page').count())>=3,'letter should render as document-style pages');
+    assert.equal(await page.locator('.nlpdf-letter-field').count(),0,'generic highlighted-field cards must not be used');
+    assert((await page.locator('[data-letter-key="studentName"]').count())>=2,'repeated student name must be linked');
+    assert((await page.locator('[data-letter-key="passport"]').count())>=1,'passport must be identified semantically');
+    assert.equal(await page.locator('[data-letter-key^="field_"]').count(),0,'unknown highlighted runs must stay normal text');
+    const names=page.locator('[data-letter-key="studentName"]');
+    await names.first().fill('Linked Name');
+    await page.waitForTimeout(50);
+    assert.equal(await names.nth(1).inputValue(),'Linked Name');
+    await page.locator('#nlpdfPackageSettingsBtn').click();
+    assert.equal(await page.locator('#nlpdfPackageSettings').isVisible(),true);
     await page.locator('#nlpdfLetterSemester').selectOption('Second');
     await page.locator('#nlpdfLetterAcademicYear').fill('2026');
+    await page.locator('#nlpdfLetterAcademicYear').press('Tab');
     await page.locator('#nlpdfLetterStartDate').fill('January 11, 2027');
     await page.locator('#nlpdfLetterFinishDate').fill('May 31, 2027');
     await page.locator('#nlpdfLetterOrientation').fill('January 4 - 8, 2027');
@@ -489,16 +501,14 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
       return {
         finished:file.finished,
         highlight:/<w:highlight\b[^>]*(?:w:val|val)="yellow"/i.test(xml),
+        linked:(xml.match(/Linked Name/g)||[]).length,
         profile:profiles['exchange|second|2026']||null
       };
     },before);
     assert(out&&out.finished,'edited Word letter should be written');
     assert.equal(out.highlight,true,'edited Word letter must keep yellow highlight markup');
-    assert.deepEqual(out.profile,{
-      startDate:'January 11, 2027',
-      finishDate:'May 31, 2027',
-      orientation:'January 4 - 8, 2027'
-    });
+    assert(out.linked>=2,'linked name replacement should reach repeated occurrences');
+    assert.deepEqual(out.profile,{startDate:'January 11, 2027',finishDate:'May 31, 2027',orientation:'January 4 - 8, 2027'});
   });
 
   await run('Export modal shows processing, then success only after write completes',async()=>{

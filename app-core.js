@@ -675,7 +675,7 @@
     el.className=`validation-summary ${errors?'has-errors':warnings?'has-warnings':'is-good'}`;
     el.innerHTML=`<strong>${errors?`${errors} error${errors===1?'':'s'}`:warnings?`0 errors · ${warnings} warning${warnings===1?'':'s'}`:'Validated'}</strong><span>${esc(r.label||'Workbook structure checked.')}</span>${warnings?`<small>${esc(r.warnings.slice(0,3).join(' · '))}${warnings>3?' · …':''}</small>`:''}`;
   }
-  function setRows(rows,meta,persist=false){sourceRows=rows;data=buildData(rows);countryCodeCache.clear();flagColorCache.clear();floatingWindows.clear();sourceMeta=meta;if(persist){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(rows));localStorage.setItem(STORAGE_META_KEY,JSON.stringify(meta));}catch(e){toast('Excel loaded, but browser storage is full.');}}updateOverview();updateSourceUI();refreshCommunicationData();renderValidationSummary();search();renderFloatingWindows();}
+  function setRows(rows,meta,persist=false){sourceRows=rows;data=buildData(rows);window.BUIC_REFERENCE_DATA={countries:data.countries,faculty:data.faculty,embassy:data.embassy};try{window.dispatchEvent(new CustomEvent('buic-reference-data-updated',{detail:window.BUIC_REFERENCE_DATA}));}catch{}countryCodeCache.clear();flagColorCache.clear();floatingWindows.clear();sourceMeta=meta;if(persist){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(rows));localStorage.setItem(STORAGE_META_KEY,JSON.stringify(meta));}catch(e){toast('Excel loaded, but browser storage is full.');}}updateOverview();updateSourceUI();refreshCommunicationData();renderValidationSummary();search();renderFloatingWindows();}
 
   let hubSyncInFlight = false;
   function hubStatus(message, error = false) {
