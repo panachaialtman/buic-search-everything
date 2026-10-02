@@ -1815,9 +1815,14 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
 
 
 /* V19 — linked document metadata and searchable reference pickers */
-#workspaceDocuments.nlpdf-primary .nlpdf-page-content-float{z-index:52;pointer-events:auto}
+#workspaceDocuments.nlpdf-primary .nlpdf-page-content-float{
+  z-index:52;pointer-events:auto;
+  transform:translate(var(--nlpdf-stage-scroll-x,0px),var(--nlpdf-stage-scroll-y,0px));
+  will-change:transform;
+}
 #workspaceDocuments.nlpdf-primary .nlpdf-content-panel{
   position:absolute;z-index:51;right:16px;top:58px;width:min(390px,calc(100% - 32px));max-height:min(520px,calc(100% - 76px));
+  transform:translate(var(--nlpdf-stage-scroll-x,0px),var(--nlpdf-stage-scroll-y,0px));will-change:transform;
   display:grid;grid-template-rows:auto minmax(0,1fr);border:1px solid var(--line-strong);border-radius:13px;
   background:color-mix(in srgb,var(--surface) 97%,transparent);box-shadow:0 14px 40px rgba(16,25,39,.18);backdrop-filter:blur(10px);overflow:hidden;
 }
