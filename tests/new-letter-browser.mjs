@@ -572,6 +572,9 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
     assert.equal(await visible('#nlpdfExportModal'),true);
+    await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
+    await page.locator('input[name="nlpdfOutput"][value="pdf"]').check();
+    await page.locator('input[name="nlpdfOutput"][value="letter"]').uncheck();
     await page.locator('#nlpdfExportName').fill('Test Student');
     await page.locator('#nlpdfChooseDestination').click();
     await page.locator('#nlpdfConfirmExport').click();
