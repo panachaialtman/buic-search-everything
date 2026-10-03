@@ -1095,15 +1095,17 @@ function facultyValues(r){
     facultyTh:clean(r['Faculty TH']),degree:clean(r['Degree Level'])
   };
 }
+function canonicalEmbassyEnglish(value){return clean(value).replace(/P\.R\.\s*CHINA/gi,'P.R. China');}
 function embassyValues(r){
-  const address=clean(r['Current Address EN'])||clean(r['Address EN']);
-  const lines=address.split(/\r?\n|\s*\|\s*/).map(clean).filter(Boolean);
+  const address=canonicalEmbassyEnglish(clean(r['Address EN'])||clean(r['Current Address EN']));
+  const lines=address.split(/\r?\n|\s*\|\s*/).map(canonicalEmbassyEnglish).filter(Boolean);
   return {
-    id:clean(r['Record ID']),embassy:clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Current Office Name EN'])||clean(r['Office Name EN']),
-    embassyOffice:clean(r['Current Office Name EN'])||clean(r['Office Name EN']),
-    embassyThai:clean(r['Current Official Name TH'])||clean(r['Official Name TH']),
-    embassyCountry:clean(r['Current Country / Territory EN'])||clean(r['Country / Territory EN']),
-    embassyCity:clean(r['Current City EN'])||clean(r['City EN']),address,lines
+    id:clean(r['Record ID']),
+    embassy:canonicalEmbassyEnglish(clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
+    embassyOffice:canonicalEmbassyEnglish(clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
+    embassyThai:clean(r['Official Name TH'])||clean(r['Current Official Name TH']),
+    embassyCountry:clean(r['Country / Territory EN'])||clean(r['Current Country / Territory EN']),
+    embassyCity:clean(r['City EN'])||clean(r['Current City EN']),address,lines
   };
 }
 function exactCentralMatch(value){
@@ -1237,8 +1239,8 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/มหาวิทยาลัยได้รับ\s+(.+?)\s+สัญชาติ/,'studentName','Student name');
     addRegexOccurrence(fields,rec,/สัญชาติ\s*([^\s]+(?:\s+[^\s]+)?)\s+หนังสือเดินทางหมายเลข/,'nationalityTh','สัญชาติ',1,{reference:'country'});
     addRegexOccurrence(fields,rec,/หนังสือเดินทางหมายเลข\s*([A-Za-z0-9]+)/,'passport','Passport number');
-    addRegexOccurrence(fields,rec,/สาขาวิชา\s*(.+?)\s+(?=(?:วิทยาลัย|คณะ))/,'programTh','สาขาวิชา',1,{reference:'faculty'});
-    addRegexOccurrence(fields,rec,/(?:วิทยาลัย|คณะ)\s*(.+?)\s+มหาวิทยาลัยกรุงเทพ/,'facultyTh','คณะ / วิทยาลัย',1,{reference:'faculty'});
+    addRegexOccurrence(fields,rec,/สาขาวิชา\s*(.+?)\s+(?=(?:วิทยาลัย|คณะ))/,'programTh','สาขาวิชา',1,{reference:'faculty',format:'thaiProgramBare'});
+    addRegexOccurrence(fields,rec,/(?:วิทยาลัย|คณะ)\s*(.+?)\s+มหาวิทยาลัยกรุงเทพ/,'facultyTh','คณะ / วิทยาลัย',1,{reference:'faculty',format:'thaiFacultyBare'});
     addRegexOccurrence(fields,rec,/ภาคการศึกษาที่\s*([123])/,'semester','Semester',1,{package:true,format:'semesterNumber'});
     addRegexOccurrence(fields,rec,/ปีการศึกษา\s*(25\d{2})/,'academicYearThai','ปีการศึกษา',1,{package:true,format:'thaiYear'});
     if(/\(\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}\s*[-–]\s*\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}\)/.test(t))addRegexOccurrence(fields,rec,/(\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}\s*[-–]\s*\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2})/,'studyPeriod','Study period',1,{format:'studyPeriodTh'});
@@ -1264,15 +1266,17 @@ function semanticLetterModel(doc,ns){
   }
   for(let i=0;i<records.length;i++){
     if(clean(records[i].full)!=='The Consul')continue;
-    let addressIndex=0;
-    for(let j=i+1;j<Math.min(records.length,i+8);j++){
+    let slot=0;
+    for(let j=i+1;j<Math.min(records.length,i+9);j++){
       const rec=records[j],trim=clean(rec.full);if(/^Dear Consul/i.test(trim))break;
       const ranges=highlightedRanges(rec);if(!ranges.length)continue;
       for(const range of ranges){
-        if(rec.occurrences.some(o=>Math.max(range.start,o.start)<Math.min(range.end,o.end)))continue;
-        if(addressIndex===0)addOccurrence(fields,rec,'embassy','Thai mission / Embassy',range.start,range.end,{reference:'embassy'});
-        else if(addressIndex<=4)addOccurrence(fields,rec,'embassyAddress'+addressIndex,'Embassy address '+addressIndex,range.start,range.end);
-        addressIndex++;
+        const alreadyMapped=rec.occurrences.some(o=>Math.max(range.start,o.start)<Math.min(range.end,o.end));
+        if(!alreadyMapped){
+          if(slot===0)addOccurrence(fields,rec,'embassy','Thai mission / Embassy',range.start,range.end,{reference:'embassy'});
+          else if(slot<=4)addOccurrence(fields,rec,'embassyAddress'+slot,'Embassy address '+slot,range.start,range.end);
+        }
+        slot++;
       }
     }
   }
@@ -1363,6 +1367,8 @@ function fieldCurrentValue(context,field){
   return context.values[field.key]??field.value;
 }
 function semesterNumber(v){return ({First:'1',Second:'2',Summer:'3'})[v]||v;}
+function stripThaiProgramPrefix(value){return clean(value).replace(/^สาขาวิชา\s*/,'').replace(/^สาขา\s*/,'');}
+function stripThaiFacultyPrefix(value){return clean(value).replace(/^(?:วิทยาลัย|คณะ)\s*/,'');}
 function occurrenceValue(context,field,occ){
   if(field.kind==='letterDate'){
     const iso=context.values.letterDate;
@@ -1377,6 +1383,8 @@ function occurrenceValue(context,field,occ){
   const value=fieldCurrentValue(context,field);
   if(occ.format==='semesterNumber')return semesterNumber(value);
   if(occ.format==='thaiYear')return String(Number(context.values.academicYear||lastAcademicYear())+543);
+  if(occ.format==='thaiProgramBare')return stripThaiProgramPrefix(value);
+  if(occ.format==='thaiFacultyBare')return stripThaiFacultyPrefix(value);
   if(field.kind==='startDate'&&toIsoDate(value))return formatDateEn(toIsoDate(value));
   if(field.kind==='finishDate'&&toIsoDate(value))return formatDateEn(toIsoDate(value));
   if(field.kind==='orientation'&&context.values.orientationStart)return formatOrientationEn(context.values.orientationStart,context.values.orientationEnd);

@@ -630,7 +630,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(out.studyPeriod,true,'Exchange study period should follow package Starting/Finishing dates');
   });
 
-  await run('Bachelor No IEN keeps Thai student paragraph and cleanly replaces location and Embassy country',async()=>{
+  await run('Bachelor No IEN maps Xian source data without duplicate mission or Thai labels',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
     await page.locator('#nlpdfExportNumber').fill('4766');
@@ -645,14 +645,12 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfChooseDestination').click();
     await page.locator('#nlpdfConfirmExport').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
-
     await page.locator('#nlpdfLetterLocation').fill('QA Student Location');
     await page.locator('#nlpdfLetterEmbassySearch').fill('Xian');
     await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});
     const xian=page.locator('#nlpdfLetterEmbassyResults [data-embassy-result]').filter({hasText:/Xian/i}).first();
-    assert.equal(await xian.count()>0,true,'Xian mission should be searchable from Central data');
+    assert.equal(await xian.count()>0,true,'Xian mission should be searchable');
     await xian.click();
-
     await page.locator('#nlpdfCreateEditedLetter').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
     const out=await page.evaluate(async before=>{
@@ -662,19 +660,27 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
       const xml=await zip.file('word/document.xml').async('string');
       const doc=new DOMParser().parseFromString(xml,'application/xml');
       const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-      const plain=[...doc.getElementsByTagNameNS(ns,'t')].map(n=>n.textContent||'').join('');
-      return {finished:file.finished,plain};
+      const paras=[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(n=>n.textContent||'').join('').trim()).filter(Boolean);
+      const plain=paras.join('\n');
+      return {finished:file.finished,plain,paras};
     },before);
-
     assert(out&&out.finished,'Bachelor No IEN letter should be written');
-    assert(out.plain.includes('QA Student Location'),'the line under To: must use Student location');
-    assert(out.plain.includes('Royal Thai Consulate-General in Xian, P.R. China'),'selected mission should replace the complete old mission text');
-    assert.equal(out.plain.includes('P.R. China, Myanmar'),false,'old template country must not remain after the selected Embassy country');
-    assert.match(out.plain,/เรียน\s*กงสุล\s*ประจำ/,'Thai addressee must preserve กงสุล ประจำ');
-    assert.match(out.plain,/มหาวิทยาลัยได้รับ\s*Thai QA\s*สัญชาติ/,'Thai student-detail paragraph must preserve the student name and surrounding sentence');
-    assert.match(out.plain,/สัญชาติ\s*\S+.*หนังสือเดินทางหมายเลข\s*QA998877/s,'Thai nationality and passport fields must remain in the paragraph');
-    assert.match(out.plain,/สาขาวิชา\s*\S+/,'Thai major must remain in the paragraph');
-    assert.match(out.plain,/(?:วิทยาลัย|คณะ)\s*\S+/,'Thai faculty/school must remain in the paragraph');
+    assert(out.plain.includes('QA Student Location'),'Student location must replace the line under To:');
+    const consul=out.paras.findIndex(x=>x==='The Consul');
+    assert(consul>=0,'The Consul block should exist');
+    const block=out.paras.slice(consul+1,consul+6);
+    assert.equal(block[0],'Royal Thai Consulate-General in Xian, P.R. China');
+    assert.equal(block[1],'Room 104, 1st Floor, Building A');
+    assert.equal(block[2],'China Railway First International');
+    assert.equal(block[3],'No. 9 Yanta North Road, Beilin District');
+    assert.equal(block[4],'Xian City, Shaanxi 710000, P.R. China');
+    assert.equal(block.filter(x=>x==='Royal Thai Consulate-General in Xian, P.R. China').length,1,'mission must appear once in the address block');
+    assert.equal(out.plain.includes('P.R. CHINA'),false,'China casing must remain P.R. China');
+    assert.equal(out.plain.includes('P.R. China, Myanmar'),false,'stale template country must not remain');
+    assert.match(out.plain,/กงสุล\s+ประจำสถานกงสุลใหญ่ ณ นครซีอาน สาธารณรัฐประชาชนจีน/,'Thai addressee must use the Xian Thai mission wording');
+    assert.equal(out.plain.includes('สาขาวิชาสาขาวิชา'),false,'Thai major label must not duplicate');
+    assert.match(out.plain,/มหาวิทยาลัยได้รับ\s*Thai QA\s*สัญชาติ/,'Thai student-detail paragraph must remain intact');
+    assert.match(out.plain,/หนังสือเดินทางหมายเลข\s*QA998877/,'Thai passport value must remain in the paragraph');
   });
 
   await run('Export modal shows processing, then success only after write completes',async()=>{
