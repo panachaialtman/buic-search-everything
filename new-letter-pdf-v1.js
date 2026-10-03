@@ -1821,7 +1821,7 @@ async function createEditedLetter(){
     const {zip,doc,ns,model}=context.editor,all=[];
     for(const field of model.fields)for(const occ of field.occurrences)all.push({field,occ});
     all.sort((a,b)=>b.occ.record.index-a.occ.record.index||b.occ.start-a.occ.start);
-    for(const {field,occ} of all)replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);
+    for(const {field,occ} of all){if(field.kind==='embassyThai')continue;replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);}
     applyLinkedPackageDateCopies(context,model,doc,ns);
     applyThaiEmbassyAddressee(context,model,doc,ns);
     applyEmbassyPostalBlock(context,doc,ns);
