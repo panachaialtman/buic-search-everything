@@ -1734,6 +1734,34 @@ function setParagraphText(paragraph,value,doc,ns){
   for(let i=1;i<runs.length;i++)for(const t of runs[i].getElementsByTagNameNS(ns,'t'))t.textContent='';
   ensureYellowHighlight(runs[0],doc,ns);
 }
+function cloneRunProperties(run,doc,ns,keepHighlight=false){
+  const source=run?[...run.children].find(x=>x.localName==='rPr'):null;
+  if(!source)return null;
+  const pr=source.cloneNode(true);
+  if(!keepHighlight)for(const h of [...pr.getElementsByTagNameNS(ns,'highlight')])h.remove();
+  return pr;
+}
+function appendTextRun(paragraph,text,doc,ns,sourceRun,highlight=false){
+  if(!text)return;
+  const run=doc.createElementNS(ns,'w:r'),pr=cloneRunProperties(sourceRun,doc,ns,highlight);
+  if(pr)run.appendChild(pr);
+  const t=doc.createElementNS(ns,'w:t');t.textContent=text;if(/^\s|\s$/.test(text))t.setAttribute('xml:space','preserve');run.appendChild(t);
+  if(highlight)ensureYellowHighlight(run,doc,ns);
+  paragraph.appendChild(run);
+}
+function applyThaiEmbassyAddressee(context,model,doc,ns){
+  const value=clean(context.values.embassyThai);if(!value)return;
+  const field=model.fields.find(f=>f.kind==='embassyThai');if(!field)return;
+  for(const occ of field.occurrences){
+    const paragraph=occ.record.paragraph,prefix=occ.record.full.slice(0,occ.start),suffix=occ.record.full.slice(occ.end);
+    const originalRuns=[...paragraph.getElementsByTagNameNS(ns,'r')];
+    const prefixRun=originalRuns[0]||occ.parts?.[0]?.run||null,missionRun=occ.parts?.[0]?.run||prefixRun,suffixRun=originalRuns[originalRuns.length-1]||prefixRun;
+    for(const run of originalRuns)run.remove();
+    appendTextRun(paragraph,prefix,doc,ns,prefixRun,false);
+    appendTextRun(paragraph,value,doc,ns,missionRun,true);
+    appendTextRun(paragraph,suffix,doc,ns,suffixRun,false);
+  }
+}
 function applyEmbassyPostalBlock(context,doc,ns){
   const office=clean(context.values.embassyOffice),sourceLines=addressLines(context.values.embassyAddress||'');
   if(!office||!sourceLines.length)return;
@@ -1766,6 +1794,7 @@ async function createEditedLetter(){
     for(const field of model.fields)for(const occ of field.occurrences)all.push({field,occ});
     all.sort((a,b)=>b.occ.record.index-a.occ.record.index||b.occ.start-a.occ.start);
     for(const {field,occ} of all)replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);
+    applyThaiEmbassyAddressee(context,model,doc,ns);
     applyEmbassyPostalBlock(context,doc,ns);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
