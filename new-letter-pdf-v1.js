@@ -15,7 +15,7 @@ const state={
   busy:false, dragId:'', pendingAsset:'', destinationHandle:null,
   zoom:1, safeArea:false, duplicateDetection:true, duplicateOnly:false, duplicateGroups:new Map(), duplicatePageHashes:new Map(), duplicateDismissed:new Set(), duplicateHashCache:new Map(), duplicateScanToken:0,
   cropMode:false, cropDraft:null, renderEpoch:0, cropBounds:null, sigAspect:.32, signaturePageId:'', toolOpen:'', guides:{x:false,y:false}, contentBounds:null, history:{undo:[],redo:[],current:null,restoring:false},
-  editLetterRequested:false, pendingLetter:null, linkedData:{}, referencePicker:null, contentPanelCollapsed:false,
+  editLetterRequested:false, pendingLetter:null, packageHandoff:null, linkedData:{}, referencePicker:null, contentPanelCollapsed:false,
   signatureUrl:'', sig:{xPct:.72,yPct:.80,widthPct:.22}
 };
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -134,14 +134,14 @@ function workspaceMarkup(){
 }
 function exportModalMarkup(){
   return '<div class="nlpdf-modal" id="nlpdfExportModal" aria-hidden="true"><div class="nlpdf-modal-backdrop" data-nlpdf-close></div><section class="nlpdf-modal-card" role="dialog" aria-modal="true">'+
-    '<div class="nlpdf-modal-head"><div><span class="eyebrow">FINAL REVIEW</span><h2>Create Package</h2></div><button class="nlpdf-close" type="button" data-nlpdf-close>×</button></div>'+
+    '<div class="nlpdf-modal-head"><div><span class="eyebrow">CREATE 1/2</span><h2>Create Package</h2></div><button class="nlpdf-close" type="button" data-nlpdf-close>×</button></div>'+
     '<div class="nlpdf-modal-body">'+
       '<div class="nlpdf-modal-grid nlpdf-package-identity-grid">'+
         '<label class="nlpdf-modal-field"><span>Document Number</span><input id="nlpdfExportNumber" placeholder="3408"></label>'+
         '<label class="nlpdf-modal-field"><span>Student name</span><input id="nlpdfExportName" placeholder="Mr. Example"></label>'+
         '<label class="nlpdf-modal-field"><span>Passport number</span><input id="nlpdfExportPassport" placeholder="AB1234567"></label>'+
         '<label class="nlpdf-modal-field"><span>Student ID</span><input id="nlpdfExportStudentId" placeholder="1690000000"></label>'+
-        '<div class="nlpdf-modal-field full"><span>Letter type</span><div class="nlpdf-letter-type-row"><select id="nlpdfExportLetterType"><option value="bachelor_no_ien">Bachelor Degree No IEN</option><option value="bachelor">Bachelor Degree</option><option value="current_no_ien">Current No IEN</option><option value="exchange">Exchange Bachelor</option><option value="master">Master Degree</option><option value="doctor">Doctor Degree</option></select><button class="nlpdf-edit-letter" id="nlpdfEditLetter" type="button">Edit letter</button></div><small class="nlpdf-letter-requirement hidden" id="nlpdfLetterRequirement">Select Letter below to continue with Edit letter.</small></div>'+
+
         '<label class="nlpdf-modal-field full"><span>PDF filename</span><input id="nlpdfExportPdfName"></label>'+
       '</div>'+
       '<div class="nlpdf-output-choice" role="group" aria-label="Create outputs"><label class="nlpdf-choice"><input type="checkbox" name="nlpdfOutput" value="folder"><div><strong>Folder</strong></div></label><label class="nlpdf-choice"><input type="checkbox" name="nlpdfOutput" value="pdf" checked><div><strong>PDF</strong></div></label><label class="nlpdf-choice"><input type="checkbox" name="nlpdfOutput" value="letter"><div><strong>Letter</strong></div></label></div>'+
@@ -149,12 +149,19 @@ function exportModalMarkup(){
       '<div class="nlpdf-destination"><div><strong id="nlpdfDestinationName">No destination selected</strong><span id="nlpdfDestinationHelp">Choose where the selected outputs should be created.</span></div><button class="nlpdf-dest-btn" id="nlpdfChooseDestination" type="button">Choose destination</button></div>'+
     '</div>'+
     '<div class="nlpdf-export-progress hidden" id="nlpdfExportProgress" role="status" aria-live="polite"><div class="nlpdf-export-progress-spinner" aria-hidden="true"></div><div class="nlpdf-export-progress-title" id="nlpdfProgressTitle">Creating in progress…</div><div class="nlpdf-export-progress-detail" id="nlpdfProgressDetail">Preparing documents.</div><div class="nlpdf-export-progress-track"><div id="nlpdfProgressFill"></div></div><div class="nlpdf-export-progress-counter" id="nlpdfProgressCounter"></div></div>'+
-    '<div class="nlpdf-modal-actions"><button class="nlpdf-cancel" type="button" data-nlpdf-close>Cancel</button><button class="nlpdf-confirm" id="nlpdfConfirmExport" type="button">Create Package</button></div>'+
-  '</section></div>'+letterEditorMarkup();
+    '<div class="nlpdf-modal-actions"><button class="nlpdf-cancel" type="button" data-nlpdf-close>Cancel</button><button class="nlpdf-confirm" id="nlpdfConfirmExport" type="button">Create 1/2</button></div>'+
+  '</section></div>'+letterTypeModalMarkup()+letterEditorMarkup();
+}
+function letterTypeModalMarkup(){
+  return '<div class="nlpdf-modal" id="nlpdfLetterTypeModal" aria-hidden="true"><div class="nlpdf-modal-backdrop" data-nlpdf-letter-type-close></div><section class="nlpdf-modal-card nlpdf-document-type-card" role="dialog" aria-modal="true">'+
+    '<div class="nlpdf-modal-head"><div><span class="eyebrow">CREATE 2/2</span><h2>Select Document Type</h2></div><button class="nlpdf-close" type="button" data-nlpdf-letter-type-close>×</button></div>'+ 
+    '<div class="nlpdf-modal-body"><label class="nlpdf-modal-field"><span>Document type</span><select id="nlpdfExportLetterType"><option value="bachelor_no_ien">Bachelor Degree No IEN</option><option value="bachelor">Bachelor Degree</option><option value="current_no_ien">Current No IEN</option><option value="exchange">Exchange Bachelor</option><option value="master">Master Degree</option><option value="doctor">Doctor Degree</option></select></label><div class="nlpdf-document-type-note">Folder and PDF from Create 1/2 are already finished. This step only chooses the Word letter template.</div></div>'+ 
+    '<div class="nlpdf-modal-actions"><button class="nlpdf-cancel" id="nlpdfLetterTypeBack" type="button">Close</button><button class="nlpdf-confirm" id="nlpdfConfirmLetterType" type="button">Create 2/2</button></div>'+ 
+  '</section></div>';
 }
 function letterEditorMarkup(){
   return '<section class="nlpdf-letter-editor hidden" id="nlpdfLetterEditor" aria-hidden="true">'+
-    '<header class="nlpdf-letter-editor-head"><div><span class="eyebrow">LETTER EDITOR</span><h2 id="nlpdfLetterEditorTitle">Edit Letter</h2><span id="nlpdfLetterEditorContext"></span></div><button class="nlpdf-letter-editor-close" id="nlpdfCancelLetterEdit" type="button">Back to PDF Builder</button></header>'+
+    '<header class="nlpdf-letter-editor-head"><div><span class="eyebrow">LETTER EDITOR</span><h2 id="nlpdfLetterEditorTitle">Edit Letter</h2><span id="nlpdfLetterEditorContext"></span></div><button class="nlpdf-letter-editor-close" id="nlpdfCancelLetterEdit" type="button">Back to Document Type</button></header>'+
     '<div class="nlpdf-letter-editor-body nlpdf-letter-form-body">'+
       '<div class="nlpdf-letter-form" id="nlpdfLetterForm">'+
         '<section class="nlpdf-letter-form-section"><div class="nlpdf-letter-form-title"><strong>Student</strong><span>Package information can be left blank if it is not needed.</span></div><div class="nlpdf-letter-form-grid">'+
@@ -168,11 +175,11 @@ function letterEditorMarkup(){
         '<section class="nlpdf-letter-form-section"><div class="nlpdf-letter-form-title"><strong>Academic</strong><span>School, faculty and program use Search Everything data.</span></div><div class="nlpdf-letter-form-grid">'+
           '<label><span>School / Faculty</span><select id="nlpdfLetterFaculty"></select></label>'+
           '<label><span>Program / Major</span><select id="nlpdfLetterProgram"></select></label>'+
-          '<label><span>Student type</span><input id="nlpdfLetterStudentType" readonly></label>'+
+          '<label><span>Student type</span><button class="nlpdf-reference-select" id="nlpdfLetterStudentType" type="button"><span class="nlpdf-reference-select-value">Document type</span><small>Change</small></button></label>'+
           '<label><span>Semester</span><select id="nlpdfLetterSemester"><option value="">Select</option><option value="First">First</option><option value="Second">Second</option><option value="Summer">Summer</option></select></label>'+
           '<label><span>Academic year</span><select id="nlpdfLetterAcademicYear"></select></label>'+
         '</div>'+
-        '<div class="nlpdf-letter-package-result" id="nlpdfLetterPackageResult"><div><span>Starting Date</span><strong id="nlpdfLetterStartDate">—</strong></div><div><span>Finishing Date</span><strong id="nlpdfLetterFinishDate">—</strong></div><div><span>Orientation</span><strong id="nlpdfLetterOrientation">—</strong></div></div>'+
+        '<div class="nlpdf-letter-package-result" id="nlpdfLetterPackageResult"><div><span>Starting Date</span><input id="nlpdfLetterStartDate" type="date"></div><div><span>Finishing Date</span><input id="nlpdfLetterFinishDate" type="date"></div><div><span>Orientation</span><div class="nlpdf-letter-orientation-range"><input id="nlpdfLetterOrientationStart" type="date" aria-label="Orientation start"><b>to</b><input id="nlpdfLetterOrientationEnd" type="date" aria-label="Orientation finish"></div></div></div>'+
         '<div class="nlpdf-letter-package-status" id="nlpdfLetterPackageStatus">Choose Semester and Academic year to use a saved package-date profile.</div></section>'+
         '<section class="nlpdf-letter-form-section hidden" id="nlpdfLetterHomeSchoolSection"><div class="nlpdf-letter-form-title"><strong>Home university / school</strong><span>Remembered schools automatically bring their country.</span></div><div class="nlpdf-letter-form-grid">'+
           '<label><span>University / School</span><input id="nlpdfLetterHomeSchool" list="nlpdfLetterHomeSchoolOptions"><datalist id="nlpdfLetterHomeSchoolOptions"></datalist></label>'+
@@ -1012,7 +1019,7 @@ function automaticIdentityStem(){
 }
 function automaticPdfFilename(){return 'Documents_'+automaticIdentityStem()+'.pdf';}
 function openExport(){
-  state.editLetterRequested=false;$('#nlpdfEditLetter').classList.remove('active');
+  state.editLetterRequested=false;state.packageHandoff=null;
   const parsed=splitCaseIdentity(caseName());
   const name=clean(state.linkedData.studentName)||parsed.name,passport=clean(state.linkedData.passport)||parsed.passport,studentId=clean(state.linkedData.studentId)||parsed.studentId;
   $('#nlpdfExportNumber').value=caseNumber();$('#nlpdfExportName').value=name;$('#nlpdfExportPassport').value=passport;$('#nlpdfExportStudentId').value=studentId;
@@ -1029,15 +1036,20 @@ function syncExportPreview(){
   $('#nlpdfFinalFolder').textContent=outputs.folder?folderName:'Not created';
   $('#nlpdfFinalLetter').textContent=outputs.letter?'Letter_'+stem+'.docx':'Not created';
   $('#nlpdfFinalPdf').textContent=outputs.pdf?pdf.value:'Not created';
-  const needsLetter=state.editLetterRequested&&!outputs.letter;
-  $('#nlpdfLetterRequirement').classList.toggle('hidden',!needsLetter);$('#nlpdfEditLetter').classList.toggle('active',state.editLetterRequested);
-  const confirm=$('#nlpdfConfirmExport');confirm.textContent='Create Package';confirm.disabled=state.busy||!outputs.any||needsLetter;
+  const confirm=$('#nlpdfConfirmExport');confirm.textContent='Create 1/2';confirm.disabled=state.busy||!outputs.any;
 }
-function requestLetterEdit(){
-  state.editLetterRequested=!state.editLetterRequested;syncExportPreview();
-  if(!state.editLetterRequested){toast('Edit letter turned off.');return;}
-  if(!selectedOutputs().letter){toast('Select Letter to continue with Edit letter.');return;}
-  toast('Edit letter turned on.');
+function openLetterTypeModal(preferredType=''){
+  const modal=$('#nlpdfLetterTypeModal'),select=$('#nlpdfExportLetterType');if(!modal||!select)return;
+  const chosen=preferredType||state.packageHandoff?.type||'bachelor_no_ien';if([...select.options].some(o=>o.value===chosen))select.value=chosen;
+  modal.classList.add('open');modal.setAttribute('aria-hidden','false');
+}
+function closeLetterTypeModal(){const modal=$('#nlpdfLetterTypeModal');if(!modal)return;modal.classList.remove('open');modal.setAttribute('aria-hidden','true');}
+function cancelLetterType(){closeLetterTypeModal();state.pendingLetter=null;state.packageHandoff=null;renderContentPanel();setStatus('Ready');}
+async function confirmLetterType(){
+  if(state.busy||!state.packageHandoff)return;
+  const type=$('#nlpdfExportLetterType').value,handoff={...state.packageHandoff,type};state.packageHandoff={...handoff};
+  closeLetterTypeModal();
+  try{await prepareLetterEditor(handoff);}catch(err){console.error(err);toast(err?.message||'Could not open the selected letter.');openLetterTypeModal(type);}
 }
 async function chooseDestination(){
   if(!window.showDirectoryPicker){toast('Folder selection requires Chrome or Edge.');return false;}
@@ -1096,7 +1108,7 @@ function facultyValues(r){
     facultyTh:clean(r['Faculty TH']),degree:clean(r['Degree Level'])
   };
 }
-function canonicalEmbassyEnglish(value){return clean(value).replace(/P\.R\.\s*CHINA/gi,'P.R. China');}
+function canonicalEmbassyEnglish(value){return clean(value).replace(/P\.R\.\s*CHINA/gi,'P.R. China').replace(/\bRussian Federation\b/gi,'Russia');}
 function embassyValues(r){
   const address=canonicalEmbassyEnglish(clean(r['Address EN'])||clean(r['Current Address EN']));
   const lines=address.split(/\r?\n|\s*\|\s*/).map(canonicalEmbassyEnglish).filter(Boolean);
@@ -1122,14 +1134,14 @@ function exactCentralMatch(value){
   }
   for(const r of refs.embassy||[]){
     const x=embassyValues(r);
-    for(const [kind,val] of [['embassy',x.embassy],['embassyOffice',x.embassyOffice],['embassyThai',x.embassyThai]])if(val&&normalizedLetterValue(val)===v)return {kind,record:r};
+    for(const [kind,val] of [['embassy',x.embassy],['embassy',clean(r['Current Display Name EN'])],['embassy',clean(r['Display Name EN'])],['embassyOffice',x.embassyOffice],['embassyOffice',clean(r['Current Office Name EN'])],['embassyOffice',clean(r['Office Name EN'])],['embassyThai',x.embassyThai]])if(val&&normalizedLetterValue(val)===v)return {kind,record:r};
 
   }
   return null;
 }
 function letterPackageProfiles(){try{const value=JSON.parse(localStorage.getItem(LETTER_PACKAGE_DATES_KEY)||'{}');return value&&typeof value==='object'?value:{};}catch{return {};}}
 function letterPackageKey(type,semester,year){return [clean(type).toLowerCase(),clean(semester).toLowerCase(),clean(year)].join('|');}
-function packageFieldElement(kind){return ({semester:'#nlpdfLetterSemester',academicYear:'#nlpdfLetterAcademicYear',startDate:'#nlpdfLetterStartDate',finishDate:'#nlpdfLetterFinishDate',orientation:'#nlpdfLetterOrientation'})[kind]||'';}
+function packageFieldElement(kind){return ({semester:'#nlpdfLetterSemester',academicYear:'#nlpdfLetterAcademicYear',startDate:'#nlpdfLetterStartDate',finishDate:'#nlpdfLetterFinishDate',orientationStart:'#nlpdfLetterOrientationStart',orientationEnd:'#nlpdfLetterOrientationEnd'})[kind]||'';}
 function packageFieldValue(kind){const selector=packageFieldElement(kind);return selector?clean($(selector)?.value):'';}
 function setPackageField(kind,value){const selector=packageFieldElement(kind),el=selector?$(selector):null;if(el&&value!==undefined&&value!==null)el.value=value;}
 function packageAcademicYearThai(){const y=Number(packageFieldValue('academicYear'));return Number.isFinite(y)&&y>1900?String(y+543):packageFieldValue('academicYear');}
@@ -1620,15 +1632,30 @@ function deletePackageProfile(key){const profiles=letterPackageProfiles();delete
 function openPackageManager(){renderPackageProfileList();resetPackageProfileForm();$('#nlpdfPackageManager').classList.remove('hidden');$('#nlpdfPackageManager').setAttribute('aria-hidden','false');}
 function closePackageManager(){$('#nlpdfPackageManager').classList.add('hidden');$('#nlpdfPackageManager').setAttribute('aria-hidden','true');}
 function renderPackageDates(context){
-  $('#nlpdfLetterStartDate').textContent=formatDateEn(context.values.startDate)||'—';$('#nlpdfLetterFinishDate').textContent=formatDateEn(context.values.finishDate)||'—';$('#nlpdfLetterOrientation').textContent=formatOrientationEn(context.values.orientationStart,context.values.orientationEnd)||'—';
+  const start=$('#nlpdfLetterStartDate'),finish=$('#nlpdfLetterFinishDate'),orientationStart=$('#nlpdfLetterOrientationStart'),orientationEnd=$('#nlpdfLetterOrientationEnd');
+  if(start)start.value=toIsoDate(context.values.startDate)||'';
+  if(finish)finish.value=toIsoDate(context.values.finishDate)||'';
+  if(orientationStart)orientationStart.value=toIsoDate(context.values.orientationStart)||'';
+  if(orientationEnd)orientationEnd.value=toIsoDate(context.values.orientationEnd)||'';
+}
+function syncEditablePackageDates(context){
+  if(!context)return;
+  context.values.startDate=clean($('#nlpdfLetterStartDate')?.value);
+  context.values.finishDate=clean($('#nlpdfLetterFinishDate')?.value);
+  context.values.orientationStart=clean($('#nlpdfLetterOrientationStart')?.value);
+  context.values.orientationEnd=clean($('#nlpdfLetterOrientationEnd')?.value);
+  context.values.orientation=formatOrientationEn(context.values.orientationStart,context.values.orientationEnd);
+  Object.assign(state.linkedData,{startDate:context.values.startDate,finishDate:context.values.finishDate,orientationStart:context.values.orientationStart,orientationEnd:context.values.orientationEnd,orientation:context.values.orientation});
 }
 function applySavedPackageDates(context){
-  const semester=packageFieldValue('semester'),year=packageFieldValue('academicYear'),profile=packageProfileParts(letterPackageKey(context.type,semester,year),letterPackageProfiles()[letterPackageKey(context.type,semester,year)]||{});
+  const semester=packageFieldValue('semester'),year=packageFieldValue('academicYear'),key=letterPackageKey(context.type,semester,year),raw=letterPackageProfiles()[key];
   context.values.semester=semester;context.values.academicYear=year;context.values.academicYearThai=year?String(Number(year)+543):'';
-  if(!semester||!year){context.values.startDate='';context.values.finishDate='';context.values.orientationStart='';context.values.orientationEnd='';renderPackageDates(context);$('#nlpdfLetterPackageStatus').textContent='Choose Semester and Academic year to use a saved package-date profile.';return false;}
-  if(!letterPackageProfiles()[letterPackageKey(context.type,semester,year)]){context.values.startDate='';context.values.finishDate='';context.values.orientationStart='';context.values.orientationEnd='';renderPackageDates(context);$('#nlpdfLetterPackageStatus').textContent='No saved profile for '+letterTypeLabel(context.type)+' · '+semester+' · '+year+'. Use Package dates to add one.';return false;}
+  if(!semester||!year){renderPackageDates(context);$('#nlpdfLetterPackageStatus').textContent='Choose Semester and Academic year to use a saved package-date profile.';return false;}
+  if(!raw){renderPackageDates(context);$('#nlpdfLetterPackageStatus').textContent='No saved profile for '+letterTypeLabel(context.type)+' · '+semester+' · '+year+'. You can enter the dates manually.';return false;}
+  const profile=packageProfileParts(key,raw);
   context.values.startDate=profile.startDate;context.values.finishDate=profile.finishDate;context.values.orientationStart=profile.orientationStart;context.values.orientationEnd=profile.orientationEnd;context.values.orientation=formatOrientationEn(profile.orientationStart,profile.orientationEnd);
-  renderPackageDates(context);$('#nlpdfLetterPackageStatus').textContent='Using saved package-date profile.';return true;
+  Object.assign(state.linkedData,{semester,academicYear:year,academicYearThai:context.values.academicYearThai,startDate:context.values.startDate,finishDate:context.values.finishDate,orientationStart:context.values.orientationStart,orientationEnd:context.values.orientationEnd,orientation:context.values.orientation});
+  renderPackageDates(context);$('#nlpdfLetterPackageStatus').textContent='Loaded saved package dates. You can edit them for this letter.';return true;
 }
 function schoolListEntries(){try{const v=JSON.parse(localStorage.getItem(LETTER_SCHOOL_LIST_KEY)||'[]');return Array.isArray(v)?v:[];}catch{return [];}}
 function saveSchoolEntries(rows){localStorage.setItem(LETTER_SCHOOL_LIST_KEY,JSON.stringify(rows));}
@@ -1696,14 +1723,16 @@ async function prepareLetterEditor(context){
   for(const [key,value] of Object.entries(state.linkedData))if(clean(value))context.values[key]=value;
   if(context.name)context.values.studentName=context.name;if(context.passport)context.values.passport=context.passport;if(context.studentId)context.values.studentId=context.studentId;if(context.num)context.values.documentNo=context.num;
   context.hasHomeSchool=model.fields.some(f=>f.kind==='homeUniversity'||f.kind==='homeCountry');
-  $('#nlpdfLetterEditorTitle').textContent='Edit '+letterTypeLabel(context.type);$('#nlpdfLetterEditorContext').textContent=[context.num,context.name,context.passport,context.studentId].filter(Boolean).join(' · ');$('#nlpdfLetterStudentType').value=letterTypeLabel(context.type);
+  $('#nlpdfLetterEditorTitle').textContent='Edit '+letterTypeLabel(context.type);$('#nlpdfLetterEditorContext').textContent=[context.num,context.name,context.passport,context.studentId].filter(Boolean).join(' · ');$('#nlpdfLetterStudentType .nlpdf-reference-select-value').textContent=letterTypeLabel(context.type);
   inferInitialPackage(context);populateCentralSelects(context);renderLetterFormValues(context);applySavedPackageDates(context);
   $('#nlpdfLetterName').oninput=e=>syncFormText(context,'studentName',e.target.value);$('#nlpdfLetterPassport').oninput=e=>syncFormText(context,'passport',e.target.value);$('#nlpdfLetterStudentId').oninput=e=>syncFormText(context,'studentId',e.target.value);$('#nlpdfLetterDocumentNo').oninput=e=>syncFormText(context,'documentNo',e.target.value);$('#nlpdfLetterLocation').oninput=e=>syncFormText(context,'recipientLocation',e.target.value);
   $('#nlpdfLetterCountry').onclick=()=>openReferencePicker('country','letter-country');
+  $('#nlpdfLetterStudentType').onclick=backToDocumentType;
   $('#nlpdfLetterFaculty').onchange=e=>applyFacultyGroup(context,e.target.value);
   $('#nlpdfLetterProgram').onchange=e=>applyProgramRecord(context,(centralReference().faculty||[]).find(r=>facultyValues(r).id===e.target.value));
   $('#nlpdfLetterSemester').onchange=()=>{context.values.semester=packageFieldValue('semester');state.linkedData.semester=context.values.semester;applySavedPackageDates(context);};
   $('#nlpdfLetterAcademicYear').onchange=()=>{context.values.academicYear=packageFieldValue('academicYear');state.linkedData.academicYear=context.values.academicYear;rememberAcademicYear(context.values.academicYear);applySavedPackageDates(context);};
+  ['nlpdfLetterStartDate','nlpdfLetterFinishDate','nlpdfLetterOrientationStart','nlpdfLetterOrientationEnd'].forEach(id=>{$('#'+id).oninput=()=>syncEditablePackageDates(context);$('#'+id).onchange=()=>syncEditablePackageDates(context);});
   $('#nlpdfLetterEmbassySearch').onfocus=e=>renderEmbassyResults(context,e.target.value);$('#nlpdfLetterEmbassySearch').oninput=e=>renderEmbassyResults(context,e.target.value);
   $('#nlpdfLetterEmbassyResults').onclick=e=>{const b=e.target.closest('[data-embassy-result]');if(!b)return;const r=(centralReference().embassy||[]).find(x=>embassyValues(x).id===b.dataset.embassyResult);if(r)applyEmbassyRecord(context,r);};
   $('#nlpdfLetterHomeSchool').oninput=e=>{context.values.homeUniversity=e.target.value;applyRememberedSchool(context,e.target.value);};
@@ -1712,7 +1741,16 @@ async function prepareLetterEditor(context){
   $('#nlpdfCreateEditedLetter').disabled=!model.fields.length;$('#nlpdfLetterEditorStatus').textContent=model.fields.length+' linked editable topic'+(model.fields.length===1?'':'s')+'. Repeated values are updated together.';
   $('#nlpdfLetterEditor').classList.remove('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','false');
 }
-function closeLetterEditor(){$('#nlpdfLetterEmbassyResults')?.classList.add('hidden');$('#nlpdfLetterEditor').classList.add('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','true');state.pendingLetter=null;renderContentPanel();}
+function hideLetterEditor(){
+  $('#nlpdfLetterEmbassyResults')?.classList.add('hidden');$('#nlpdfLetterEditor').classList.add('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','true');
+}
+function finishLetterEditor(){hideLetterEditor();state.pendingLetter=null;state.packageHandoff=null;renderContentPanel();}
+function backToDocumentType(){
+  const context=state.pendingLetter;if(context)syncEditablePackageDates(context);
+  const preferred=context?.type||state.packageHandoff?.type||'bachelor_no_ien';
+  if(state.packageHandoff)state.packageHandoff.type=preferred;
+  hideLetterEditor();state.pendingLetter=null;openLetterTypeModal(preferred);renderContentPanel();
+}
 
 function replaceOccurrence(occ,value,doc,ns){
   const parts=occ.parts;if(!parts.length)return;
@@ -1799,7 +1837,10 @@ async function createEditedLetter(){
   const context=state.pendingLetter;if(!context?.editor||state.busy)return;
   state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
   try{
-    applySavedPackageDates(context);saveCurrentHomeSchool(context);refreshSelectedEmbassyContext(context);
+    syncEditablePackageDates(context);
+    if(context.values.startDate&&context.values.finishDate&&context.values.startDate>context.values.finishDate)throw new Error('Finishing Date must be on or after Starting Date.');
+    if(context.values.orientationStart&&context.values.orientationEnd&&context.values.orientationStart>context.values.orientationEnd)throw new Error('Orientation finish must be on or after Orientation start.');
+    saveCurrentHomeSchool(context);refreshSelectedEmbassyContext(context);
     const {zip,doc,ns,model}=context.editor,all=[];
     for(const field of model.fields)for(const occ of field.occurrences)all.push({field,occ});
     all.sort((a,b)=>b.occ.record.index-a.occ.record.index||b.occ.start-a.occ.start);
@@ -1810,7 +1851,7 @@ async function createEditedLetter(){
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
     await writeFile(context.targetDir,context.letterName,new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
     $('#nlpdfLetterEditorStatus').textContent='Letter created successfully. Edited values remain highlighted for checking.';setStatus('Ready · Letter created');toast('Letter created · highlights kept.');
-    await new Promise(resolve=>setTimeout(resolve,650));closeLetterEditor();
+    await new Promise(resolve=>setTimeout(resolve,650));finishLetterEditor();
   }catch(err){console.error(err);$('#nlpdfLetterEditorStatus').textContent=err?.message||'Could not create letter.';toast(err?.message||'Could not create letter.');}
   finally{state.busy=false;$('#nlpdfCreateEditedLetter').disabled=false;updateControls();}
 }
@@ -1818,10 +1859,9 @@ async function confirmExport(){
   if(state.busy)return;
   const name=safePath($('#nlpdfExportName').value),num=safePath($('#nlpdfExportNumber').value),passport=clean($('#nlpdfExportPassport').value),studentId=clean($('#nlpdfExportStudentId').value),outputs=selectedOutputs(),stem=automaticIdentityStem();
   if(!outputs.any){toast('Select Folder, PDF, or Letter.');return;}
-  if(state.editLetterRequested&&!outputs.letter){syncExportPreview();return;}
   if(!state.destinationHandle){const ok=await chooseDestination();if(!ok)return;}
   state.busy=true;$('#nlpdfConfirmExport').disabled=true;
-  exportProgress('Creating in progress…','Preparing selected outputs.',0,outputs.pdf?state.pages.length:0);
+  exportProgress('Creating in progress…','Preparing Create 1/2.',0,outputs.pdf?state.pages.length:0);
   setStatus('Creating package…');updateControls();await allowExportProgressToPaint();
   let handoff=null;
   try{
@@ -1837,18 +1877,10 @@ async function confirmExport(){
       exportProgress('Creating in progress…','Writing PDF…',state.pages.length,state.pages.length);
       await writeFile(targetDir,pdfName,new Blob([bytes],{type:'application/pdf'}));
     }
-    if(outputs.letter){
-      const letterName='Letter_'+stem+'.docx',type=$('#nlpdfExportLetterType').value;
-      if(state.editLetterRequested)handoff={num,name,passport,studentId,type,letterName,targetDir};
-      else{
-        exportProgress('Creating in progress…','Writing letter…',outputs.pdf?state.pages.length:0,outputs.pdf?state.pages.length:0);
-        await writeFile(targetDir,letterName,new Blob([letterBytes(type)],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
-      }
-    }
+    if(outputs.letter)handoff={num,name,passport,studentId,letterName:'Letter_'+stem+'.docx',targetDir,type:state.packageHandoff?.type||'bachelor_no_ien'};
     if(handoff){
-      hideExportProgress();closeExport();state.busy=false;updateControls();
-      await prepareLetterEditor(handoff);
-      return;
+      state.packageHandoff=handoff;hideExportProgress();closeExport();state.busy=false;$('#nlpdfConfirmExport').disabled=false;updateControls();
+      setStatus('Create 1/2 complete · Select document type');toast('Create 1/2 complete.');openLetterTypeModal(handoff.type);return;
     }
     exportProgress('Successfully created','Selected outputs are fully saved.',outputs.pdf?state.pages.length:0,outputs.pdf?state.pages.length:0,'success');
     setStatus('Ready · Export complete');toast('Package created.');
@@ -2177,9 +2209,9 @@ async function build(){
   window.addEventListener('buic-reference-data-updated',()=>{if(state.pendingLetter&&!$('#nlpdfLetterEditor').classList.contains('hidden')){populateCentralSelects(state.pendingLetter);renderLetterFormValues(state.pendingLetter);renderSchoolList();}renderContentPanel();if(state.referencePicker)renderReferencePickerResults($('#nlpdfReferencePickerSearch')?.value||'');});
 
   $('#nlpdfCreate').addEventListener('click',openExport);
-  $$('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
-  $('#nlpdfEditLetter').addEventListener('click',requestLetterEdit);
-  $('#nlpdfCancelLetterEdit').addEventListener('click',closeLetterEditor);$('#nlpdfCreateEditedLetter').addEventListener('click',createEditedLetter);
+  $('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
+  $('[data-nlpdf-letter-type-close]').forEach(x=>x.addEventListener('click',cancelLetterType));$('#nlpdfLetterTypeBack').addEventListener('click',cancelLetterType);$('#nlpdfConfirmLetterType').addEventListener('click',confirmLetterType);
+  $('#nlpdfCancelLetterEdit').addEventListener('click',backToDocumentType);$('#nlpdfCreateEditedLetter').addEventListener('click',createEditedLetter);
   ['nlpdfExportNumber','nlpdfExportName','nlpdfExportPassport','nlpdfExportStudentId'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(id==='nlpdfExportName')$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();}));
   $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutput"]').forEach(x=>x.addEventListener('change',syncExportPreview));
 

@@ -447,19 +447,28 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await visible('#nlpdfStage'),true);
   });
 
-  await run('Edit letter is a real on/off toggle and only locks package while enabled without Letter',async()=>{
+  await run('Letter selection uses Create 1/2 then Document Type Create 2/2',async()=>{
     await page.locator('#nlpdfCreate').click();
     assert.equal(await page.locator('input[name="nlpdfOutput"]').count(),3);
-    await page.locator('#nlpdfEditLetter').click();
-    assert.equal(await page.locator('#nlpdfConfirmExport').isDisabled(),true);
-    assert.equal(await page.locator('#nlpdfLetterRequirement').isVisible(),true);
-    await page.locator('#nlpdfEditLetter').click();
-    assert.equal(await page.locator('#nlpdfConfirmExport').isDisabled(),false);
-    assert.equal(await page.locator('#nlpdfLetterRequirement').isVisible(),false);
-    await page.locator('#nlpdfEditLetter').click();
+    assert.equal(await page.locator('#nlpdfEditLetter').count(),0);
+    assert.equal((await page.locator('#nlpdfConfirmExport').innerText()).trim(),'Create 1/2');
+    await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
+    await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
     await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
-    assert.equal(await page.locator('#nlpdfConfirmExport').isDisabled(),false);
-    await page.locator('#nlpdfExportModal [data-nlpdf-close]').last().click();
+    await page.locator('#nlpdfChooseDestination').click();
+    const before=await page.evaluate(()=>window.__mockFiles.length);
+    await page.locator('#nlpdfConfirmExport').click();
+    await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
+    assert.equal(await page.evaluate(before=>window.__mockFiles.length===before,before),true,'Create 1/2 must not write a Word letter before document type is chosen');
+    assert.equal((await page.locator('#nlpdfConfirmLetterType').innerText()).trim(),'Create 2/2');
+    await page.locator('#nlpdfExportLetterType').selectOption('exchange');
+    await page.locator('#nlpdfConfirmLetterType').click();
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+    assert.match(await page.locator('#nlpdfLetterStudentType').innerText(),/Exchange Bachelor/);
+    await page.locator('#nlpdfLetterStudentType').click();
+    await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible'});
+    assert.equal(await page.evaluate(before=>window.__mockFiles.length===before,before),true,'changing document type must not recreate folder/PDF/letter');
+    await page.locator('[data-nlpdf-letter-type-close]').last().click();
   });
 
   await run('Page Content is clickable, expandable, searchable, and shares linked document data',async()=>{
@@ -544,13 +553,14 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.match(await text('#nlpdfFinalLetter'),/Letter_Linked Name_AB1234567_1690000000\.docx/);
     await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
 
-    await page.locator('#nlpdfExportLetterType').selectOption('exchange');
     await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
     await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
     await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
-    await page.locator('#nlpdfEditLetter').click();
     await page.locator('#nlpdfChooseDestination').click();
     await page.locator('#nlpdfConfirmExport').click();
+    await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
+    await page.locator('#nlpdfExportLetterType').selectOption('exchange');
+    await page.locator('#nlpdfConfirmLetterType').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
     assert.equal(await page.locator('.nlpdf-letter-page').count(),0,'Word-style mock pages must stay removed');
     assert.equal(await page.locator('#nlpdfLetterName').inputValue(),'Linked Name');
@@ -580,9 +590,12 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
 
     await page.locator('#nlpdfLetterSemester').selectOption('Second');
     await page.locator('#nlpdfLetterAcademicYear').selectOption('2026');
-    assert.equal((await page.locator('#nlpdfLetterStartDate').innerText()).trim(),'January 11, 2027');
-    assert.equal((await page.locator('#nlpdfLetterFinishDate').innerText()).trim(),'May 31, 2027');
-    assert.equal((await page.locator('#nlpdfLetterOrientation').innerText()).trim(),'January 4 - 8, 2027');
+    assert.equal(await page.locator('#nlpdfLetterStartDate').inputValue(),'2027-01-11');
+    assert.equal(await page.locator('#nlpdfLetterFinishDate').inputValue(),'2027-05-31');
+    assert.equal(await page.locator('#nlpdfLetterOrientationStart').inputValue(),'2027-01-04');
+    assert.equal(await page.locator('#nlpdfLetterOrientationEnd').inputValue(),'2027-01-08');
+    await page.locator('#nlpdfLetterFinishDate').fill('2027-06-15');
+    await page.locator('#nlpdfLetterOrientationEnd').fill('2027-01-09');
 
     await page.locator('#nlpdfSchoolManagerBtn').click();
     await page.locator('#nlpdfSchoolManager').waitFor({state:'visible'});
@@ -625,7 +638,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
         passport:(xml.match(/AB1234567/g)||[]).length,
         englishDate:xml.includes('October 8, 2026'),
         thaiDate:xml.includes('8 ตุลาคม 2569'),
-        studyPeriod:xml.includes('January 11, 2027 to May 31, 2027')
+        studyPeriod:xml.includes('January 11, 2027 to June 15, 2027'),
+        editedOrientation:xml.includes('January 4 - 9, 2027')
       };
     },before);
     assert(out&&out.finished,'edited Word letter should be written');
@@ -633,7 +647,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert(out.name>=1,'student name should be written');
     assert(out.passport>=1,'passport should be written');
     if(await letterDate.count()){assert.equal(out.englishDate,true);assert.equal(out.thaiDate,true);}
-    assert.equal(out.studyPeriod,true,'Exchange study period should follow package Starting/Finishing dates');
+    assert.equal(out.studyPeriod,true,'Exchange study period should follow the manually edited Starting/Finishing dates');
+    assert.equal(out.editedOrientation,true,'manual Orientation edit should override the saved package profile');
   });
 
   await run('Bachelor No IEN maps Xian source data, linked package dates, and Thai addressee exactly',async()=>{
@@ -649,17 +664,18 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportName').fill('Thai QA');
     await page.locator('#nlpdfExportPassport').fill('QA998877');
     await page.locator('#nlpdfExportStudentId').fill('1690111111');
-    await page.locator('#nlpdfExportLetterType').selectOption('bachelor_no_ien');
     await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
     await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
     await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
-    await page.locator('#nlpdfEditLetter').click();
     await page.locator('#nlpdfChooseDestination').click();
     await page.locator('#nlpdfConfirmExport').click();
+    await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
+    await page.locator('#nlpdfExportLetterType').selectOption('bachelor_no_ien');
+    await page.locator('#nlpdfConfirmLetterType').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
     await page.locator('#nlpdfLetterSemester').selectOption('Second');
     await page.locator('#nlpdfLetterAcademicYear').selectOption('2026');
-    assert.equal((await page.locator('#nlpdfLetterFinishDate').innerText()).trim(),'May 31, 2030');
+    assert.equal(await page.locator('#nlpdfLetterFinishDate').inputValue(),'2030-05-31');
     await page.locator('#nlpdfLetterLocation').fill('QA Student Location');
     await page.locator('#nlpdfLetterEmbassySearch').fill('Xian');
     await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});
@@ -725,7 +741,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await visible('#nlpdfExportModal'),false);
   });
 
-  await run('Package export creates folder and Word/PDF with correct page count',async()=>{
+  await run('Package export creates folder/PDF once, then letter after Step 2',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
     await page.locator('#nlpdfExportName').fill('QA Student');
@@ -738,20 +754,42 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.match(await text('#nlpdfFinalFolder'),/9012 QA Student_QA1234567_1690999999/);
     assert.match(await text('#nlpdfFinalLetter'),/Letter_QA Student_QA1234567_1690999999\.docx/);
     await page.locator('#nlpdfConfirmExport').click();
-    await page.waitForFunction(()=>document.querySelector('#nlpdfExportProgress')?.dataset.mode==='success',{timeout:60000});
+    await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:60000});
+    const afterStep1=await page.evaluate(async before=>{
+      const data=window.__mockFiles.slice(before),pdf=data.find(f=>f.name.endsWith('.pdf'));
+      return {count:data.length,files:data.map(f=>({name:f.name,finished:f.finished,length:f.bytes?.length||0})),pageCount:pdf?await PDFLib.PDFDocument.load(pdf.bytes).then(d=>d.getPageCount()):null};
+    },before);
+    assert(afterStep1.files.find(x=>x.name==='Documents_QA Student_QA1234567_1690999999.pdf'&&x.finished&&x.length>100));
+    assert.equal(afterStep1.files.some(x=>x.name.endsWith('.docx')),false,'Word letter must wait for Step 2/editor');
+    assert.equal(afterStep1.pageCount,7,'5 document pages + 1 front + 1 back');
+    await page.locator('#nlpdfExportLetterType').selectOption('exchange');
+    await page.locator('#nlpdfConfirmLetterType').click();
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+    await page.locator('#nlpdfLetterStudentType').click();
+    await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible'});
+    assert.equal(await page.evaluate(({before,count})=>window.__mockFiles.slice(before).length===count,{before,count:afterStep1.count}),true,'returning to document type must not recreate Step 1 outputs');
+    await page.locator('#nlpdfExportLetterType').selectOption('bachelor_no_ien');
+    await page.locator('#nlpdfConfirmLetterType').click();
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+    await page.locator('#nlpdfLetterEmbassySearch').fill('Moscow');
+    await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});
+    const moscow=page.locator('#nlpdfLetterEmbassyResults [data-embassy-result]').filter({hasText:/Moscow/i}).first();
+    assert.equal(await moscow.count()>0,true,'Moscow embassy should be searchable');
+    assert.match(await moscow.innerText(),/Russia/);
+    assert.doesNotMatch(await moscow.innerText(),/Russian Federation/);
+    await moscow.click();
+    await page.locator('#nlpdfCreateEditedLetter').click();
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
     const out=await page.evaluate(async before=>{
-      const data=window.__mockFiles.slice(before);
-      const pdf=data.find(f=>f.name.endsWith('.pdf'));
-      return {
-        files:data.map(f=>({name:f.name,finished:f.finished,length:f.bytes?.length||0})),
-        pageCount:pdf?await PDFLib.PDFDocument.load(pdf.bytes).then(d=>d.getPageCount()):null
-      };
+      const data=window.__mockFiles.slice(before),file=data.find(f=>f.name==='Letter_QA Student_QA1234567_1690999999.docx');
+      if(!file)return {files:data.map(f=>({name:f.name,finished:f.finished,length:f.bytes?.length||0})),plain:''};
+      const zip=await JSZip.loadAsync(file.bytes),xml=await zip.file('word/document.xml').async('string'),doc=new DOMParser().parseFromString(xml,'application/xml'),ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+      const plain=[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(n=>n.textContent||'').join('')).join('\n');
+      return {files:data.map(f=>({name:f.name,finished:f.finished,length:f.bytes?.length||0})),plain};
     },before);
     assert(out.files.find(x=>x.name==='Letter_QA Student_QA1234567_1690999999.docx'&&x.finished&&x.length>100));
-    assert(out.files.find(x=>x.name==='Documents_QA Student_QA1234567_1690999999.pdf'&&x.finished&&x.length>100));
-    assert.equal(out.pageCount,7,'5 document pages + 1 front + 1 back');
-    await page.waitForTimeout(1000);
-    assert.equal(await visible('#nlpdfExportModal'),false);
+    assert(out.plain.includes('Royal Thai Embassy in Moscow, Russia'),'generated letter should use Russia');
+    assert.equal(out.plain.includes('Royal Thai Embassy in Moscow, Russian Federation'),false,'generated letter must not use Russian Federation');
   });
 
   await run('Current Letter fills the viewport, exposes reserved topics, and keeps fallback in Settings',async()=>{
