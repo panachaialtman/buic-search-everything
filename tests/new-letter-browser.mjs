@@ -694,7 +694,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(block.some(x=>x==='Royal Thai Consulate-General in Xian, P.R. China'),false,'Display Name must not be used as the postal address heading');
     assert.equal(out.plain.includes('P.R. CHINA'),false,'China casing must remain P.R. China');
     assert.equal(out.plain.includes('P.R. China, Myanmar'),false,'stale template country must not remain');
-    assert(out.plain.includes('เรียน กงสุล ประจำสถานกงสุลใหญ่ ณ นครซีอาน สาธารณรัฐประชาชนจีน'),'Thai addressee must exactly use the selected Xian Thai mission wording');
+    assert(out.plain.includes('เรียน กงสุล ประจำสถานกงสุลใหญ่ ณ นครซีอาน สาธารณรัฐประชาชนจีน'),'Thai addressee must exactly use the selected Xian Thai mission wording; actual Thai mission lines: '+JSON.stringify(out.rawParas.filter(x=>/(?:เรียน|กงสุล|สถานเอกอัครราชทูต|สถานกงสุล)/.test(x))));
     assert.equal(out.plain.includes('สถานเอกอัครราชทูต ณ กรุงย่างกุ้ง'),false,'old Yangon Thai mission must not remain');
     assert.equal(out.plain.includes('December 31, 2030'),false,'old finishing date must not remain on another page');
     assert((out.plain.match(/May 31, 2030/g)||[]).length>=2,'all linked finishing-date occurrences must use May 31, 2030');
