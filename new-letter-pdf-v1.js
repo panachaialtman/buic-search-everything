@@ -1006,10 +1006,11 @@ function syncPackageIdentityToLinked(){
   state.linkedData.passport=clean($('#nlpdfExportPassport')?.value);
   state.linkedData.studentId=clean($('#nlpdfExportStudentId')?.value);
 }
-function automaticPdfFilename(){
+function automaticIdentityStem(){
   const parts=[safePath($('#nlpdfExportName')?.value),safePath($('#nlpdfExportPassport')?.value),safePath($('#nlpdfExportStudentId')?.value)].filter(Boolean);
-  return 'Documents_'+(parts.length?parts.join('_'):'Student')+'.pdf';
+  return parts.length?parts.join('_'):'Student';
 }
+function automaticPdfFilename(){return 'Documents_'+automaticIdentityStem()+'.pdf';}
 function openExport(){
   state.editLetterRequested=false;$('#nlpdfEditLetter').classList.remove('active');
   const parsed=splitCaseIdentity(caseName());
@@ -1022,9 +1023,9 @@ function openExport(){
 function closeExport(){$('#nlpdfExportModal').classList.remove('open');$('#nlpdfExportModal').setAttribute('aria-hidden','true');}
 function syncExportPreview(){
   syncPackageIdentityToLinked();
-  const num=safePath($('#nlpdfExportNumber').value),name=safePath($('#nlpdfExportName').value),stem=name||'Student',pdf=$('#nlpdfExportPdfName');
+  const num=safePath($('#nlpdfExportNumber').value),stem=automaticIdentityStem(),pdf=$('#nlpdfExportPdfName');
   if(pdf.dataset.auto==='1'||!clean(pdf.value))pdf.value=automaticPdfFilename();
-  const outputs=selectedOutputs(),folderName=[num,name].filter(Boolean).join(' ')||'Student';
+  const outputs=selectedOutputs(),folderName=[num,stem].filter(Boolean).join(' ')||'Student';
   $('#nlpdfFinalFolder').textContent=outputs.folder?folderName:'Not created';
   $('#nlpdfFinalLetter').textContent=outputs.letter?'Letter_'+stem+'.docx':'Not created';
   $('#nlpdfFinalPdf').textContent=outputs.pdf?pdf.value:'Not created';
@@ -1718,6 +1719,44 @@ function replaceOccurrence(occ,value,doc,ns){
     if(i===0)ensureYellowHighlight(part.run,doc,ns);
   });
 }
+function paragraphPlainText(paragraph,ns){return [...paragraph.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join('').trim();}
+function setParagraphText(paragraph,value,doc,ns){
+  let runs=[...paragraph.getElementsByTagNameNS(ns,'r')];
+  if(!runs.length){
+    const run=doc.createElementNS(ns,'w:r'),textNode=doc.createElementNS(ns,'w:t');
+    run.appendChild(textNode);paragraph.appendChild(run);runs=[run];
+  }
+  let texts=[...runs[0].getElementsByTagNameNS(ns,'t')];
+  if(!texts.length){const t=doc.createElementNS(ns,'w:t');runs[0].appendChild(t);texts=[t];}
+  texts[0].textContent=value;
+  if(/^\s|\s$/.test(value))texts[0].setAttribute('xml:space','preserve');else texts[0].removeAttribute('xml:space');
+  for(let i=1;i<texts.length;i++)texts[i].textContent='';
+  for(let i=1;i<runs.length;i++)for(const t of runs[i].getElementsByTagNameNS(ns,'t'))t.textContent='';
+  ensureYellowHighlight(runs[0],doc,ns);
+}
+function applyEmbassyPostalBlock(context,doc,ns){
+  const office=clean(context.values.embassyOffice),sourceLines=addressLines(context.values.embassyAddress||'');
+  if(!office||!sourceLines.length)return;
+  const desired=[office,...sourceLines];
+  const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
+  const consulIndex=paragraphs.findIndex(p=>paragraphPlainText(p,ns)==='The Consul');
+  if(consulIndex<0)return;
+  let dearIndex=-1;
+  for(let i=consulIndex+1;i<paragraphs.length;i++){if(/^Dear Consul/i.test(paragraphPlainText(paragraphs[i],ns))){dearIndex=i;break;}}
+  if(dearIndex<0)return;
+  const between=paragraphs.slice(consulIndex+1,dearIndex);
+  const addressParas=between.filter(p=>paragraphPlainText(p,ns)||[...p.getElementsByTagNameNS(ns,'highlight')].length);
+  if(!addressParas.length)return;
+  const dear=paragraphs[dearIndex],parent=dear.parentNode,template=addressParas[addressParas.length-1];
+  while(addressParas.length<desired.length){
+    const clone=template.cloneNode(true);setParagraphText(clone,'',doc,ns);parent.insertBefore(clone,dear);addressParas.push(clone);
+  }
+  for(let i=0;i<addressParas.length;i++){
+    if(i<desired.length)setParagraphText(addressParas[i],desired[i],doc,ns);
+    else setParagraphText(addressParas[i],'',doc,ns);
+  }
+}
+
 async function createEditedLetter(){
   const context=state.pendingLetter;if(!context?.editor||state.busy)return;
   state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
@@ -1727,6 +1766,7 @@ async function createEditedLetter(){
     for(const field of model.fields)for(const occ of field.occurrences)all.push({field,occ});
     all.sort((a,b)=>b.occ.record.index-a.occ.record.index||b.occ.start-a.occ.start);
     for(const {field,occ} of all)replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);
+    applyEmbassyPostalBlock(context,doc,ns);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
     await writeFile(context.targetDir,context.letterName,new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
@@ -1737,7 +1777,7 @@ async function createEditedLetter(){
 }
 async function confirmExport(){
   if(state.busy)return;
-  const name=safePath($('#nlpdfExportName').value),num=safePath($('#nlpdfExportNumber').value),passport=clean($('#nlpdfExportPassport').value),studentId=clean($('#nlpdfExportStudentId').value),outputs=selectedOutputs(),stem=name||'Student';
+  const name=safePath($('#nlpdfExportName').value),num=safePath($('#nlpdfExportNumber').value),passport=clean($('#nlpdfExportPassport').value),studentId=clean($('#nlpdfExportStudentId').value),outputs=selectedOutputs(),stem=automaticIdentityStem();
   if(!outputs.any){toast('Select Folder, PDF, or Letter.');return;}
   if(state.editLetterRequested&&!outputs.letter){syncExportPreview();return;}
   if(!state.destinationHandle){const ok=await chooseDestination();if(!ok)return;}
@@ -1749,7 +1789,7 @@ async function confirmExport(){
     let targetDir=state.destinationHandle;
     if(outputs.folder){
       exportProgress('Creating in progress…','Creating student folder.',0,outputs.pdf?state.pages.length:0);
-      const folderName=[num,name].filter(Boolean).join(' ')||'Student';
+      const folderName=[num,stem].filter(Boolean).join(' ')||'Student';
       targetDir=await state.destinationHandle.getDirectoryHandle(folderName,{create:true});
     }
     if(outputs.pdf){

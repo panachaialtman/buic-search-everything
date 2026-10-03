@@ -538,6 +538,12 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportPassport').fill('AB1234567');
     await page.locator('#nlpdfExportStudentId').fill('1690000000');
     assert.equal(await page.locator('#nlpdfExportPdfName').inputValue(),'Documents_Linked Name_AB1234567_1690000000.pdf');
+    await page.locator('input[name="nlpdfOutput"][value="folder"]').check();
+    await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
+    assert.match(await text('#nlpdfFinalFolder'),/0789 Linked Name_AB1234567_1690000000/);
+    assert.match(await text('#nlpdfFinalLetter'),/Letter_Linked Name_AB1234567_1690000000\.docx/);
+    await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
+
     await page.locator('#nlpdfExportLetterType').selectOption('exchange');
     await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
     await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
@@ -608,7 +614,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfCreateEditedLetter').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
     const out=await page.evaluate(async before=>{
-      const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Linked Name.docx');
+      const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Linked Name_AB1234567_1690000000.docx');
       if(!file)return null;
       const zip=await JSZip.loadAsync(file.bytes);
       const xml=await zip.file('word/document.xml').async('string');
@@ -654,7 +660,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfCreateEditedLetter').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
     const out=await page.evaluate(async before=>{
-      const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Thai QA.docx');
+      const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Thai QA_QA998877_1690111111.docx');
       if(!file)return null;
       const zip=await JSZip.loadAsync(file.bytes);
       const xml=await zip.file('word/document.xml').async('string');
@@ -716,8 +722,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportNumber').fill('9012');
     await page.locator('input[name="nlpdfOutput"][value="folder"]').check();
     await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
-    assert.match(await text('#nlpdfFinalFolder'),/9012 QA Student/);
-    assert.match(await text('#nlpdfFinalLetter'),/Letter_QA Student\.docx/);
+    assert.match(await text('#nlpdfFinalFolder'),/9012 QA Student_QA1234567_1690999999/);
+    assert.match(await text('#nlpdfFinalLetter'),/Letter_QA Student_QA1234567_1690999999\.docx/);
     await page.locator('#nlpdfConfirmExport').click();
     await page.waitForFunction(()=>document.querySelector('#nlpdfExportProgress')?.dataset.mode==='success',{timeout:60000});
     const out=await page.evaluate(async before=>{
@@ -728,7 +734,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
         pageCount:pdf?await PDFLib.PDFDocument.load(pdf.bytes).then(d=>d.getPageCount()):null
       };
     },before);
-    assert(out.files.find(x=>x.name==='Letter_QA Student.docx'&&x.finished&&x.length>100));
+    assert(out.files.find(x=>x.name==='Letter_QA Student_QA1234567_1690999999.docx'&&x.finished&&x.length>100));
     assert(out.files.find(x=>x.name==='Documents_QA Student_QA1234567_1690999999.pdf'&&x.finished&&x.length>100));
     assert.equal(out.pageCount,7,'5 document pages + 1 front + 1 back');
     await page.waitForTimeout(1000);
