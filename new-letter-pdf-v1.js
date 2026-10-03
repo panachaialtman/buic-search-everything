@@ -1008,7 +1008,7 @@ function syncPackageIdentityToLinked(){
 }
 function automaticPdfFilename(){
   const parts=[safePath($('#nlpdfExportName')?.value),safePath($('#nlpdfExportPassport')?.value),safePath($('#nlpdfExportStudentId')?.value)].filter(Boolean);
-  return (parts.length?parts.join('_'):'Documents_Student')+'.pdf';
+  return 'Documents_'+(parts.length?parts.join('_'):'Student')+'.pdf';
 }
 function openExport(){
   state.editLetterRequested=false;$('#nlpdfEditLetter').classList.remove('active');
@@ -1223,6 +1223,7 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/Student\s*ID(?:\s*No\.)?\s*[:：]?\s*([A-Za-z0-9-]+)/i,'studentId','Student ID');
     addRegexOccurrence(fields,rec,/รหัสนักศึกษา\s*[:：]?\s*([0-9-]+)/,'studentId','รหัสนักศึกษา');
     addRegexOccurrence(fields,rec,/I am writing to inform you that\s+([^,]+),/,'studentName','Student name');
+    addRegexOccurrence(fields,rec,/letter addressed to the\s+(.+?),\s+requesting\b/i,'embassy','Thai mission / Embassy',1,{reference:'embassy'});
     addRegexOccurrence(fields,rec,/,\s+(?:an?\s+)?([^,]+?)\s+Citizen\b/,'nationalityEn','Nationality',1,{reference:'country'});
     addRegexOccurrence(fields,rec,/student at\s+([^,]+),/i,'homeUniversity','Home university / school');
     addRegexOccurrence(fields,rec,/student at\s+[^,]+,\s*([^,]+?)\s+has been admitted/i,'homeCountry','Home university country');
@@ -1232,10 +1233,12 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/ที่\s*มกท\/ศนช\.\s*([0-9]+)/,'documentNo','Document number');
     if(/^\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}$/.test(trim))addOccurrence(fields,rec,'letterDate','Letter date',t.indexOf(trim),t.indexOf(trim)+trim.length,{format:'dateTh'});
     addRegexOccurrence(fields,rec,/เรื่อง[^\n]*ของ\s+(.+)$/,'studentName','Student name');
-    addRegexOccurrence(fields,rec,/เรียน[^\n]*?(?:ประจำ)?(.+)$/,'embassyThai','สถานทูต / สถานกงสุล',1,{reference:'embassy'});
+    addRegexOccurrence(fields,rec,/^เรียน\s+(?:กงสุล\s+ประจำ)?(.+)$/,'embassyThai','สถานทูต / สถานกงสุล',1,{reference:'embassy'});
     addRegexOccurrence(fields,rec,/มหาวิทยาลัยได้รับ\s+(.+?)\s+สัญชาติ/,'studentName','Student name');
     addRegexOccurrence(fields,rec,/สัญชาติ\s*([^\s]+(?:\s+[^\s]+)?)\s+หนังสือเดินทางหมายเลข/,'nationalityTh','สัญชาติ',1,{reference:'country'});
     addRegexOccurrence(fields,rec,/หนังสือเดินทางหมายเลข\s*([A-Za-z0-9]+)/,'passport','Passport number');
+    addRegexOccurrence(fields,rec,/สาขาวิชา\s*(.+?)\s+(?=(?:วิทยาลัย|คณะ))/,'programTh','สาขาวิชา',1,{reference:'faculty'});
+    addRegexOccurrence(fields,rec,/(?:วิทยาลัย|คณะ)\s*(.+?)\s+มหาวิทยาลัยกรุงเทพ/,'facultyTh','คณะ / วิทยาลัย',1,{reference:'faculty'});
     addRegexOccurrence(fields,rec,/ภาคการศึกษาที่\s*([123])/,'semester','Semester',1,{package:true,format:'semesterNumber'});
     addRegexOccurrence(fields,rec,/ปีการศึกษา\s*(25\d{2})/,'academicYearThai','ปีการศึกษา',1,{package:true,format:'thaiYear'});
     if(/\(\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}\s*[-–]\s*\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}\)/.test(t))addRegexOccurrence(fields,rec,/(\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}\s*[-–]\s*\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2})/,'studyPeriod','Study period',1,{format:'studyPeriodTh'});
@@ -1248,20 +1251,6 @@ function semanticLetterModel(doc,ns){
       const reference=match.kind==='embassy'?'embassy':match.kind==='programEn'||match.kind==='facultyEn'?'faculty':match.kind==='nationalityEn'||match.kind==='countryEn'?'country':'';
       addOccurrence(fields,rec,match.kind,label,range.start,range.end,{reference});
     }
-  }
-  const embassyRecs=centralReference().embassy||[];
-  for(const rec of records){
-    if(rec.occurrences.length)continue;
-    const range=highlightedRanges(rec);
-    if(range.length!==1||!clean(range[0].value))continue;
-    const val=normalizedLetterValue(range[0].value);
-    let lineNo=0,hit=null;
-    for(const er of embassyRecs){
-      const e=embassyValues(er),parts=e.address.split(/\r?\n/).map(clean).filter(Boolean);
-      const ix=parts.findIndex(x=>normalizedLetterValue(x)===val||normalizedLetterValue(x).includes(val));
-      if(ix>=0){hit=er;lineNo=ix+1;break;}
-    }
-    if(hit)addOccurrence(fields,rec,'embassyAddress'+lineNo,'Embassy address '+lineNo,range[0].start,range[0].end);
   }
   for(let i=0;i<records.length;i++){
     const rec=records[i];

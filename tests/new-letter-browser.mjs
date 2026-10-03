@@ -537,7 +537,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportName').fill('Linked Name');
     await page.locator('#nlpdfExportPassport').fill('AB1234567');
     await page.locator('#nlpdfExportStudentId').fill('1690000000');
-    assert.equal(await page.locator('#nlpdfExportPdfName').inputValue(),'Linked Name_AB1234567_1690000000.pdf');
+    assert.equal(await page.locator('#nlpdfExportPdfName').inputValue(),'Documents_Linked Name_AB1234567_1690000000.pdf');
     await page.locator('#nlpdfExportLetterType').selectOption('exchange');
     await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
     await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
@@ -630,6 +630,53 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(out.studyPeriod,true,'Exchange study period should follow package Starting/Finishing dates');
   });
 
+  await run('Bachelor No IEN keeps Thai student paragraph and cleanly replaces location and Embassy country',async()=>{
+    const before=await page.evaluate(()=>window.__mockFiles.length);
+    await page.locator('#nlpdfCreate').click();
+    await page.locator('#nlpdfExportNumber').fill('4766');
+    await page.locator('#nlpdfExportName').fill('Thai QA');
+    await page.locator('#nlpdfExportPassport').fill('QA998877');
+    await page.locator('#nlpdfExportStudentId').fill('1690111111');
+    await page.locator('#nlpdfExportLetterType').selectOption('bachelor_no_ien');
+    await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
+    await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
+    await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
+    await page.locator('#nlpdfEditLetter').click();
+    await page.locator('#nlpdfChooseDestination').click();
+    await page.locator('#nlpdfConfirmExport').click();
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+
+    await page.locator('#nlpdfLetterLocation').fill('QA Student Location');
+    await page.locator('#nlpdfLetterEmbassySearch').fill('Xian');
+    await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});
+    const xian=page.locator('#nlpdfLetterEmbassyResults [data-embassy-result]').filter({hasText:/Xian/i}).first();
+    assert.equal(await xian.count()>0,true,'Xian mission should be searchable from Central data');
+    await xian.click();
+
+    await page.locator('#nlpdfCreateEditedLetter').click();
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
+    const out=await page.evaluate(async before=>{
+      const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Thai QA.docx');
+      if(!file)return null;
+      const zip=await JSZip.loadAsync(file.bytes);
+      const xml=await zip.file('word/document.xml').async('string');
+      const doc=new DOMParser().parseFromString(xml,'application/xml');
+      const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+      const plain=[...doc.getElementsByTagNameNS(ns,'t')].map(n=>n.textContent||'').join('');
+      return {finished:file.finished,plain};
+    },before);
+
+    assert(out&&out.finished,'Bachelor No IEN letter should be written');
+    assert(out.plain.includes('QA Student Location'),'the line under To: must use Student location');
+    assert(out.plain.includes('Royal Thai Consulate-General in Xian, P.R. China'),'selected mission should replace the complete old mission text');
+    assert.equal(out.plain.includes('P.R. China, Myanmar'),false,'old template country must not remain after the selected Embassy country');
+    assert.match(out.plain,/เรียน\s*กงสุล\s*ประจำ/,'Thai addressee must preserve กงสุล ประจำ');
+    assert.match(out.plain,/มหาวิทยาลัยได้รับ\s*Thai QA\s*สัญชาติ/,'Thai student-detail paragraph must preserve the student name and surrounding sentence');
+    assert.match(out.plain,/สัญชาติ\s*\S+.*หนังสือเดินทางหมายเลข\s*QA998877/s,'Thai nationality and passport fields must remain in the paragraph');
+    assert.match(out.plain,/สาขาวิชา\s*\S+/,'Thai major must remain in the paragraph');
+    assert.match(out.plain,/(?:วิทยาลัย|คณะ)\s*\S+/,'Thai faculty/school must remain in the paragraph');
+  });
+
   await run('Export modal shows processing, then success only after write completes',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.locator('#nlpdfCreate').click();
@@ -658,7 +705,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportName').fill('QA Student');
     await page.locator('#nlpdfExportPassport').fill('QA1234567');
     await page.locator('#nlpdfExportStudentId').fill('1690999999');
-    assert.equal(await page.locator('#nlpdfExportPdfName').inputValue(),'QA Student_QA1234567_1690999999.pdf');
+    assert.equal(await page.locator('#nlpdfExportPdfName').inputValue(),'Documents_QA Student_QA1234567_1690999999.pdf');
     await page.locator('#nlpdfExportNumber').fill('9012');
     await page.locator('input[name="nlpdfOutput"][value="folder"]').check();
     await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
@@ -675,7 +722,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
       };
     },before);
     assert(out.files.find(x=>x.name==='Letter_QA Student.docx'&&x.finished&&x.length>100));
-    assert(out.files.find(x=>x.name==='QA Student_QA1234567_1690999999.pdf'&&x.finished&&x.length>100));
+    assert(out.files.find(x=>x.name==='Documents_QA Student_QA1234567_1690999999.pdf'&&x.finished&&x.length>100));
     assert.equal(out.pageCount,7,'5 document pages + 1 front + 1 back');
     await page.waitForTimeout(1000);
     assert.equal(await visible('#nlpdfExportModal'),false);
