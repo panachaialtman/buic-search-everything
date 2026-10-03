@@ -1218,6 +1218,8 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/School:\s*(.+)$/,'facultyEn','School / Faculty',1,{reference:'faculty'});
     addRegexOccurrence(fields,rec,/Starting Date:\s*(.+)$/,'startDate','Starting Date',1,{package:true});
     addRegexOccurrence(fields,rec,/Finishing Date:\s*(.+?)\s*$/,'finishDate','Finishing Date',1,{package:true});
+    addRegexOccurrence(fields,rec,/study period spans from\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})\s+to\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})/i,'startDate','Starting Date',1,{package:true});
+    addRegexOccurrence(fields,rec,/study period spans from\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})\s+to\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})/i,'finishDate','Finishing Date',2,{package:true});
     const highlightedDates=highlightedRanges(rec).filter(range=>/^[A-Z][a-z]+\s+\d{1,2},\s+\d{4}$/.test(clean(range.value)));
     if(highlightedDates.length>=2&&/(?:Bachelor|Master|Doctor|Degree Program|study period|period of study)/i.test(t)){
       const first=highlightedDates[0],last=highlightedDates[highlightedDates.length-1];
@@ -1795,24 +1797,6 @@ function applyEmbassyPostalBlock(context,doc,ns){
   for(let i=desired.length;i<slots.length;i++)slots[i].remove();
 }
 
-function applyLinkedPackageDateCopies(context,model,doc,ns){
-  const specs=[['startDate',context.values.startDate],['finishDate',context.values.finishDate]];
-  for(const [kind,current] of specs){
-    if(!clean(current))continue;
-    const field=model.fields.find(f=>f.kind===kind);if(!field)continue;
-    const originals=new Set([field.value,...field.occurrences.map(o=>o.raw)].map(normalizedLetterValue).filter(Boolean));
-    const rendered=toIsoDate(current)?formatDateEn(toIsoDate(current)):clean(current);
-    if(!rendered)continue;
-    for(const rec of model.records){
-      for(const range of highlightedRanges(rec)){
-        if(!originals.has(normalizedLetterValue(range.value)))continue;
-        const occ={record:rec,start:range.start,end:range.end,raw:range.value,parts:occurrenceParts(rec,range.start,range.end),format:''};
-        replaceOccurrence(occ,rendered,doc,ns);
-      }
-    }
-  }
-}
-
 async function createEditedLetter(){
   const context=state.pendingLetter;if(!context?.editor||state.busy)return;
   state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
@@ -1822,7 +1806,6 @@ async function createEditedLetter(){
     for(const field of model.fields)for(const occ of field.occurrences)all.push({field,occ});
     all.sort((a,b)=>b.occ.record.index-a.occ.record.index||b.occ.start-a.occ.start);
     for(const {field,occ} of all){if(field.kind==='embassyThai')continue;replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);}
-    applyLinkedPackageDateCopies(context,model,doc,ns);
     applyThaiEmbassyAddressee(context,model,doc,ns);
     applyEmbassyPostalBlock(context,doc,ns);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
