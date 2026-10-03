@@ -1930,3 +1930,19 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
 #workspaceDocuments.nlpdf-primary .nlpdf-letter-form-grid textarea:not([readonly]){background:var(--surface-2);color:var(--text)}
 @media(max-width:1050px){#workspaceDocuments.nlpdf-primary .nlpdf-letter-workspace{grid-template-columns:minmax(300px,.75fr) minmax(470px,1.25fr)}}
 @media(max-width:820px){#workspaceDocuments.nlpdf-primary .nlpdf-letter-wizard-nav{overflow:auto;grid-template-columns:repeat(5,minmax(150px,1fr));padding:0 8px}#workspaceDocuments.nlpdf-primary .nlpdf-letter-workspace{grid-template-columns:1fr;overflow:auto}#workspaceDocuments.nlpdf-primary .nlpdf-letter-content-preview{min-height:420px;border-right:0;border-bottom:1px solid var(--line)}#workspaceDocuments.nlpdf-primary .nlpdf-letter-form-pane{min-height:620px}#workspaceDocuments.nlpdf-primary .nlpdf-letter-sticky-meta{grid-template-columns:1fr}#workspaceDocuments.nlpdf-primary .nlpdf-letter-final-grid{grid-template-columns:1fr}}
+
+
+/* V23 — editable hover magnifier for Letter Content preview */
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-content-head{display:grid;grid-template-columns:minmax(120px,1fr) auto auto;align-items:center;gap:10px}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-content-title{display:grid;gap:2px;min-width:0}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-content-title span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls{display:flex;align-items:center;gap:6px;padding:4px 7px;border:1px solid var(--line);border-radius:9px;background:var(--surface);white-space:nowrap}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls>span{font-size:8px!important;font-weight:850;color:var(--text)!important}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls label{display:flex;align-items:center;gap:3px;color:var(--muted);font-size:8px;font-weight:750}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls input{width:42px;height:26px;box-sizing:border-box;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--text);padding:0 4px;text-align:center;font:inherit;font-size:9px;font-weight:800;outline:0}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-content-stage{isolation:isolate}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier{position:absolute;z-index:8;pointer-events:none;border:2px solid color-mix(in srgb,var(--accent) 82%,#fff);border-radius:5px;background:#fff;box-shadow:0 8px 22px rgba(17,31,50,.24);box-sizing:content-box;image-rendering:auto}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier.hidden{display:none!important}
+@media(max-width:1150px){#workspaceDocuments.nlpdf-primary .nlpdf-letter-content-head{grid-template-columns:1fr auto}.nlpdf-letter-magnifier-controls{grid-column:1/-1;justify-self:start}}
+@media(max-width:820px){#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls{flex-wrap:wrap;white-space:normal}}
