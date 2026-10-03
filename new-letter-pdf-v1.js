@@ -1242,7 +1242,7 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/ที่\s*มกท\/ศนช\.\s*([0-9]+)/,'documentNo','Document number');
     if(/^\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}$/.test(trim))addOccurrence(fields,rec,'letterDate','Letter date',t.indexOf(trim),t.indexOf(trim)+trim.length,{format:'dateTh'});
     addRegexOccurrence(fields,rec,/เรื่อง[^\n]*ของ\s+(.+)$/,'studentName','Student name');
-    addRegexOccurrence(fields,rec,/^เรียน\s+(?:กงสุล\s+ประจำ)?(.+)$/,'embassyThai','สถานทูต / สถานกงสุล',1,{reference:'embassy'});
+    addRegexOccurrence(fields,rec,/^เรียน\s*(?:กงสุล\s+ประจำ)?(.+)$/,'embassyThai','สถานทูต / สถานกงสุล',1,{reference:'embassy'});
     addRegexOccurrence(fields,rec,/มหาวิทยาลัยได้รับ\s+(.+?)\s+สัญชาติ/,'studentName','Student name');
     addRegexOccurrence(fields,rec,/สัญชาติ\s*([^\s]+(?:\s+[^\s]+)?)\s+หนังสือเดินทางหมายเลข/,'nationalityTh','สัญชาติ',1,{reference:'country'});
     addRegexOccurrence(fields,rec,/หนังสือเดินทางหมายเลข\s*([A-Za-z0-9]+)/,'passport','Passport number');
@@ -1766,13 +1766,13 @@ function applyThaiEmbassyAddressee(context,model,doc,ns){
   const targets=new Set((field?.occurrences||[]).map(occ=>occ.record));
   for(const rec of model.records){
     const original=clean(rec.full);
-    if(/^เรียน\s+กงสุล\s+ประจำ/.test(original))targets.add(rec);
-    else if(/^เรียน\s+/.test(original)&&/(?:สถานเอกอัครราชทูต|สถานกงสุลใหญ่|สถานกงสุล)/.test(original))targets.add(rec);
+    if(/^เรียน\s*กงสุล\s+ประจำ/.test(original))targets.add(rec);
+    else if(/^เรียน\s*/.test(original)&&/(?:สถานเอกอัครราชทูต|สถานกงสุลใหญ่|สถานกงสุล)/.test(original))targets.add(rec);
   }
   for(const rec of targets){
     const paragraph=rec.paragraph,original=clean(rec.full),runs=[...paragraph.getElementsByTagNameNS(ns,'r')],styleRun=runs.find(r=>[...r.getElementsByTagNameNS(ns,'t')].some(t=>clean(t.textContent)))||runs[0]||null;
     let prefix='เรียน ';
-    if(/^เรียน\s+กงสุล\s+ประจำ/.test(original))prefix='เรียน กงสุล ประจำ';
+    if(/^เรียน\s*กงสุล\s+ประจำ/.test(original))prefix='เรียน กงสุล ประจำ';
     for(const run of runs)run.remove();
     appendTextRun(paragraph,prefix,doc,ns,styleRun,false);
     appendTextRun(paragraph,value,doc,ns,styleRun,true);
