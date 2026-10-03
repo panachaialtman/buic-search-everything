@@ -1218,8 +1218,7 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/School:\s*(.+)$/,'facultyEn','School / Faculty',1,{reference:'faculty'});
     addRegexOccurrence(fields,rec,/Starting Date:\s*(.+)$/,'startDate','Starting Date',1,{package:true});
     addRegexOccurrence(fields,rec,/Finishing Date:\s*(.+?)\s*$/,'finishDate','Finishing Date',1,{package:true});
-    addRegexOccurrence(fields,rec,/study period spans from\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})\s+to\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})/i,'startDate','Starting Date',1,{package:true});
-    addRegexOccurrence(fields,rec,/study period spans from\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})\s+to\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})/i,'finishDate','Finishing Date',2,{package:true});
+    addRegexOccurrence(fields,rec,/study period spans from\s+(.+?)(?:\.|$)/i,'studyPeriod','Study period',1,{format:'studyPeriodEn'});
     const highlightedDates=highlightedRanges(rec).filter(range=>/^[A-Z][a-z]+\s+\d{1,2},\s+\d{4}$/.test(clean(range.value)));
     if(highlightedDates.length>=2&&/(?:Bachelor|Master|Doctor|Degree Program|study period|period of study)/i.test(t)){
       const first=highlightedDates[0],last=highlightedDates[highlightedDates.length-1];
@@ -1239,7 +1238,6 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/student at\s+([^,]+),/i,'homeUniversity','Home university / school');
     addRegexOccurrence(fields,rec,/student at\s+[^,]+,\s*([^,]+?)\s+has been admitted/i,'homeCountry','Home university country');
     addRegexOccurrence(fields,rec,/(?:Bachelor’s|Master’s|Doctor)\s+Degree Program in\s+(.+?)(?:\.|\s+The study period)/,'programEn','Program / Major',1,{reference:'faculty'});
-    addRegexOccurrence(fields,rec,/study period spans from\s+(.+?)(?:\.|$)/i,'studyPeriod','Study period',1,{format:'studyPeriodEn'});
     addRegexOccurrence(fields,rec,/issuing\s+(.+?)\s+an extendable/i,'studentName','Student name');
     addRegexOccurrence(fields,rec,/ที่\s*มกท\/ศนช\.\s*([0-9]+)/,'documentNo','Document number');
     if(/^\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}$/.test(trim))addOccurrence(fields,rec,'letterDate','Letter date',t.indexOf(trim),t.indexOf(trim)+trim.length,{format:'dateTh'});
@@ -1374,7 +1372,7 @@ function occurrenceValue(context,field,occ){
     if(!iso)return occ.raw;
     return occ.format==='dateTh'?formatDateTh(iso):formatDateEn(iso);
   }
-  if(field.kind==='studyPeriod'&&context.type==='exchange'){
+  if(field.kind==='studyPeriod'){
     const start=context.values.startDate,end=context.values.finishDate;
     if(!start||!end)return occ.raw;
     return occ.format==='studyPeriodTh'?formatStudyPeriodTh(start,end):formatStudyPeriodEn(start,end);
