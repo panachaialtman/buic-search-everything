@@ -696,7 +696,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(out.plain.includes('P.R. China, Myanmar'),false,'stale template country must not remain');
     assert(out.plain.includes('เรียน กงสุล ประจำสถานกงสุลใหญ่ ณ นครซีอาน สาธารณรัฐประชาชนจีน'),'Thai addressee must exactly use the selected Xian Thai mission wording; actual Thai mission lines: '+JSON.stringify(out.rawParas.filter(x=>/(?:เรียน|กงสุล|สถานเอกอัครราชทูต|สถานกงสุล)/.test(x))));
     assert.equal(out.plain.includes('สถานเอกอัครราชทูต ณ กรุงย่างกุ้ง'),false,'old Yangon Thai mission must not remain');
-    assert.equal(out.plain.includes('December 31, 2030'),false,'old finishing date must not remain on another page');
+    assert.equal(out.plain.includes('December 31, 2030'),false,'old finishing date must not remain on another page; actual 2030 lines: '+JSON.stringify(out.rawParas.filter(x=>/2030/.test(x))));
     assert((out.plain.match(/May 31, 2030/g)||[]).length>=2,'all linked finishing-date occurrences must use May 31, 2030');
     assert.equal(out.plain.includes('สาขาวิชาสาขาวิชา'),false,'Thai major label must not duplicate');
     assert.match(out.plain,/มหาวิทยาลัยได้รับ\s*Thai QA\s*สัญชาติ/,'Thai student-detail paragraph must remain intact');
