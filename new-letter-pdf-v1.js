@@ -1218,6 +1218,12 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/School:\s*(.+)$/,'facultyEn','School / Faculty',1,{reference:'faculty'});
     addRegexOccurrence(fields,rec,/Starting Date:\s*(.+)$/,'startDate','Starting Date',1,{package:true});
     addRegexOccurrence(fields,rec,/Finishing Date:\s*(.+?)\s*$/,'finishDate','Finishing Date',1,{package:true});
+    const highlightedDates=highlightedRanges(rec).filter(range=>/^[A-Z][a-z]+\s+\d{1,2},\s+\d{4}$/.test(clean(range.value)));
+    if(highlightedDates.length>=2&&/(?:Bachelor|Master|Doctor|Degree Program|study period|period of study)/i.test(t)){
+      const first=highlightedDates[0],last=highlightedDates[highlightedDates.length-1];
+      addOccurrence(fields,rec,'startDate','Starting Date',first.start,first.end,{package:true});
+      addOccurrence(fields,rec,'finishDate','Finishing Date',last.start,last.end,{package:true});
+    }
     addRegexOccurrence(fields,rec,/The\s+(?:Preliminary Course of the\s+)?(First|Second|Summer)\s+Semester/,'semester','Semester',1,{package:true});
     addRegexOccurrence(fields,rec,/Academic Year\s+(\d{4})/,'academicYear','Academic year',1,{package:true});
     addRegexOccurrence(fields,rec,/(?:commence|started)\s+on\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})/,'startDate','Starting Date',1,{package:true});
@@ -1749,39 +1755,61 @@ function appendTextRun(paragraph,text,doc,ns,sourceRun,highlight=false){
   if(highlight)ensureYellowHighlight(run,doc,ns);
   paragraph.appendChild(run);
 }
+function refreshSelectedEmbassyContext(context){
+  const id=clean($('#nlpdfLetterEmbassy')?.value);if(!id)return;
+  const record=(centralReference().embassy||[]).find(r=>embassyValues(r).id===id);if(!record)return;
+  const patch=embassyLinkedPatch(record);Object.assign(context.values,patch);Object.assign(state.linkedData,patch);
+}
 function applyThaiEmbassyAddressee(context,model,doc,ns){
   const value=clean(context.values.embassyThai);if(!value)return;
-  const field=model.fields.find(f=>f.kind==='embassyThai');if(!field)return;
-  for(const occ of field.occurrences){
-    const paragraph=occ.record.paragraph,prefix=occ.record.full.slice(0,occ.start),suffix=occ.record.full.slice(occ.end);
-    const originalRuns=[...paragraph.getElementsByTagNameNS(ns,'r')];
-    const prefixRun=originalRuns[0]||occ.parts?.[0]?.run||null,missionRun=occ.parts?.[0]?.run||prefixRun,suffixRun=originalRuns[originalRuns.length-1]||prefixRun;
-    for(const run of originalRuns)run.remove();
-    appendTextRun(paragraph,prefix,doc,ns,prefixRun,false);
-    appendTextRun(paragraph,value,doc,ns,missionRun,true);
-    appendTextRun(paragraph,suffix,doc,ns,suffixRun,false);
+  const field=model.fields.find(f=>f.kind==='embassyThai');
+  const targets=new Set((field?.occurrences||[]).map(occ=>occ.record));
+  for(const rec of model.records){
+    const original=clean(rec.full);
+    if(/^เรียน\s+กงสุล\s+ประจำ/.test(original))targets.add(rec);
+    else if(/^เรียน\s+/.test(original)&&/(?:สถานเอกอัครราชทูต|สถานกงสุลใหญ่|สถานกงสุล)/.test(original))targets.add(rec);
+  }
+  for(const rec of targets){
+    const paragraph=rec.paragraph,original=clean(rec.full),runs=[...paragraph.getElementsByTagNameNS(ns,'r')],styleRun=runs.find(r=>[...r.getElementsByTagNameNS(ns,'t')].some(t=>clean(t.textContent)))||runs[0]||null;
+    let prefix='เรียน ';
+    if(/^เรียน\s+กงสุล\s+ประจำ/.test(original))prefix='เรียน กงสุล ประจำ';
+    for(const run of runs)run.remove();
+    appendTextRun(paragraph,prefix,doc,ns,styleRun,false);
+    appendTextRun(paragraph,value,doc,ns,styleRun,true);
   }
 }
 function applyEmbassyPostalBlock(context,doc,ns){
   const office=clean(context.values.embassyOffice),sourceLines=addressLines(context.values.embassyAddress||'');
   if(!office||!sourceLines.length)return;
-  const desired=[office,...sourceLines];
-  const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
-  const consulIndex=paragraphs.findIndex(p=>paragraphPlainText(p,ns)==='The Consul');
-  if(consulIndex<0)return;
-  let dearIndex=-1;
-  for(let i=consulIndex+1;i<paragraphs.length;i++){if(/^Dear Consul/i.test(paragraphPlainText(paragraphs[i],ns))){dearIndex=i;break;}}
+  const desired=[office,...sourceLines],paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
+  const consulIndex=paragraphs.findIndex(p=>paragraphPlainText(p,ns)==='The Consul');if(consulIndex<0)return;
+  let dearIndex=-1;for(let i=consulIndex+1;i<paragraphs.length;i++){if(/^Dear Consul/i.test(paragraphPlainText(paragraphs[i],ns))){dearIndex=i;break;}}
   if(dearIndex<0)return;
-  const between=paragraphs.slice(consulIndex+1,dearIndex);
-  const addressParas=between.filter(p=>paragraphPlainText(p,ns)||[...p.getElementsByTagNameNS(ns,'highlight')].length);
-  if(!addressParas.length)return;
-  const dear=paragraphs[dearIndex],parent=dear.parentNode,template=addressParas[addressParas.length-1];
-  while(addressParas.length<desired.length){
-    const clone=template.cloneNode(true);setParagraphText(clone,'',doc,ns);parent.insertBefore(clone,dear);addressParas.push(clone);
+  const dear=paragraphs[dearIndex],parent=dear.parentNode,between=paragraphs.slice(consulIndex+1,dearIndex);
+  const template=between.find(p=>paragraphPlainText(p,ns))||between[0]||dear;
+  const slots=[...between];
+  while(slots.length<desired.length){
+    const clone=template.cloneNode(true);setParagraphText(clone,'',doc,ns);parent.insertBefore(clone,dear);slots.push(clone);
   }
-  for(let i=0;i<addressParas.length;i++){
-    if(i<desired.length)setParagraphText(addressParas[i],desired[i],doc,ns);
-    else setParagraphText(addressParas[i],'',doc,ns);
+  for(let i=0;i<desired.length;i++)setParagraphText(slots[i],desired[i],doc,ns);
+  for(let i=desired.length;i<slots.length;i++)slots[i].remove();
+}
+
+function applyLinkedPackageDateCopies(context,model,doc,ns){
+  const specs=[['startDate',context.values.startDate],['finishDate',context.values.finishDate]];
+  for(const [kind,current] of specs){
+    if(!clean(current))continue;
+    const field=model.fields.find(f=>f.kind===kind);if(!field)continue;
+    const originals=new Set([field.value,...field.occurrences.map(o=>o.raw)].map(normalizedLetterValue).filter(Boolean));
+    const rendered=toIsoDate(current)?formatDateEn(toIsoDate(current)):clean(current);
+    if(!rendered)continue;
+    for(const rec of model.records){
+      for(const range of highlightedRanges(rec)){
+        if(!originals.has(normalizedLetterValue(range.value)))continue;
+        const occ={record:rec,start:range.start,end:range.end,raw:range.value,parts:occurrenceParts(rec,range.start,range.end),format:''};
+        replaceOccurrence(occ,rendered,doc,ns);
+      }
+    }
   }
 }
 
@@ -1789,11 +1817,12 @@ async function createEditedLetter(){
   const context=state.pendingLetter;if(!context?.editor||state.busy)return;
   state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
   try{
-    applySavedPackageDates(context);saveCurrentHomeSchool(context);
+    applySavedPackageDates(context);saveCurrentHomeSchool(context);refreshSelectedEmbassyContext(context);
     const {zip,doc,ns,model}=context.editor,all=[];
     for(const field of model.fields)for(const occ of field.occurrences)all.push({field,occ});
     all.sort((a,b)=>b.occ.record.index-a.occ.record.index||b.occ.start-a.occ.start);
     for(const {field,occ} of all)replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);
+    applyLinkedPackageDateCopies(context,model,doc,ns);
     applyThaiEmbassyAddressee(context,model,doc,ns);
     applyEmbassyPostalBlock(context,doc,ns);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));

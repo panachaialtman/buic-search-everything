@@ -636,8 +636,14 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(out.studyPeriod,true,'Exchange study period should follow package Starting/Finishing dates');
   });
 
-  await run('Bachelor No IEN maps Xian source data without duplicate mission or Thai labels',async()=>{
+  await run('Bachelor No IEN maps Xian source data, linked package dates, and Thai addressee exactly',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
+    await page.evaluate(()=>{
+      const profiles=JSON.parse(localStorage.getItem('buic-letter-package-dates-v1')||'{}');
+      profiles['bachelor_no_ien|second|2026']={type:'bachelor_no_ien',semester:'Second',year:'2026',startDate:'2027-01-11',finishDate:'2030-05-31',orientationStart:'2027-01-04',orientationEnd:'2027-01-08'};
+      localStorage.setItem('buic-letter-package-dates-v1',JSON.stringify(profiles));
+      localStorage.setItem('buic-letter-last-academic-year-v1','2026');
+    });
     await page.locator('#nlpdfCreate').click();
     await page.locator('#nlpdfExportNumber').fill('4766');
     await page.locator('#nlpdfExportName').fill('Thai QA');
@@ -651,6 +657,9 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfChooseDestination').click();
     await page.locator('#nlpdfConfirmExport').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+    await page.locator('#nlpdfLetterSemester').selectOption('Second');
+    await page.locator('#nlpdfLetterAcademicYear').selectOption('2026');
+    assert.equal((await page.locator('#nlpdfLetterFinishDate').innerText()).trim(),'May 31, 2030');
     await page.locator('#nlpdfLetterLocation').fill('QA Student Location');
     await page.locator('#nlpdfLetterEmbassySearch').fill('Xian');
     await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});
@@ -666,25 +675,29 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
       const xml=await zip.file('word/document.xml').async('string');
       const doc=new DOMParser().parseFromString(xml,'application/xml');
       const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-      const paras=[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(n=>n.textContent||'').join('').trim()).filter(Boolean);
-      const plain=paras.join('\n');
-      return {finished:file.finished,plain,paras};
+      const rawParas=[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(n=>n.textContent||'').join('').trim());
+      const paras=rawParas.filter(Boolean),plain=paras.join('\n');
+      return {finished:file.finished,plain,paras,rawParas};
     },before);
     assert(out&&out.finished,'Bachelor No IEN letter should be written');
     assert(out.plain.includes('QA Student Location'),'Student location must replace the line under To:');
-    const consul=out.paras.findIndex(x=>x==='The Consul');
+    const consul=out.rawParas.findIndex(x=>x==='The Consul');
     assert(consul>=0,'The Consul block should exist');
-    const block=out.paras.slice(consul+1,consul+6);
+    const block=out.rawParas.slice(consul+1,consul+6);
     assert.equal(block[0],'Royal Thai Consulate-General in Xian','address block must use Office Name, not Display Name with country suffix');
     assert.equal(block[1],'Room 104, 1st Floor, Building A');
     assert.equal(block[2],'China Railway First International');
     assert.equal(block[3],'No. 9 Yanta North Road, Beilin District');
     assert.equal(block[4],'Xian City, Shaanxi 710000, P.R. China','full final address row must not be truncated');
+    assert.match(out.rawParas[consul+6]||'',/^Dear Consul/,'no blank paragraph may split the Embassy address block');
     assert.equal(block.filter(x=>x==='Royal Thai Consulate-General in Xian').length,1,'office name must appear once in the address block');
     assert.equal(block.some(x=>x==='Royal Thai Consulate-General in Xian, P.R. China'),false,'Display Name must not be used as the postal address heading');
     assert.equal(out.plain.includes('P.R. CHINA'),false,'China casing must remain P.R. China');
     assert.equal(out.plain.includes('P.R. China, Myanmar'),false,'stale template country must not remain');
-    assert.match(out.plain,/กงสุล\s+ประจำสถานกงสุลใหญ่ ณ นครซีอาน สาธารณรัฐประชาชนจีน/,'Thai addressee must use the Xian Thai mission wording');
+    assert(out.plain.includes('เรียน กงสุล ประจำสถานกงสุลใหญ่ ณ นครซีอาน สาธารณรัฐประชาชนจีน'),'Thai addressee must exactly use the selected Xian Thai mission wording');
+    assert.equal(out.plain.includes('สถานเอกอัครราชทูต ณ กรุงย่างกุ้ง'),false,'old Yangon Thai mission must not remain');
+    assert.equal(out.plain.includes('December 31, 2030'),false,'old finishing date must not remain on another page');
+    assert((out.plain.match(/May 31, 2030/g)||[]).length>=2,'all linked finishing-date occurrences must use May 31, 2030');
     assert.equal(out.plain.includes('สาขาวิชาสาขาวิชา'),false,'Thai major label must not duplicate');
     assert.match(out.plain,/มหาวิทยาลัยได้รับ\s*Thai QA\s*สัญชาติ/,'Thai student-detail paragraph must remain intact');
     assert.match(out.plain,/หนังสือเดินทางหมายเลข\s*QA998877/,'Thai passport value must remain in the paragraph');
