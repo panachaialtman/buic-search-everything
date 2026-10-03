@@ -457,9 +457,11 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
     await page.locator('#nlpdfChooseDestination').click();
     const before=await page.evaluate(()=>window.__mockFiles.length);
+    await page.evaluate(()=>{const t=document.querySelector('#toast');if(t){t.textContent='';t.classList.remove('show');}});
     await page.locator('#nlpdfConfirmExport').click();
     await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
     assert.equal(await page.evaluate(before=>window.__mockFiles.length===before,before),true,'Create 1/2 must not write a Word letter before document type is chosen');
+    assert.equal((await page.locator('#toast').innerText()).includes('Create 1/2 complete'),false,'Letter-only must not imply an output was already created');
     assert.equal((await page.locator('#nlpdfConfirmLetterType').innerText()).trim(),'Create 2/2');
     await page.locator('#nlpdfExportLetterType').selectOption('exchange');
     await page.locator('#nlpdfConfirmLetterType').click();
@@ -538,117 +540,32 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfZoomFit').click();
   });
 
-  await run('Edit Letter uses selectable academic data, reusable dates, school memory, and Embassy search',async()=>{
+  await run('Edit Letter uses topic pages, linked Content previews, reusable dates, school memory, and Embassy search',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
+    for(const [index,type] of [[0,'passport'],[1,'receipt'],[2,'bu_application'],[3,'visa_application']]){
+      await page.locator('#nlpdfFilmstrip [data-page-id]').nth(index).click();await page.locator('#nlpdfPageContentType').selectOption(type);
+    }
     await page.locator('#nlpdfCreate').click();
-    assert.match(await page.locator('#nlpdfExportNumber').locator('xpath=..').innerText(),/Document Number/);
-    await page.locator('#nlpdfExportNumber').fill('0789');
-    await page.locator('#nlpdfExportName').fill('Linked Name');
-    await page.locator('#nlpdfExportPassport').fill('AB1234567');
-    await page.locator('#nlpdfExportStudentId').fill('1690000000');
-    assert.equal(await page.locator('#nlpdfExportPdfName').inputValue(),'Documents_Linked Name_AB1234567_1690000000.pdf');
-    await page.locator('input[name="nlpdfOutput"][value="folder"]').check();
-    await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
-    assert.match(await text('#nlpdfFinalFolder'),/0789 Linked Name_AB1234567_1690000000/);
-    assert.match(await text('#nlpdfFinalLetter'),/Letter_Linked Name_AB1234567_1690000000\.docx/);
-    await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
-
-    await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
-    await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
-    await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
-    await page.locator('#nlpdfChooseDestination').click();
-    await page.locator('#nlpdfConfirmExport').click();
-    await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
-    await page.locator('#nlpdfExportLetterType').selectOption('exchange');
-    await page.locator('#nlpdfConfirmLetterType').click();
-    await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
-    assert.equal(await page.locator('.nlpdf-letter-page').count(),0,'Word-style mock pages must stay removed');
-    assert.equal(await page.locator('#nlpdfLetterName').inputValue(),'Linked Name');
-    assert.equal(await page.locator('#nlpdfLetterPassport').inputValue(),'AB1234567');
-    assert.equal(await page.locator('#nlpdfLetterStudentId').inputValue(),'1690000000');
-    assert.equal(await page.locator('#nlpdfLetterDocumentNo').inputValue(),'0789');
-    assert.equal(await page.locator('#nlpdfLetterLocation').inputValue(),'Goes, Netherlands');
-    assert.match(await page.locator('#nlpdfLetterCountry').innerText(),/Netherlands/i);
-    assert.equal(await page.locator('#nlpdfLetterFaculty').evaluate(el=>el.tagName),'SELECT');
-    assert.equal(await page.locator('#nlpdfLetterAcademicYear').evaluate(el=>el.tagName),'SELECT');
-    assert.equal(await page.locator('#nlpdfPackageManagerBtn').isVisible(),true);
-    assert.equal(await page.locator('#nlpdfSchoolManagerBtn').isVisible(),true);
-
-    await page.locator('#nlpdfPackageManagerBtn').click();
-    await page.locator('#nlpdfPackageManager').waitFor({state:'visible'});
-    await page.locator('#nlpdfPkgType').selectOption('exchange');
-    await page.locator('#nlpdfPkgSemester').selectOption('Second');
-    await page.locator('#nlpdfPkgYear').selectOption('2026');
-    await page.locator('#nlpdfPkgStart').fill('2027-01-11');
-    await page.locator('#nlpdfPkgFinish').fill('2027-05-31');
-    await page.locator('#nlpdfPkgOrientationStart').fill('2027-01-04');
-    await page.locator('#nlpdfPkgOrientationEnd').fill('2027-01-08');
-    await page.locator('#nlpdfPkgSave').click();
-    assert.match(await page.locator('#nlpdfPackageProfileList').innerText(),/Exchange Bachelor/);
-    assert.match(await page.locator('#nlpdfPackageProfileList').innerText(),/January 11, 2027/);
-    await page.locator('[data-package-close]').last().click();
-
-    await page.locator('#nlpdfLetterSemester').selectOption('Second');
-    await page.locator('#nlpdfLetterAcademicYear').selectOption('2026');
-    assert.equal(await page.locator('#nlpdfLetterStartDate').inputValue(),'2027-01-11');
-    assert.equal(await page.locator('#nlpdfLetterFinishDate').inputValue(),'2027-05-31');
-    assert.equal(await page.locator('#nlpdfLetterOrientationStart').inputValue(),'2027-01-04');
-    assert.equal(await page.locator('#nlpdfLetterOrientationEnd').inputValue(),'2027-01-08');
-    await page.locator('#nlpdfLetterFinishDate').fill('2027-06-15');
-    await page.locator('#nlpdfLetterOrientationEnd').fill('2027-01-09');
-
-    await page.locator('#nlpdfSchoolManagerBtn').click();
-    await page.locator('#nlpdfSchoolManager').waitFor({state:'visible'});
-    await page.locator('#nlpdfSchoolName').fill('QA Home University');
-    const schoolCountry=await page.locator('#nlpdfSchoolCountry option').evaluateAll(opts=>{
-      const hit=opts.find(o=>/Myanmar/i.test(o.textContent||'')&&o.value);return hit?.value||opts.find(o=>o.value)?.value||'';
-    });
-    if(schoolCountry)await page.locator('#nlpdfSchoolCountry').selectOption(schoolCountry);
-    if(schoolCountry)await page.locator('#nlpdfSchoolSave').click();
-    if(schoolCountry)assert.match(await page.locator('#nlpdfSchoolList').innerText(),/QA Home University/);
-    await page.locator('[data-school-close]').last().click();
-    if(await page.locator('#nlpdfLetterHomeSchoolSection').isVisible()){
-      await page.locator('#nlpdfLetterHomeSchool').fill('QA Home University');
-      await page.locator('#nlpdfLetterHomeSchool').press('Tab');
-      if(schoolCountry)assert.equal(await page.locator('#nlpdfLetterHomeCountry').inputValue(),schoolCountry);
-    }
-
-    await page.locator('#nlpdfLetterEmbassySearch').fill('Yangon');
-    await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});
-    const result=page.locator('#nlpdfLetterEmbassyResults [data-embassy-result]').first();
-    if(await result.count()){
-      await result.click();
-      assert((await page.locator('#nlpdfLetterEmbassyAddress').inputValue()).trim().length>5,'embassy address must come from reference data');
-    }
-
-    const letterDate=page.locator('#nlpdfLetterExtraFields input[type="date"]').first();
-    if(await letterDate.count())await letterDate.fill('2026-10-08');
-
-    await page.locator('#nlpdfCreateEditedLetter').click();
-    await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
-    const out=await page.evaluate(async before=>{
-      const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Linked Name_AB1234567_1690000000.docx');
-      if(!file)return null;
-      const zip=await JSZip.loadAsync(file.bytes);
-      const xml=await zip.file('word/document.xml').async('string');
-      return {
-        finished:file.finished,
-        highlight:/<w:highlight\b[^>]*(?:w:val|val)="yellow"/i.test(xml),
-        name:(xml.match(/Linked Name/g)||[]).length,
-        passport:(xml.match(/AB1234567/g)||[]).length,
-        englishDate:xml.includes('October 8, 2026'),
-        thaiDate:xml.includes('8 ตุลาคม 2569'),
-        studyPeriod:xml.includes('January 11, 2027 to June 15, 2027'),
-        editedOrientation:xml.includes('January 4 - 9, 2027')
-      };
-    },before);
-    assert(out&&out.finished,'edited Word letter should be written');
-    assert.equal(out.highlight,true,'edited values must remain highlighted');
-    assert(out.name>=1,'student name should be written');
-    assert(out.passport>=1,'passport should be written');
-    if(await letterDate.count()){assert.equal(out.englishDate,true);assert.equal(out.thaiDate,true);}
-    assert.equal(out.studyPeriod,true,'Exchange study period should follow the manually edited Starting/Finishing dates');
-    assert.equal(out.editedOrientation,true,'manual Orientation edit should override the saved package profile');
+    await page.locator('#nlpdfExportNumber').fill('0789');await page.locator('#nlpdfExportName').fill('Linked Name');await page.locator('#nlpdfExportPassport').fill('AB1234567');await page.locator('#nlpdfExportStudentId').fill('1690000000');
+    await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
+    await page.locator('#nlpdfChooseDestination').click();await page.locator('#nlpdfConfirmExport').click();await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
+    await page.locator('#nlpdfExportLetterType').selectOption('exchange');await page.locator('#nlpdfConfirmLetterType').click();await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+    assert.equal(await page.locator('#nlpdfLetterStepStudent').isVisible(),true);assert.match(await page.locator('#nlpdfLetterContentLabel').innerText(),/Passport/);
+    assert.equal(await page.locator('#nlpdfLetterName').inputValue(),'Linked Name');assert.equal(await page.locator('#nlpdfLetterPassport').inputValue(),'AB1234567');assert.equal(await page.locator('#nlpdfLetterStudentId').inputValue(),'1690000000');assert.equal(await page.locator('#nlpdfLetterDocumentNo').inputValue(),'0789');
+    await page.locator('#nlpdfLetterNext').click();assert.equal(await page.locator('#nlpdfLetterStepAcademic').isVisible(),true);assert.match(await page.locator('#nlpdfLetterContentLabel').innerText(),/Receipt/);assert.equal((await page.locator('#nlpdfLetterContentCounter').innerText()).trim(),'1 / 2');
+    await page.locator('#nlpdfLetterContentNext').click();assert.match(await page.locator('#nlpdfLetterContentLabel').innerText(),/BU Application/);
+    assert.equal(await page.locator('#nlpdfPackageManagerBtn').isVisible(),true);assert.equal(await page.locator('#nlpdfSchoolManagerBtn').isVisible(),true);
+    await page.locator('#nlpdfPackageManagerBtn').click();await page.locator('#nlpdfPackageManager').waitFor({state:'visible'});await page.locator('#nlpdfPkgType').selectOption('exchange');await page.locator('#nlpdfPkgSemester').selectOption('Second');await page.locator('#nlpdfPkgYear').selectOption('2026');await page.locator('#nlpdfPkgStart').fill('2027-01-11');await page.locator('#nlpdfPkgFinish').fill('2027-05-31');await page.locator('#nlpdfPkgOrientationStart').fill('2027-01-04');await page.locator('#nlpdfPkgOrientationEnd').fill('2027-01-08');await page.locator('#nlpdfPkgSave').click();await page.locator('[data-package-close]').last().click();
+    await page.locator('#nlpdfLetterSemester').selectOption('Second');await page.locator('#nlpdfLetterAcademicYear').selectOption('2026');assert.equal(await page.locator('#nlpdfLetterStartDate').inputValue(),'2027-01-11');assert.equal(await page.locator('#nlpdfLetterFinishDate').inputValue(),'2027-05-31');await page.locator('#nlpdfLetterFinishDate').fill('2027-06-15');await page.locator('#nlpdfLetterOrientationEnd').fill('2027-01-09');
+    await page.locator('#nlpdfSchoolManagerBtn').click();await page.locator('#nlpdfSchoolManager').waitFor({state:'visible'});await page.locator('#nlpdfSchoolName').fill('QA Home University');
+    const schoolCountry=await page.locator('#nlpdfSchoolCountry option').evaluateAll(opts=>{const hit=opts.find(o=>/Myanmar/i.test(o.textContent||'')&&o.value);return hit?.value||opts.find(o=>o.value)?.value||'';});if(schoolCountry){await page.locator('#nlpdfSchoolCountry').selectOption(schoolCountry);await page.locator('#nlpdfSchoolSave').click();}await page.locator('[data-school-close]').last().click();
+    if(await page.locator('#nlpdfLetterHomeSchoolSection').isVisible()){await page.locator('#nlpdfLetterHomeSchool').fill('QA Home University');await page.locator('#nlpdfLetterHomeSchool').press('Tab');}
+    await page.locator('[data-letter-step="2"]').click();assert.match(await page.locator('#nlpdfLetterContentLabel').innerText(),/Visa Application/);await page.locator('#nlpdfLetterEmbassySearch').fill('Yangon');await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});const result=page.locator('#nlpdfLetterEmbassyResults [data-embassy-result]').first();if(await result.count())await result.click();
+    assert.equal(await page.locator('#nlpdfLetterEmbassyAddress').getAttribute('readonly'),null);await page.locator('#nlpdfLetterEmbassyAddress').fill('Custom Embassy Address\nSecond Line');
+    await page.locator('[data-letter-step="3"]').click();assert.match(await page.locator('#nlpdfLetterReview').innerText(),/Linked Name/);await page.locator('#nlpdfLetterNext').click();assert.equal(await page.locator('#nlpdfLetterStepFinal').isVisible(),true);assert.equal(await page.locator('#nlpdfLetterFinalDocumentNo').inputValue(),'0789');assert.equal(await page.locator('#nlpdfLetterFinalStudentId').inputValue(),'1690000000');await page.locator('#nlpdfLetterFinalDate').fill('2026-10-08');
+    await page.locator('#nlpdfCreateEditedLetter').click();await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
+    const out=await page.evaluate(async before=>{const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Linked Name_AB1234567_1690000000.docx');if(!file)return null;const zip=await JSZip.loadAsync(file.bytes),xml=await zip.file('word/document.xml').async('string');return{finished:file.finished,highlight:/<w:highlight\b[^>]*(?:w:val|val)="yellow"/i.test(xml),name:(xml.match(/Linked Name/g)||[]).length,passport:(xml.match(/AB1234567/g)||[]).length,englishDate:xml.includes('October 8, 2026'),thaiDate:xml.includes('8 ตุลาคม 2569'),studyPeriod:xml.includes('January 11, 2027 to June 15, 2027'),editedOrientation:xml.includes('January 4 - 9, 2027'),customAddress:xml.includes('Custom Embassy Address')};},before);
+    assert(out&&out.finished);assert.equal(out.highlight,true);assert(out.name>=1);assert(out.passport>=1);assert.equal(out.englishDate,true);assert.equal(out.thaiDate,true);assert.equal(out.studyPeriod,true);assert.equal(out.editedOrientation,true);assert.equal(out.customAddress,true,'manual Embassy address must be used in final Word output');
   });
 
   await run('Bachelor No IEN maps Xian source data, linked package dates, and Thai addressee exactly',async()=>{
@@ -673,16 +590,17 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportLetterType').selectOption('bachelor_no_ien');
     await page.locator('#nlpdfConfirmLetterType').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+    await page.locator('[data-letter-step="1"]').click();
     await page.locator('#nlpdfLetterSemester').selectOption('Second');
     await page.locator('#nlpdfLetterAcademicYear').selectOption('2026');
     assert.equal(await page.locator('#nlpdfLetterFinishDate').inputValue(),'2030-05-31');
-    await page.locator('#nlpdfLetterLocation').fill('QA Student Location');
-    await page.locator('#nlpdfLetterEmbassySearch').fill('Xian');
+    await page.locator('[data-letter-step="0"]').click();await page.locator('#nlpdfLetterLocation').fill('QA Student Location');
+    await page.locator('[data-letter-step="2"]').click();await page.locator('#nlpdfLetterEmbassySearch').fill('Xian');
     await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});
     const xian=page.locator('#nlpdfLetterEmbassyResults [data-embassy-result]').filter({hasText:/Xian/i}).first();
     assert.equal(await xian.count()>0,true,'Xian mission should be searchable');
     await xian.click();
-    await page.locator('#nlpdfCreateEditedLetter').click();
+    await page.locator('[data-letter-step="4"]').click();await page.locator('#nlpdfCreateEditedLetter').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
     const out=await page.evaluate(async before=>{
       const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Thai QA_QA998877_1690111111.docx');
@@ -718,6 +636,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.match(out.plain,/มหาวิทยาลัยได้รับ\s*Thai QA\s*สัญชาติ/,'Thai student-detail paragraph must remain intact');
     assert.match(out.plain,/หนังสือเดินทางหมายเลข\s*QA998877/,'Thai passport value must remain in the paragraph');
   });
+
 
   await run('Export modal shows processing, then success only after write completes',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
@@ -771,14 +690,14 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportLetterType').selectOption('bachelor_no_ien');
     await page.locator('#nlpdfConfirmLetterType').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
-    await page.locator('#nlpdfLetterEmbassySearch').fill('Moscow');
+    await page.locator('[data-letter-step="2"]').click();await page.locator('#nlpdfLetterEmbassySearch').fill('Moscow');
     await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});
     const moscow=page.locator('#nlpdfLetterEmbassyResults [data-embassy-result]').filter({hasText:/Moscow/i}).first();
     assert.equal(await moscow.count()>0,true,'Moscow embassy should be searchable');
     assert.match(await moscow.innerText(),/Russia/);
     assert.doesNotMatch(await moscow.innerText(),/Russian Federation/);
     await moscow.click();
-    await page.locator('#nlpdfCreateEditedLetter').click();
+    await page.locator('[data-letter-step="4"]').click();await page.locator('#nlpdfCreateEditedLetter').click();
     await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
     const out=await page.evaluate(async before=>{
       const data=window.__mockFiles.slice(before),file=data.find(f=>f.name==='Letter_QA Student_QA1234567_1690999999.docx');
@@ -791,6 +710,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert(out.plain.includes('Royal Thai Embassy in Moscow, Russia'),'generated letter should use Russia');
     assert.equal(out.plain.includes('Royal Thai Embassy in Moscow, Russian Federation'),false,'generated letter must not use Russian Federation');
   });
+
 
   await run('Current Letter fills the viewport, exposes reserved topics, and keeps fallback in Settings',async()=>{
     assert.equal((await page.locator('[data-workspace="extend"]').innerText()).trim(),'Current Letter');

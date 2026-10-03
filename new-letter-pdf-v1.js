@@ -15,7 +15,7 @@ const state={
   busy:false, dragId:'', pendingAsset:'', destinationHandle:null,
   zoom:1, safeArea:false, duplicateDetection:true, duplicateOnly:false, duplicateGroups:new Map(), duplicatePageHashes:new Map(), duplicateDismissed:new Set(), duplicateHashCache:new Map(), duplicateScanToken:0,
   cropMode:false, cropDraft:null, renderEpoch:0, cropBounds:null, sigAspect:.32, signaturePageId:'', toolOpen:'', guides:{x:false,y:false}, contentBounds:null, history:{undo:[],redo:[],current:null,restoring:false},
-  editLetterRequested:false, pendingLetter:null, packageHandoff:null, linkedData:{}, referencePicker:null, contentPanelCollapsed:false,
+  editLetterRequested:false, pendingLetter:null, packageHandoff:null, letterWizardStep:0, letterPreviewIndex:0, letterPreviewEpoch:0, linkedData:{}, referencePicker:null, contentPanelCollapsed:false,
   signatureUrl:'', sig:{xPct:.72,yPct:.80,widthPct:.22}
 };
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -161,39 +161,63 @@ function letterTypeModalMarkup(){
 }
 function letterEditorMarkup(){
   return '<section class="nlpdf-letter-editor hidden" id="nlpdfLetterEditor" aria-hidden="true">'+
-    '<header class="nlpdf-letter-editor-head"><div><span class="eyebrow">LETTER EDITOR</span><h2 id="nlpdfLetterEditorTitle">Edit Letter</h2><span id="nlpdfLetterEditorContext"></span></div><button class="nlpdf-letter-editor-close" id="nlpdfCancelLetterEdit" type="button">Back to Document Type</button></header>'+
-    '<div class="nlpdf-letter-editor-body nlpdf-letter-form-body">'+
-      '<div class="nlpdf-letter-form" id="nlpdfLetterForm">'+
-        '<section class="nlpdf-letter-form-section"><div class="nlpdf-letter-form-title"><strong>Student</strong><span>Package information can be left blank if it is not needed.</span></div><div class="nlpdf-letter-form-grid">'+
-          '<label><span>Student name</span><input id="nlpdfLetterName" data-form-key="studentName"></label>'+
-          '<label><span>Passport number</span><input id="nlpdfLetterPassport" data-form-key="passport"></label>'+
-          '<label><span>Student ID</span><input id="nlpdfLetterStudentId" data-form-key="studentId"></label>'+
-          '<label><span>Document Number</span><input id="nlpdfLetterDocumentNo" data-form-key="documentNo"></label>'+
-          '<label><span>Nationality / Country</span><button class="nlpdf-reference-select" id="nlpdfLetterCountry" type="button"><span class="nlpdf-reference-select-value">Search nationality / country</span><small>Search</small></button></label>'+
-          '<label><span>Student location</span><input id="nlpdfLetterLocation" data-form-key="recipientLocation"></label>'+
-        '</div></section>'+
-        '<section class="nlpdf-letter-form-section"><div class="nlpdf-letter-form-title"><strong>Academic</strong><span>School, faculty and program use Search Everything data.</span></div><div class="nlpdf-letter-form-grid">'+
-          '<label><span>School / Faculty</span><select id="nlpdfLetterFaculty"></select></label>'+
-          '<label><span>Program / Major</span><select id="nlpdfLetterProgram"></select></label>'+
-          '<label><span>Student type</span><button class="nlpdf-reference-select" id="nlpdfLetterStudentType" type="button"><span class="nlpdf-reference-select-value">Document type</span><small>Change</small></button></label>'+
-          '<label><span>Semester</span><select id="nlpdfLetterSemester"><option value="">Select</option><option value="First">First</option><option value="Second">Second</option><option value="Summer">Summer</option></select></label>'+
-          '<label><span>Academic year</span><select id="nlpdfLetterAcademicYear"></select></label>'+
-        '</div>'+
-        '<div class="nlpdf-letter-package-result" id="nlpdfLetterPackageResult"><div><span>Starting Date</span><input id="nlpdfLetterStartDate" type="date"></div><div><span>Finishing Date</span><input id="nlpdfLetterFinishDate" type="date"></div><div><span>Orientation</span><div class="nlpdf-letter-orientation-range"><input id="nlpdfLetterOrientationStart" type="date" aria-label="Orientation start"><b>to</b><input id="nlpdfLetterOrientationEnd" type="date" aria-label="Orientation finish"></div></div></div>'+
-        '<div class="nlpdf-letter-package-status" id="nlpdfLetterPackageStatus">Choose Semester and Academic year to use a saved package-date profile.</div></section>'+
-        '<section class="nlpdf-letter-form-section hidden" id="nlpdfLetterHomeSchoolSection"><div class="nlpdf-letter-form-title"><strong>Home university / school</strong><span>Remembered schools automatically bring their country.</span></div><div class="nlpdf-letter-form-grid">'+
-          '<label><span>University / School</span><input id="nlpdfLetterHomeSchool" list="nlpdfLetterHomeSchoolOptions"><datalist id="nlpdfLetterHomeSchoolOptions"></datalist></label>'+
-          '<label><span>Country</span><select id="nlpdfLetterHomeCountry"></select></label>'+
-        '</div></section>'+
-        '<section class="nlpdf-letter-form-section"><div class="nlpdf-letter-form-title"><strong>Embassy</strong><span>Search by country (English/Thai), city, or mission name.</span></div><div class="nlpdf-letter-form-grid">'+
-          '<label class="wide"><span>Thai Embassy / Consulate</span><div class="nlpdf-embassy-search"><input id="nlpdfLetterEmbassySearch" autocomplete="off" placeholder="Search Lao, ลาว, Vientiane, Savannakhet..."><input id="nlpdfLetterEmbassy" type="hidden"><div class="nlpdf-embassy-results hidden" id="nlpdfLetterEmbassyResults"></div></div></label>'+
-          '<label class="wide"><span>Embassy address</span><textarea id="nlpdfLetterEmbassyAddress" rows="4" readonly></textarea></label>'+
-        '</div></section>'+
-        '<section class="nlpdf-letter-form-section" id="nlpdfLetterExtraSection"><div class="nlpdf-letter-form-title"><strong>Other letter details</strong><span>Linked fields are shown once even when the Word letter uses them several times.</span></div><div class="nlpdf-letter-form-grid" id="nlpdfLetterExtraFields"></div></section>'+
-      '</div>'+
-    '</div>'+
-    '<div class="nlpdf-letter-fabs"><button class="nlpdf-package-manager-fab nlpdf-school-manager-fab" id="nlpdfSchoolManagerBtn" type="button">School Lists</button><button class="nlpdf-package-manager-fab nlpdf-letter-package-fab" id="nlpdfPackageManagerBtn" type="button">Package dates</button></div>'+
-    '<footer class="nlpdf-letter-editor-actions"><span id="nlpdfLetterEditorStatus">Review the fields before creating the letter.</span><button class="nlpdf-confirm" id="nlpdfCreateEditedLetter" type="button">Create Letter</button></footer>'+
+    '<header class="nlpdf-letter-editor-head"><div><span class="eyebrow">LETTER EDITOR</span><h2 id="nlpdfLetterEditorTitle">Edit Letter</h2><span id="nlpdfLetterEditorContext"></span></div><button class="nlpdf-letter-editor-close" id="nlpdfCancelLetterEdit" type="button">Back to Document Type</button></header>'+ 
+    '<div class="nlpdf-letter-editor-body">'+
+      '<nav class="nlpdf-letter-wizard-nav" aria-label="Letter editor steps">'+
+        '<button type="button" data-letter-step="0"><b>1</b><span>Student information</span></button>'+ 
+        '<button type="button" data-letter-step="1"><b>2</b><span>Academic</span></button>'+ 
+        '<button type="button" data-letter-step="2"><b>3</b><span>Embassy</span></button>'+ 
+        '<button type="button" data-letter-step="3"><b>4</b><span>Create Letter</span></button>'+ 
+        '<button type="button" data-letter-step="4"><b>5</b><span>Final details</span></button>'+ 
+      '</nav>'+ 
+      '<div class="nlpdf-letter-workspace">'+
+        '<aside class="nlpdf-letter-content-preview">'+
+          '<div class="nlpdf-letter-content-head"><div><strong>Content</strong><span id="nlpdfLetterContentLabel">No linked content</span></div><div class="nlpdf-letter-content-nav"><button id="nlpdfLetterContentPrev" type="button" aria-label="Previous content">‹</button><span id="nlpdfLetterContentCounter">—</span><button id="nlpdfLetterContentNext" type="button" aria-label="Next content">›</button></div></div>'+ 
+          '<div class="nlpdf-letter-content-stage"><canvas id="nlpdfLetterContentCanvas" width="520" height="736"></canvas><div class="nlpdf-letter-content-empty" id="nlpdfLetterContentEmpty">No document page is assigned to this topic.</div></div>'+ 
+        '</aside>'+ 
+        '<main class="nlpdf-letter-form-pane">'+
+          '<div class="nlpdf-letter-sticky-meta">'+
+            '<label><span>Document Number</span><input id="nlpdfLetterDocumentNo" data-form-key="documentNo"></label>'+ 
+            '<label><span>Student Number</span><input id="nlpdfLetterStudentId" data-form-key="studentId"></label>'+ 
+            '<label><span>Student type</span><button class="nlpdf-reference-select" id="nlpdfLetterStudentType" type="button"><span class="nlpdf-reference-select-value">Document type</span><small>Change</small></button></label>'+ 
+          '</div>'+ 
+          '<div class="nlpdf-letter-panel-scroll">'+
+            '<section class="nlpdf-letter-step-panel" id="nlpdfLetterStepStudent" data-letter-panel="0"><div class="nlpdf-letter-panel-title"><strong>Student information</strong><span>Check the student against the Passport content.</span></div><div class="nlpdf-letter-form-grid">'+
+              '<label><span>Student name</span><input id="nlpdfLetterName" data-form-key="studentName"></label>'+ 
+              '<label><span>Passport number</span><input id="nlpdfLetterPassport" data-form-key="passport"></label>'+ 
+              '<label><span>Nationality / Country</span><button class="nlpdf-reference-select" id="nlpdfLetterCountry" type="button"><span class="nlpdf-reference-select-value">Search nationality / country</span><small>Search</small></button></label>'+ 
+              '<label><span>Student location</span><input id="nlpdfLetterLocation" data-form-key="recipientLocation"></label>'+ 
+            '</div></section>'+ 
+            '<section class="nlpdf-letter-step-panel hidden" id="nlpdfLetterStepAcademic" data-letter-panel="1"><div class="nlpdf-letter-panel-title"><strong>Academic</strong><span>Receipt is shown first when both Receipt and BU Application are attached.</span></div>'+ 
+              '<div class="nlpdf-letter-panel-tools"><button class="nlpdf-school-manager-fab" id="nlpdfSchoolManagerBtn" type="button">School Lists</button><button class="nlpdf-letter-package-fab" id="nlpdfPackageManagerBtn" type="button">Package dates</button></div>'+ 
+              '<div class="nlpdf-letter-form-grid">'+
+                '<label><span>School / Faculty</span><select id="nlpdfLetterFaculty"></select></label>'+ 
+                '<label><span>Program / Major</span><select id="nlpdfLetterProgram"></select></label>'+ 
+                '<label><span>Semester</span><select id="nlpdfLetterSemester"><option value="">Select</option><option value="First">First</option><option value="Second">Second</option><option value="Summer">Summer</option></select></label>'+ 
+                '<label><span>Academic year</span><select id="nlpdfLetterAcademicYear"></select></label>'+ 
+              '</div>'+ 
+              '<div class="nlpdf-letter-package-result" id="nlpdfLetterPackageResult"><div><span>Starting Date</span><input id="nlpdfLetterStartDate" type="date"></div><div><span>Finishing Date</span><input id="nlpdfLetterFinishDate" type="date"></div><div><span>Orientation</span><div class="nlpdf-letter-orientation-range"><input id="nlpdfLetterOrientationStart" type="date" aria-label="Orientation start"><b>to</b><input id="nlpdfLetterOrientationEnd" type="date" aria-label="Orientation finish"></div></div></div>'+ 
+              '<div class="nlpdf-letter-package-status" id="nlpdfLetterPackageStatus">Choose Semester and Academic year to use a saved package-date profile.</div>'+ 
+              '<div class="nlpdf-letter-home-school hidden" id="nlpdfLetterHomeSchoolSection"><div class="nlpdf-letter-subtitle">Home university / school</div><div class="nlpdf-letter-form-grid">'+
+                '<label><span>University / School</span><input id="nlpdfLetterHomeSchool" list="nlpdfLetterHomeSchoolOptions"><datalist id="nlpdfLetterHomeSchoolOptions"></datalist></label>'+ 
+                '<label><span>Country</span><select id="nlpdfLetterHomeCountry"></select></label>'+ 
+              '</div></div>'+ 
+            '</section>'+ 
+            '<section class="nlpdf-letter-step-panel hidden" id="nlpdfLetterStepEmbassy" data-letter-panel="2"><div class="nlpdf-letter-panel-title"><strong>Embassy</strong><span>Compare the selected mission with the Visa Application content.</span></div><div class="nlpdf-letter-form-grid">'+
+              '<label class="wide"><span>Thai Embassy / Consulate</span><div class="nlpdf-embassy-search"><input id="nlpdfLetterEmbassySearch" autocomplete="off" placeholder="Search Lao, ลาว, Vientiane, Savannakhet..."><input id="nlpdfLetterEmbassy" type="hidden"><div class="nlpdf-embassy-results hidden" id="nlpdfLetterEmbassyResults"></div></div></label>'+ 
+              '<label class="wide"><span>Embassy address</span><textarea id="nlpdfLetterEmbassyAddress" rows="6"></textarea></label>'+ 
+            '</div></section>'+ 
+            '<section class="nlpdf-letter-step-panel hidden" id="nlpdfLetterStepReview" data-letter-panel="3"><div class="nlpdf-letter-panel-title"><strong>Create Letter</strong><span>Review the information that will be linked into the Word template.</span></div><div class="nlpdf-letter-review" id="nlpdfLetterReview"></div></section>'+ 
+            '<section class="nlpdf-letter-step-panel hidden" id="nlpdfLetterStepFinal" data-letter-panel="4"><div class="nlpdf-letter-panel-title"><strong>Final details</strong><span>These are the last values to check before the Word file is actually created.</span></div><div class="nlpdf-letter-final-grid">'+
+              '<label><span>Letter date</span><input id="nlpdfLetterFinalDate" type="date"></label>'+ 
+              '<label><span>Document Number</span><input id="nlpdfLetterFinalDocumentNo"></label>'+ 
+              '<label><span>Student Number</span><input id="nlpdfLetterFinalStudentId"></label>'+ 
+            '</div><section class="nlpdf-letter-extra-final hidden" id="nlpdfLetterExtraSection"><div class="nlpdf-letter-subtitle">Other letter details</div><div class="nlpdf-letter-form-grid" id="nlpdfLetterExtraFields"></div></section></section>'+ 
+          '</div>'+ 
+        '</main>'+ 
+      '</div>'+ 
+    '</div>'+ 
+    '<footer class="nlpdf-letter-editor-actions"><span id="nlpdfLetterEditorStatus">Review the fields before creating the letter.</span><button class="nlpdf-cancel" id="nlpdfLetterBack" type="button">Back</button><button class="nlpdf-confirm" id="nlpdfLetterNext" type="button">Next</button><button class="nlpdf-confirm hidden" id="nlpdfCreateEditedLetter" type="button">Create Letter</button></footer>'+ 
   '</section>';
 }
 
@@ -1334,6 +1358,7 @@ function dateParts(iso){
 }
 function formatDateEn(iso){const p=dateParts(iso);return p?MONTHS_EN[p.month-1]+' '+p.day+', '+p.year:'';}
 function formatDateTh(iso){const p=dateParts(iso);return p?p.day+' '+MONTHS_TH[p.month-1]+' '+(p.year+543):'';}
+function todayIsoLocal(){const d=new Date();return d.getFullYear()+'-'+isoPad(d.getMonth()+1)+'-'+isoPad(d.getDate());}
 function formatOrientationEn(start,end){
   const a=dateParts(start),b=dateParts(end);if(!a)return'';
   if(!b||start===end)return formatDateEn(start);
@@ -1477,7 +1502,7 @@ function setEmbassySearchDisplay(context,r){
   const m=embassySearchMeta(r);input.value=[m.countryEn,m.countryTh,m.cityEn].filter(Boolean).join(' · ');hidden.value=m.id;
 }
 function applyEmbassyRecord(context,r,rerender=true){
-  if(!r)return;
+  if(!r)return;context.embassyAddressEdited=false;
   for(const target of [context.values,state.linkedData])for(const key of Object.keys(target||{}))if(/^embassyAddress\d+$/.test(key))target[key]='';
   const patch=embassyLinkedPatch(r);Object.assign(context.values,patch);Object.assign(state.linkedData,patch);
   setEmbassySearchDisplay(context,r);$('#nlpdfLetterEmbassyResults')?.classList.add('hidden');
@@ -1588,6 +1613,7 @@ function syncFormText(context,key,value){
   if(['studentName','passport','studentId','recipientLocation'].includes(key))state.linkedData[key]=value;
   const id=({studentName:'nlpdfLetterName',passport:'nlpdfLetterPassport',studentId:'nlpdfLetterStudentId',documentNo:'nlpdfLetterDocumentNo',recipientLocation:'nlpdfLetterLocation',homeUniversity:'nlpdfLetterHomeSchool'})[key];
   if(id&&$('#'+id)&&document.activeElement!==$('#'+id))$('#'+id).value=value||'';
+  const mirror=({studentId:'nlpdfLetterFinalStudentId',documentNo:'nlpdfLetterFinalDocumentNo'})[key];if(mirror&&$('#'+mirror)&&document.activeElement!==$('#'+mirror))$('#'+mirror).value=value||'';
 }
 function letterPackageProfiles(){try{const value=JSON.parse(localStorage.getItem(LETTER_PACKAGE_DATES_KEY)||'{}');return value&&typeof value==='object'?value:{};}catch{return {};}}
 function letterPackageKey(type,semester,year){return [clean(type).toLowerCase(),clean(semester).toLowerCase(),clean(year)].join('|');}
@@ -1692,22 +1718,51 @@ function saveCurrentHomeSchool(context){
   let rows=schoolListEntries().filter(x=>normalizedLetterValue(x.school)!==normalizedLetterValue(school));rows.push({school,countryId:c.id,countryEn:c.countryEn,countryTh:c.countryTh,updatedAt:new Date().toISOString()});saveSchoolEntries(rows);
 }
 function recognizedExtraFields(context){
-  const covered=new Set(['studentName','passport','studentId','documentNo','recipientLocation','nationalityEn','nationalityTh','countryEn','countryTh','programEn','programTh','facultyEn','facultyTh','embassy','embassyOffice','embassyThai','embassyCountry','embassyAddress','embassyAddress1','embassyAddress2','embassyAddress3','embassyAddress4','semester','academicYear','academicYearThai','startDate','finishDate','orientation','homeUniversity','homeCountry','studyPeriod']);
+  const covered=new Set(['studentName','passport','studentId','documentNo','recipientLocation','nationalityEn','nationalityTh','countryEn','countryTh','programEn','programTh','facultyEn','facultyTh','embassy','embassyOffice','embassyThai','embassyCountry','embassyAddress','embassyAddress1','embassyAddress2','embassyAddress3','embassyAddress4','semester','academicYear','academicYearThai','startDate','finishDate','orientation','homeUniversity','homeCountry','studyPeriod','letterDate']);
   return context.editor.model.fields.filter(f=>!covered.has(f.kind)&&!covered.has(f.key)&&!f.package);
 }
 function renderLetterExtras(context){
   const host=$('#nlpdfLetterExtraFields'),section=$('#nlpdfLetterExtraSection');if(!host||!section)return;const extras=recognizedExtraFields(context);section.classList.toggle('hidden',!extras.length);
-  host.innerHTML=extras.map(f=>{
-    if(f.kind==='letterDate'){const iso=context.values.letterDate||toIsoDate(f.value);return '<label><span>Letter date / วันที่หนังสือ</span><input type="date" data-letter-extra="'+esc(f.key)+'" value="'+esc(iso)+'"></label>';}
-    return '<label><span>'+esc(f.label||f.kind)+'</span><input data-letter-extra="'+esc(f.key)+'" value="'+esc(context.values[f.key]??f.value??'')+'"></label>';
-  }).join('');
+  host.innerHTML=extras.map(f=>'<label><span>'+esc(f.label||f.kind)+'</span><input data-letter-extra="'+esc(f.key)+'" value="'+esc(context.values[f.key]??f.value??'')+'"></label>').join('');
 }
 function renderLetterFormValues(context){
   syncFormText(context,'studentName',context.values.studentName||context.name||'');syncFormText(context,'passport',context.values.passport||context.passport||'');syncFormText(context,'studentId',context.values.studentId||context.studentId||'');syncFormText(context,'documentNo',context.values.documentNo||context.num||'');syncFormText(context,'recipientLocation',context.values.recipientLocation||'');
   const home=clean(context.values.homeUniversity||''),homeSection=$('#nlpdfLetterHomeSchoolSection');if(homeSection)homeSection.classList.toggle('hidden',!context.hasHomeSchool);
   if($('#nlpdfLetterHomeSchool'))$('#nlpdfLetterHomeSchool').value=home;refreshHomeSchoolChoices(context);
-  renderLetterCountryChoice(context);$('#nlpdfLetterEmbassyAddress').value=context.values.embassyAddress||[1,2,3,4].map(i=>context.values['embassyAddress'+i]).filter(Boolean).join('\n');renderLetterExtras(context);
+  renderLetterCountryChoice(context);$('#nlpdfLetterEmbassyAddress').value=context.values.embassyAddress||[1,2,3,4].map(i=>context.values['embassyAddress'+i]).filter(Boolean).join('\n');if($('#nlpdfLetterFinalDate'))$('#nlpdfLetterFinalDate').value=context.values.letterDate||todayIsoLocal();renderLetterExtras(context);
 }
+function letterContentPagesForStep(step){
+  if(step===0)return state.pages.filter(p=>p.contentType==='passport');
+  if(step===1)return [...state.pages.filter(p=>p.contentType==='receipt'),...state.pages.filter(p=>p.contentType==='bu_application')];
+  if(step===2)return state.pages.filter(p=>p.contentType==='visa_application');
+  return [];
+}
+async function renderLetterContentPreview(){
+  const canvas=$('#nlpdfLetterContentCanvas'),empty=$('#nlpdfLetterContentEmpty'),label=$('#nlpdfLetterContentLabel'),counter=$('#nlpdfLetterContentCounter'),prev=$('#nlpdfLetterContentPrev'),next=$('#nlpdfLetterContentNext');if(!canvas||!empty||!label||!counter||!prev||!next)return;
+  const pages=letterContentPagesForStep(state.letterWizardStep),epoch=++state.letterPreviewEpoch;
+  if(!pages.length){canvas.classList.add('hidden');empty.classList.remove('hidden');empty.textContent='No document page is assigned to this topic.';label.textContent=state.letterWizardStep===3?'Letter review':state.letterWizardStep===4?'Final details':'No linked content';counter.textContent='—';prev.disabled=true;next.disabled=true;return;}
+  state.letterPreviewIndex=clamp(state.letterPreviewIndex,0,pages.length-1);const p=pages[state.letterPreviewIndex],pageNo=state.pages.indexOf(p)+1;
+  label.textContent=contentTypeLabel(p.contentType)+' · document page '+pageNo;counter.textContent=(state.letterPreviewIndex+1)+' / '+pages.length;prev.disabled=state.letterPreviewIndex<=0;next.disabled=state.letterPreviewIndex>=pages.length-1;
+  empty.classList.add('hidden');canvas.classList.remove('hidden');
+  try{await drawPageToCanvas(p,canvas,520,736);}catch(err){if(epoch===state.letterPreviewEpoch){console.error(err);canvas.classList.add('hidden');empty.classList.remove('hidden');empty.textContent='Preview unavailable.';}}
+}
+function renderLetterReview(context){
+  const host=$('#nlpdfLetterReview');if(!host)return;const country=linkedCountryLabel(),mission=clean($('#nlpdfLetterEmbassySearch')?.value)||context.values.embassy||'—',address=clean($('#nlpdfLetterEmbassyAddress')?.value)||'—';
+  const study=[context.values.facultyEn,context.values.programEn].filter(Boolean).join(' · ')||'—',term=[packageFieldValue('semester'),packageFieldValue('academicYear')].filter(Boolean).join(' · ')||'—',dates=[formatDateEn(context.values.startDate),formatDateEn(context.values.finishDate)].filter(Boolean).join(' → ')||'—';
+  host.innerHTML='<article><strong>Student information</strong><span>'+esc(context.values.studentName||'—')+'</span><span>'+esc(context.values.passport||'—')+'</span><span>'+esc(country||'—')+'</span><span>'+esc(context.values.recipientLocation||'—')+'</span></article>'+ 
+    '<article><strong>Academic</strong><span>'+esc(study)+'</span><span>'+esc(term)+'</span><span>'+esc(dates)+'</span><span>'+esc(formatOrientationEn(context.values.orientationStart,context.values.orientationEnd)||'—')+'</span></article>'+ 
+    '<article><strong>Embassy</strong><span>'+esc(mission)+'</span><span class="pre">'+esc(address)+'</span></article>';
+}
+function renderLetterFinalDetails(context){const d=$('#nlpdfLetterFinalDate'),n=$('#nlpdfLetterFinalDocumentNo'),s=$('#nlpdfLetterFinalStudentId');if(d&&document.activeElement!==d)d.value=context.values.letterDate||todayIsoLocal();if(n&&document.activeElement!==n)n.value=context.values.documentNo||'';if(s&&document.activeElement!==s)s.value=context.values.studentId||'';}
+function setLetterWizardStep(step,resetPreview=true){
+  const context=state.pendingLetter;if(!context)return;const next=clamp(Number(step)||0,0,4);state.letterWizardStep=next;if(resetPreview)state.letterPreviewIndex=0;
+  document.querySelectorAll('[data-letter-panel]').forEach(el=>el.classList.toggle('hidden',Number(el.dataset.letterPanel)!==next));document.querySelectorAll('[data-letter-step]').forEach(el=>{const active=Number(el.dataset.letterStep)===next;el.classList.toggle('active',active);el.setAttribute('aria-current',active?'step':'false');});
+  const back=$('#nlpdfLetterBack'),forward=$('#nlpdfLetterNext'),create=$('#nlpdfCreateEditedLetter');if(back)back.disabled=next===0;if(forward){forward.classList.toggle('hidden',next===4);forward.textContent=next===3?'Continue':'Next';}if(create)create.classList.toggle('hidden',next!==4);
+  if(next===3)renderLetterReview(context);if(next===4)renderLetterFinalDetails(context);const names=['Student information','Academic','Embassy','Create Letter','Final details'];$('#nlpdfLetterEditorStatus').textContent='Step '+(next+1)+' of 5 · '+names[next];renderLetterContentPreview();
+}
+function moveLetterWizard(delta){setLetterWizardStep(state.letterWizardStep+delta,true);}
+function changeLetterContentPreview(delta){const pages=letterContentPagesForStep(state.letterWizardStep);if(!pages.length)return;state.letterPreviewIndex=clamp(state.letterPreviewIndex+delta,0,pages.length-1);renderLetterContentPreview();}
+
 function inferInitialPackage(context){
   const fields=context.editor.model.fields,sem=context.values.semester||fields.find(f=>f.kind==='semester')?.value,year=context.values.academicYear||fields.find(f=>f.kind==='academicYear')?.value||fields.find(f=>f.kind==='academicYearThai')?.value;
   const selected=/^1$/.test(sem)?'First':/^2$/.test(sem)?'Second':/^3$/.test(sem)?'Summer':canonicalSemester(sem)||'';
@@ -1721,11 +1776,11 @@ async function prepareLetterEditor(context){
   const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main',model=semanticLetterModel(doc,ns);context.editor={zip,doc,ns,model};context.values={};state.pendingLetter=context;
   for(const field of model.fields)context.values[field.key]=field.kind==='letterDate'?(toIsoDate(field.value)||''):field.value;
   for(const [key,value] of Object.entries(state.linkedData))if(clean(value))context.values[key]=value;
-  if(context.name)context.values.studentName=context.name;if(context.passport)context.values.passport=context.passport;if(context.studentId)context.values.studentId=context.studentId;if(context.num)context.values.documentNo=context.num;
+  if(context.name)context.values.studentName=context.name;if(context.passport)context.values.passport=context.passport;if(context.studentId)context.values.studentId=context.studentId;if(context.num)context.values.documentNo=context.num;if(!context.values.letterDate)context.values.letterDate=todayIsoLocal();context.embassyAddressEdited=false;
   context.hasHomeSchool=model.fields.some(f=>f.kind==='homeUniversity'||f.kind==='homeCountry');
   $('#nlpdfLetterEditorTitle').textContent='Edit '+letterTypeLabel(context.type);$('#nlpdfLetterEditorContext').textContent=[context.num,context.name,context.passport,context.studentId].filter(Boolean).join(' · ');$('#nlpdfLetterStudentType .nlpdf-reference-select-value').textContent=letterTypeLabel(context.type);
   inferInitialPackage(context);populateCentralSelects(context);renderLetterFormValues(context);applySavedPackageDates(context);
-  $('#nlpdfLetterName').oninput=e=>syncFormText(context,'studentName',e.target.value);$('#nlpdfLetterPassport').oninput=e=>syncFormText(context,'passport',e.target.value);$('#nlpdfLetterStudentId').oninput=e=>syncFormText(context,'studentId',e.target.value);$('#nlpdfLetterDocumentNo').oninput=e=>syncFormText(context,'documentNo',e.target.value);$('#nlpdfLetterLocation').oninput=e=>syncFormText(context,'recipientLocation',e.target.value);
+  $('#nlpdfLetterName').oninput=e=>syncFormText(context,'studentName',e.target.value);$('#nlpdfLetterPassport').oninput=e=>syncFormText(context,'passport',e.target.value);$('#nlpdfLetterStudentId').oninput=e=>syncFormText(context,'studentId',e.target.value);$('#nlpdfLetterDocumentNo').oninput=e=>syncFormText(context,'documentNo',e.target.value);$('#nlpdfLetterLocation').oninput=e=>syncFormText(context,'recipientLocation',e.target.value);$('#nlpdfLetterFinalDocumentNo').oninput=e=>syncFormText(context,'documentNo',e.target.value);$('#nlpdfLetterFinalStudentId').oninput=e=>syncFormText(context,'studentId',e.target.value);$('#nlpdfLetterFinalDate').oninput=e=>{context.values.letterDate=e.target.value||todayIsoLocal();};
   $('#nlpdfLetterCountry').onclick=()=>openReferencePicker('country','letter-country');
   $('#nlpdfLetterStudentType').onclick=backToDocumentType;
   $('#nlpdfLetterFaculty').onchange=e=>applyFacultyGroup(context,e.target.value);
@@ -1734,12 +1789,11 @@ async function prepareLetterEditor(context){
   $('#nlpdfLetterAcademicYear').onchange=()=>{context.values.academicYear=packageFieldValue('academicYear');state.linkedData.academicYear=context.values.academicYear;rememberAcademicYear(context.values.academicYear);applySavedPackageDates(context);};
   ['nlpdfLetterStartDate','nlpdfLetterFinishDate','nlpdfLetterOrientationStart','nlpdfLetterOrientationEnd'].forEach(id=>{$('#'+id).oninput=()=>syncEditablePackageDates(context);$('#'+id).onchange=()=>syncEditablePackageDates(context);});
   $('#nlpdfLetterEmbassySearch').onfocus=e=>renderEmbassyResults(context,e.target.value);$('#nlpdfLetterEmbassySearch').oninput=e=>renderEmbassyResults(context,e.target.value);
-  $('#nlpdfLetterEmbassyResults').onclick=e=>{const b=e.target.closest('[data-embassy-result]');if(!b)return;const r=(centralReference().embassy||[]).find(x=>embassyValues(x).id===b.dataset.embassyResult);if(r)applyEmbassyRecord(context,r);};
+  $('#nlpdfLetterEmbassyResults').onclick=e=>{const b=e.target.closest('[data-embassy-result]');if(!b)return;const r=(centralReference().embassy||[]).find(x=>embassyValues(x).id===b.dataset.embassyResult);if(r)applyEmbassyRecord(context,r);};$('#nlpdfLetterEmbassyAddress').oninput=e=>{context.embassyAddressEdited=true;context.values.embassyAddress=e.target.value;state.linkedData.embassyAddress=e.target.value;for(const target of [context.values,state.linkedData])for(const key of Object.keys(target))if(/^embassyAddress\d+$/.test(key))target[key]='';addressLines(e.target.value).forEach((line,i)=>{context.values['embassyAddress'+(i+1)]=line;state.linkedData['embassyAddress'+(i+1)]=line;});};
   $('#nlpdfLetterHomeSchool').oninput=e=>{context.values.homeUniversity=e.target.value;applyRememberedSchool(context,e.target.value);};
   $('#nlpdfLetterHomeCountry').onchange=e=>{const r=(centralReference().countries||[]).find(x=>countryValues(x).id===e.target.value);if(r)context.values.homeCountry=countryValues(r).countryEn;};
-  $('#nlpdfLetterExtraFields').oninput=e=>{const el=e.target.closest('[data-letter-extra]');if(!el)return;context.values[el.dataset.letterExtra]=el.type==='date'?el.value:el.value;};
-  $('#nlpdfCreateEditedLetter').disabled=!model.fields.length;$('#nlpdfLetterEditorStatus').textContent=model.fields.length+' linked editable topic'+(model.fields.length===1?'':'s')+'. Repeated values are updated together.';
-  $('#nlpdfLetterEditor').classList.remove('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','false');
+  $('#nlpdfLetterExtraFields').oninput=e=>{const el=e.target.closest('[data-letter-extra]');if(!el)return;context.values[el.dataset.letterExtra]=el.value;};document.querySelectorAll('[data-letter-step]').forEach(b=>b.onclick=()=>setLetterWizardStep(Number(b.dataset.letterStep),true));$('#nlpdfLetterBack').onclick=()=>moveLetterWizard(-1);$('#nlpdfLetterNext').onclick=()=>moveLetterWizard(1);$('#nlpdfLetterContentPrev').onclick=()=>changeLetterContentPreview(-1);$('#nlpdfLetterContentNext').onclick=()=>changeLetterContentPreview(1);
+  $('#nlpdfCreateEditedLetter').disabled=!model.fields.length;$('#nlpdfLetterEditor').classList.remove('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','false');setLetterWizardStep(0,true);
 }
 function hideLetterEditor(){
   $('#nlpdfLetterEmbassyResults')?.classList.add('hidden');$('#nlpdfLetterEditor').classList.add('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','true');
@@ -1794,9 +1848,8 @@ function appendTextRun(paragraph,text,doc,ns,sourceRun,highlight=false){
   paragraph.appendChild(run);
 }
 function refreshSelectedEmbassyContext(context){
-  const id=clean($('#nlpdfLetterEmbassy')?.value);if(!id)return;
-  const record=(centralReference().embassy||[]).find(r=>embassyValues(r).id===id);if(!record)return;
-  const patch=embassyLinkedPatch(record);Object.assign(context.values,patch);Object.assign(state.linkedData,patch);
+  const id=clean($('#nlpdfLetterEmbassy')?.value);if(!id)return;const record=(centralReference().embassy||[]).find(r=>embassyValues(r).id===id);if(!record)return;
+  const manual=context.embassyAddressEdited?String(context.values.embassyAddress??''):null,patch=embassyLinkedPatch(record);if(context.embassyAddressEdited){patch.embassyAddress=manual;for(const key of Object.keys(patch))if(/^embassyAddress\d+$/.test(key))delete patch[key];addressLines(manual).forEach((line,i)=>patch['embassyAddress'+(i+1)]=line);}Object.assign(context.values,patch);Object.assign(state.linkedData,patch);
 }
 function applyThaiEmbassyAddressee(context,model,doc,ns){
   const value=clean(context.values.embassyThai);if(!value)return;
@@ -1837,7 +1890,7 @@ async function createEditedLetter(){
   const context=state.pendingLetter;if(!context?.editor||state.busy)return;
   state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
   try{
-    syncEditablePackageDates(context);
+    syncEditablePackageDates(context);context.values.letterDate=clean($('#nlpdfLetterFinalDate')?.value)||context.values.letterDate||todayIsoLocal();syncFormText(context,'documentNo',clean($('#nlpdfLetterFinalDocumentNo')?.value)||context.values.documentNo);syncFormText(context,'studentId',clean($('#nlpdfLetterFinalStudentId')?.value)||context.values.studentId);
     if(context.values.startDate&&context.values.finishDate&&context.values.startDate>context.values.finishDate)throw new Error('Finishing Date must be on or after Starting Date.');
     if(context.values.orientationStart&&context.values.orientationEnd&&context.values.orientationStart>context.values.orientationEnd)throw new Error('Orientation finish must be on or after Orientation start.');
     saveCurrentHomeSchool(context);refreshSelectedEmbassyContext(context);
@@ -1880,7 +1933,7 @@ async function confirmExport(){
     if(outputs.letter)handoff={num,name,passport,studentId,letterName:'Letter_'+stem+'.docx',targetDir,type:state.packageHandoff?.type||'bachelor_no_ien'};
     if(handoff){
       state.packageHandoff=handoff;hideExportProgress();closeExport();state.busy=false;$('#nlpdfConfirmExport').disabled=false;updateControls();
-      setStatus('Create 1/2 complete · Select document type');toast('Create 1/2 complete.');openLetterTypeModal(handoff.type);return;
+      if(outputs.folder||outputs.pdf){setStatus('Create 1/2 complete · Select document type');toast('Create 1/2 complete.');}else setStatus('Select document type · Letter not created yet');openLetterTypeModal(handoff.type);return;
     }
     exportProgress('Successfully created','Selected outputs are fully saved.',outputs.pdf?state.pages.length:0,outputs.pdf?state.pages.length:0,'success');
     setStatus('Ready · Export complete');toast('Package created.');
