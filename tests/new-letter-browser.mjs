@@ -669,12 +669,13 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     const consul=out.paras.findIndex(x=>x==='The Consul');
     assert(consul>=0,'The Consul block should exist');
     const block=out.paras.slice(consul+1,consul+6);
-    assert.equal(block[0],'Royal Thai Consulate-General in Xian, P.R. China');
+    assert.equal(block[0],'Royal Thai Consulate-General in Xian','address block must use Office Name, not Display Name with country suffix');
     assert.equal(block[1],'Room 104, 1st Floor, Building A');
     assert.equal(block[2],'China Railway First International');
     assert.equal(block[3],'No. 9 Yanta North Road, Beilin District');
-    assert.equal(block[4],'Xian City, Shaanxi 710000, P.R. China');
-    assert.equal(block.filter(x=>x==='Royal Thai Consulate-General in Xian, P.R. China').length,1,'mission must appear once in the address block');
+    assert.equal(block[4],'Xian City, Shaanxi 710000, P.R. China','full final address row must not be truncated');
+    assert.equal(block.filter(x=>x==='Royal Thai Consulate-General in Xian').length,1,'office name must appear once in the address block');
+    assert.equal(block.some(x=>x==='Royal Thai Consulate-General in Xian, P.R. China'),false,'Display Name must not be used as the postal address heading');
     assert.equal(out.plain.includes('P.R. CHINA'),false,'China casing must remain P.R. China');
     assert.equal(out.plain.includes('P.R. China, Myanmar'),false,'stale template country must not remain');
     assert.match(out.plain,/กงสุล\s+ประจำสถานกงสุลใหญ่ ณ นครซีอาน สาธารณรัฐประชาชนจีน/,'Thai addressee must use the Xian Thai mission wording');

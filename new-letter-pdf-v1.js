@@ -1121,7 +1121,7 @@ function exactCentralMatch(value){
   }
   for(const r of refs.embassy||[]){
     const x=embassyValues(r);
-    for(const [kind,val] of [['embassy',x.embassy],['embassy',x.embassyOffice],['embassyThai',x.embassyThai]])if(val&&normalizedLetterValue(val)===v)return {kind,record:r};
+    for(const [kind,val] of [['embassy',x.embassy],['embassyOffice',x.embassyOffice],['embassyThai',x.embassyThai]])if(val&&normalizedLetterValue(val)===v)return {kind,record:r};
 
   }
   return null;
@@ -1249,8 +1249,8 @@ function semanticLetterModel(doc,ns){
     for(const range of highlightedRanges(rec)){
       if(rec.occurrences.some(o=>Math.max(range.start,o.start)<Math.min(range.end,o.end)))continue;
       const match=exactCentralMatch(range.value);if(!match)continue;
-      const label=({nationalityEn:'Nationality',nationalityTh:'สัญชาติ',countryEn:'Country',countryTh:'ประเทศ',programEn:'Program / Major',programTh:'สาขาวิชา',facultyEn:'School / Faculty',facultyTh:'คณะ / วิทยาลัย',embassy:'Thai mission / Embassy',embassyThai:'สถานทูต / สถานกงสุล',embassyAddress:'Embassy address'})[match.kind]||match.kind;
-      const reference=match.kind==='embassy'?'embassy':match.kind==='programEn'||match.kind==='facultyEn'?'faculty':match.kind==='nationalityEn'||match.kind==='countryEn'?'country':'';
+      const label=({nationalityEn:'Nationality',nationalityTh:'สัญชาติ',countryEn:'Country',countryTh:'ประเทศ',programEn:'Program / Major',programTh:'สาขาวิชา',facultyEn:'School / Faculty',facultyTh:'คณะ / วิทยาลัย',embassy:'Thai mission / Embassy',embassyOffice:'Thai mission / Embassy',embassyThai:'สถานทูต / สถานกงสุล',embassyAddress:'Embassy address'})[match.kind]||match.kind;
+      const reference=match.kind.startsWith('embassy')?'embassy':match.kind==='programEn'||match.kind==='facultyEn'?'faculty':match.kind==='nationalityEn'||match.kind==='countryEn'?'country':'';
       addOccurrence(fields,rec,match.kind,label,range.start,range.end,{reference});
     }
   }
@@ -1267,14 +1267,14 @@ function semanticLetterModel(doc,ns){
   for(let i=0;i<records.length;i++){
     if(clean(records[i].full)!=='The Consul')continue;
     let slot=0;
-    for(let j=i+1;j<Math.min(records.length,i+9);j++){
+    for(let j=i+1;j<records.length;j++){
       const rec=records[j],trim=clean(rec.full);if(/^Dear Consul/i.test(trim))break;
       const ranges=highlightedRanges(rec);if(!ranges.length)continue;
       for(const range of ranges){
         const alreadyMapped=rec.occurrences.some(o=>Math.max(range.start,o.start)<Math.min(range.end,o.end));
         if(!alreadyMapped){
-          if(slot===0)addOccurrence(fields,rec,'embassy','Thai mission / Embassy',range.start,range.end,{reference:'embassy'});
-          else if(slot<=4)addOccurrence(fields,rec,'embassyAddress'+slot,'Embassy address '+slot,range.start,range.end);
+          if(slot===0)addOccurrence(fields,rec,'embassyOffice','Thai mission / Embassy',range.start,range.end,{reference:'embassy'});
+          else addOccurrence(fields,rec,'embassyAddress'+slot,'Embassy address '+slot,range.start,range.end);
         }
         slot++;
       }
@@ -1283,28 +1283,18 @@ function semanticLetterModel(doc,ns){
   return {records,fields:[...fields.values()],pages:Math.max(1,...records.map(r=>r.pageIndex+1))};
 }
 function addressLines(address){
-  const raw=clean(address);if(!raw)return[];
-  let parts=raw.split(/\r?\n|\s*\|\s*/).map(clean).filter(Boolean);
-  if(parts.length===1&&raw.includes(','))parts=raw.split(',').map(clean).filter(Boolean);
-  if(parts.length===5)return [[parts[0],parts[1]].join(', '),parts[2],[parts[3],parts[4]].join(', ')];
-  if(parts.length>4){
-    const out=[];let current='';
-    for(const part of parts){
-      const next=current?current+', '+part:part;
-      if(current&&next.length>42&&out.length<3){out.push(current);current=part;}else current=next;
-    }
-    if(current)out.push(current);return out.slice(0,4);
-  }
-  return parts.slice(0,4);
+  const raw=canonicalEmbassyEnglish(address);if(!raw)return[];
+  return raw.split(/\r?\n|\s*\|\s*/).map(canonicalEmbassyEnglish).filter(Boolean);
 }
 function embassyValues(r){
-  const address=clean(r['Current Address EN'])||clean(r['Address EN']);
+  const address=canonicalEmbassyEnglish(clean(r['Address EN'])||clean(r['Current Address EN']));
   return {
-    id:clean(r['Record ID']),embassy:clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Current Office Name EN'])||clean(r['Office Name EN']),
-    embassyOffice:clean(r['Current Office Name EN'])||clean(r['Office Name EN']),
-    embassyThai:clean(r['Current Official Name TH'])||clean(r['Official Name TH']),
-    embassyCountry:clean(r['Current Country / Territory EN'])||clean(r['Country / Territory EN']),
-    embassyCity:clean(r['Current City EN'])||clean(r['City EN']),address,lines:addressLines(address)
+    id:clean(r['Record ID']),
+    embassy:canonicalEmbassyEnglish(clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
+    embassyOffice:canonicalEmbassyEnglish(clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
+    embassyThai:clean(r['Official Name TH'])||clean(r['Current Official Name TH']),
+    embassyCountry:clean(r['Country / Territory EN'])||clean(r['Current Country / Territory EN']),
+    embassyCity:clean(r['City EN'])||clean(r['Current City EN']),address,lines:addressLines(address)
   };
 }
 function isoPad(n){return String(n).padStart(2,'0');}
@@ -1428,8 +1418,9 @@ function countryLinkedPatch(r){
   const x=countryValues(r);return {nationalityEn:x.nationalityEn,nationalityTh:x.nationalityTh,countryEn:x.countryEn,countryTh:x.countryTh};
 }
 function embassyLinkedPatch(r){
-  const x=embassyValues(r),patch={embassy:x.embassy,embassyThai:x.embassyThai,embassyCountry:x.embassyCountry,embassyAddress:x.address};
-  for(let i=1;i<=4;i++)patch['embassyAddress'+i]=x.lines[i-1]||'';
+  const x=embassyValues(r),patch={embassy:x.embassy,embassyOffice:x.embassyOffice,embassyThai:x.embassyThai,embassyCountry:x.embassyCountry,embassyAddress:x.address};
+  for(const key of Object.keys(state.linkedData||{}))if(/^embassyAddress\d+$/.test(key))patch[key]='';
+  x.lines.forEach((line,i)=>{patch['embassyAddress'+(i+1)]=line;});
   return patch;
 }
 function applyCountryRecord(context,r,rerender=true){
@@ -1467,7 +1458,9 @@ function setEmbassySearchDisplay(context,r){
   const m=embassySearchMeta(r);input.value=[m.countryEn,m.countryTh,m.cityEn].filter(Boolean).join(' · ');hidden.value=m.id;
 }
 function applyEmbassyRecord(context,r,rerender=true){
-  if(!r)return;const patch=embassyLinkedPatch(r);Object.assign(context.values,patch);Object.assign(state.linkedData,patch);
+  if(!r)return;
+  for(const target of [context.values,state.linkedData])for(const key of Object.keys(target||{}))if(/^embassyAddress\d+$/.test(key))target[key]='';
+  const patch=embassyLinkedPatch(r);Object.assign(context.values,patch);Object.assign(state.linkedData,patch);
   setEmbassySearchDisplay(context,r);$('#nlpdfLetterEmbassyResults')?.classList.add('hidden');
   if(rerender)renderLetterFormValues(context);
 }
@@ -1665,7 +1658,7 @@ function saveCurrentHomeSchool(context){
   let rows=schoolListEntries().filter(x=>normalizedLetterValue(x.school)!==normalizedLetterValue(school));rows.push({school,countryId:c.id,countryEn:c.countryEn,countryTh:c.countryTh,updatedAt:new Date().toISOString()});saveSchoolEntries(rows);
 }
 function recognizedExtraFields(context){
-  const covered=new Set(['studentName','passport','studentId','documentNo','recipientLocation','nationalityEn','nationalityTh','countryEn','countryTh','programEn','programTh','facultyEn','facultyTh','embassy','embassyThai','embassyCountry','embassyAddress','embassyAddress1','embassyAddress2','embassyAddress3','embassyAddress4','semester','academicYear','academicYearThai','startDate','finishDate','orientation','homeUniversity','homeCountry','studyPeriod']);
+  const covered=new Set(['studentName','passport','studentId','documentNo','recipientLocation','nationalityEn','nationalityTh','countryEn','countryTh','programEn','programTh','facultyEn','facultyTh','embassy','embassyOffice','embassyThai','embassyCountry','embassyAddress','embassyAddress1','embassyAddress2','embassyAddress3','embassyAddress4','semester','academicYear','academicYearThai','startDate','finishDate','orientation','homeUniversity','homeCountry','studyPeriod']);
   return context.editor.model.fields.filter(f=>!covered.has(f.kind)&&!covered.has(f.key)&&!f.package);
 }
 function renderLetterExtras(context){
