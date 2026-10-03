@@ -2209,8 +2209,8 @@ async function build(){
   window.addEventListener('buic-reference-data-updated',()=>{if(state.pendingLetter&&!$('#nlpdfLetterEditor').classList.contains('hidden')){populateCentralSelects(state.pendingLetter);renderLetterFormValues(state.pendingLetter);renderSchoolList();}renderContentPanel();if(state.referencePicker)renderReferencePickerResults($('#nlpdfReferencePickerSearch')?.value||'');});
 
   $('#nlpdfCreate').addEventListener('click',openExport);
-  $('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
-  $('[data-nlpdf-letter-type-close]').forEach(x=>x.addEventListener('click',cancelLetterType));$('#nlpdfLetterTypeBack').addEventListener('click',cancelLetterType);$('#nlpdfConfirmLetterType').addEventListener('click',confirmLetterType);
+  document.querySelectorAll('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
+  document.querySelectorAll('[data-nlpdf-letter-type-close]').forEach(x=>x.addEventListener('click',cancelLetterType));$('#nlpdfLetterTypeBack').addEventListener('click',cancelLetterType);$('#nlpdfConfirmLetterType').addEventListener('click',confirmLetterType);
   $('#nlpdfCancelLetterEdit').addEventListener('click',backToDocumentType);$('#nlpdfCreateEditedLetter').addEventListener('click',createEditedLetter);
   ['nlpdfExportNumber','nlpdfExportName','nlpdfExportPassport','nlpdfExportStudentId'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(id==='nlpdfExportName')$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();}));
   $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutput"]').forEach(x=>x.addEventListener('change',syncExportPreview));
