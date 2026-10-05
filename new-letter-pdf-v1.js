@@ -1339,12 +1339,16 @@ function addressLines(address){
   const raw=canonicalEmbassyEnglish(address);if(!raw)return[];
   return raw.split(/\r?\n|\s*\|\s*/).map(canonicalEmbassyEnglish).filter(Boolean);
 }
+function isTaiwanTradeOfficeRecord(r){
+  const id=clean(r?.['Record ID']),country=clean(r?.['Country / Territory EN'])||clean(r?.['Current Country / Territory EN']),type=clean(r?.['Office Type'])||clean(r?.['Current Office Type']);
+  return id==='E096'||(country==='Taiwan'&&/Trade and Economic Office/i.test(type));
+}
 function embassyValues(r){
-  const address=canonicalEmbassyEnglish(clean(r['Address EN'])||clean(r['Current Address EN']));
+  const address=canonicalEmbassyEnglish(clean(r['Address EN'])||clean(r['Current Address EN'])),taiwanTrade=isTaiwanTradeOfficeRecord(r);
   return {
     id:clean(r['Record ID']),
-    embassy:canonicalEmbassyEnglish(clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
-    embassyOffice:canonicalEmbassyEnglish(clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
+    embassy:taiwanTrade?'Thailand Trade and Economic Office in Taipei, Taiwan (ROC)':canonicalEmbassyEnglish(clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
+    embassyOffice:taiwanTrade?'Thailand Trade and Economic Office in Taipei':canonicalEmbassyEnglish(clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
     embassyThai:clean(r['Official Name TH'])||clean(r['Current Official Name TH']),
     embassyCountry:clean(r['Country / Territory EN'])||clean(r['Current Country / Territory EN']),
     embassyCity:clean(r['City EN'])||clean(r['Current City EN']),address,lines:addressLines(address)
@@ -1472,7 +1476,7 @@ function countryLinkedPatch(r){
   const x=countryValues(r);return {nationalityEn:x.nationalityEn,nationalityTh:x.nationalityTh,countryEn:x.countryEn,countryTh:x.countryTh};
 }
 function embassyLinkedPatch(r){
-  const x=embassyValues(r),patch={embassy:x.embassy,embassyOffice:x.embassyOffice,embassyThai:x.embassyThai,embassyCountry:x.embassyCountry,embassyAddress:x.address};
+  const x=embassyValues(r),patch={embassyRecordId:x.id,embassy:x.embassy,embassyOffice:x.embassyOffice,embassyThai:x.embassyThai,embassyCountry:x.embassyCountry,embassyAddress:x.address};
   for(const key of Object.keys(state.linkedData||{}))if(/^embassyAddress\d+$/.test(key))patch[key]='';
   x.lines.forEach((line,i)=>{patch['embassyAddress'+(i+1)]=line;});
   return patch;
@@ -1885,8 +1889,11 @@ function refreshSelectedEmbassyContext(context){
   const id=clean($('#nlpdfLetterEmbassy')?.value);if(!id)return;const record=(centralReference().embassy||[]).find(r=>embassyValues(r).id===id);if(!record)return;
   const manual=context.embassyAddressEdited?String(context.values.embassyAddress??''):null,patch=embassyLinkedPatch(record);if(context.embassyAddressEdited){patch.embassyAddress=manual;for(const key of Object.keys(patch))if(/^embassyAddress\d+$/.test(key))delete patch[key];addressLines(manual).forEach((line,i)=>patch['embassyAddress'+(i+1)]=line);}Object.assign(context.values,patch);Object.assign(state.linkedData,patch);
 }
+function isTaiwanTradeOfficeContext(context){
+  return clean(context?.values?.embassyRecordId)==='E096'||(clean(context?.values?.embassyCountry)==='Taiwan'&&/Thailand Trade and Economic Office/i.test(clean(context?.values?.embassy)||clean(context?.values?.embassyOffice)));
+}
 function applyThaiEmbassyAddressee(context,model,doc,ns){
-  const value=clean(context.values.embassyThai);if(!value)return;
+  const taiwanTrade=isTaiwanTradeOfficeContext(context),value=taiwanTrade?'ผู้อำนวยการใหญ่':clean(context.values.embassyThai);if(!value)return;
   const field=model.fields.find(f=>f.kind==='embassyThai');
   const targets=new Set((field?.occurrences||[]).map(occ=>occ.record));
   for(const rec of model.records){
@@ -1897,7 +1904,7 @@ function applyThaiEmbassyAddressee(context,model,doc,ns){
   for(const rec of targets){
     const paragraph=rec.paragraph,original=clean(rec.full),runs=[...paragraph.getElementsByTagNameNS(ns,'r')],styleRun=runs.find(r=>[...r.getElementsByTagNameNS(ns,'t')].some(t=>clean(t.textContent)))||runs[0]||null;
     let prefix='เรียน ';
-    if(/^เรียน\s*กงสุล\s+ประจำ/.test(original))prefix='เรียน กงสุล ประจำ';
+    if(!taiwanTrade&&/^เรียน\s*กงสุล\s+ประจำ/.test(original))prefix='เรียน กงสุล ประจำ';
     for(const run of runs)run.remove();
     appendTextRun(paragraph,prefix,doc,ns,styleRun,false);
     appendTextRun(paragraph,value,doc,ns,styleRun,true);
@@ -1931,6 +1938,14 @@ function applyExchangeHomeSchoolPunctuation(context,doc,ns){
     insertParagraphTextAt(paragraph,ns,end,',');
   }
 }
+function applyTaiwanTradeOfficeEnglishAddressee(context,doc,ns){
+  if(!isTaiwanTradeOfficeContext(context))return;
+  const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
+  const heading=paragraphs.find(p=>paragraphPlainText(p,ns)==='The Consul');
+  if(heading)setParagraphText(heading,'Dear The Director',doc,ns);
+  const stale=paragraphs.find(p=>/^Dear Consul\b/i.test(paragraphPlainText(p,ns)));
+  if(stale&&stale!==heading)stale.remove();
+}
 function applyEmbassyPostalBlock(context,doc,ns){
   const office=clean(context.values.embassyOffice),sourceLines=addressLines(context.values.embassyAddress||'');
   if(!office||!sourceLines.length)return;
@@ -1962,6 +1977,7 @@ async function createEditedLetter(){
     for(const {field,occ} of all){if(field.kind==='embassyThai')continue;replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);}
     applyThaiEmbassyAddressee(context,model,doc,ns);
     applyEmbassyPostalBlock(context,doc,ns);
+    applyTaiwanTradeOfficeEnglishAddressee(context,doc,ns);
     applyExchangeHomeSchoolPunctuation(context,doc,ns);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
