@@ -1894,6 +1894,34 @@ function applyThaiEmbassyAddressee(context,model,doc,ns){
     appendTextRun(paragraph,value,doc,ns,styleRun,true);
   }
 }
+function paragraphTextNodeMap(paragraph,ns){
+  let offset=0;return [...paragraph.getElementsByTagNameNS(ns,'t')].map(node=>{const value=node.textContent||'',start=offset;offset+=value.length;return{node,value,start,end:offset};});
+}
+function insertParagraphTextAt(paragraph,ns,offset,text){
+  const nodes=paragraphTextNodeMap(paragraph,ns);if(!nodes.length||!text)return false;
+  let hit=nodes.find(x=>offset>=x.start&&offset<=x.end);if(!hit)hit=nodes[nodes.length-1];
+  const local=clamp(offset-hit.start,0,hit.value.length);hit.node.textContent=hit.value.slice(0,local)+text+hit.value.slice(local);return true;
+}
+function removeParagraphTextRange(paragraph,ns,start,end){
+  if(end<=start)return false;let changed=false;
+  for(const part of paragraphTextNodeMap(paragraph,ns)){const a=Math.max(start,part.start),b=Math.min(end,part.end);if(b<=a)continue;const from=a-part.start,to=b-part.start;part.node.textContent=part.value.slice(0,from)+part.value.slice(to);changed=true;}
+  return changed;
+}
+function applyExchangeHomeSchoolPunctuation(context,doc,ns){
+  if(context.type!=='exchange')return;const school=clean(context.values.homeUniversity);if(!school)return;
+  const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
+  for(const paragraph of paragraphs){
+    const full=paragraphPlainText(paragraph,ns),schoolAt=full.indexOf(school);if(schoolAt<0)continue;
+    const end=schoolAt+school.length,after=full.slice(end),thai=/[\u0E00-\u0E7F]/.test(full);
+    if(thai){
+      const comma=after.match(/^(\s*),/);if(comma)removeParagraphTextRange(paragraph,ns,end+comma[1].length,end+comma[1].length+1);
+      continue;
+    }
+    if(!/\bstudent at\b/i.test(full)||!/\bhas been admitted\b/i.test(full))continue;
+    if(/^\s*,/.test(after))continue;
+    insertParagraphTextAt(paragraph,ns,end,',');
+  }
+}
 function applyEmbassyPostalBlock(context,doc,ns){
   const office=clean(context.values.embassyOffice),sourceLines=addressLines(context.values.embassyAddress||'');
   if(!office||!sourceLines.length)return;
@@ -1925,6 +1953,7 @@ async function createEditedLetter(){
     for(const {field,occ} of all){if(field.kind==='embassyThai')continue;replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);}
     applyThaiEmbassyAddressee(context,model,doc,ns);
     applyEmbassyPostalBlock(context,doc,ns);
+    applyExchangeHomeSchoolPunctuation(context,doc,ns);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
     await writeFile(context.targetDir,context.letterName,new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
