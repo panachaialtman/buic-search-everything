@@ -608,7 +608,16 @@ function clearAllDocuments(){
   state.duplicateGroups=new Map();state.duplicatePageHashes=new Map();state.duplicateOnly=false;updateDuplicateControls();
   toast('Document pages cleared. Default assets and settings were kept.');
 }
-function rotateSelected(d){if(state.cropMode)return;for(const p of state.pages)if(state.selected.has(p.id))p.rotation=((p.rotation||0)+d+360)%360;renderAll();recordEdit();}
+function rotateCropWithPage(crop,degrees){
+  let c={...(crop||defaultCrop())},steps=((Math.round(degrees/90)%4)+4)%4;
+  while(steps--){c={top:c.left,right:c.top,bottom:c.right,left:c.bottom};}
+  return c;
+}
+function rotateSelected(d){
+  if(state.cropMode)return;
+  for(const p of state.pages)if(state.selected.has(p.id)){p.crop=rotateCropWithPage(p.crop,d);p.rotation=((p.rotation||0)+d+360)%360;}
+  renderAll();recordEdit();
+}
 function duplicateSelected(){const ids=[...state.selected],newIds=[];for(const id of ids){const i=state.pages.findIndex(p=>p.id===id);if(i<0)continue;const p=state.pages[i],cp={...p,id:uid(),crop:{...p.crop},transform:{...p.transform}};state.pages.splice(i+1,0,cp);newIds.push(cp.id);}if(newIds.length){state.selected=new Set(newIds);state.activeId=newIds[newIds.length-1];state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);}renderAll();recordEdit();state.duplicateDismissed.clear();scanDuplicates().catch(console.error);}
 function moveActive(d){const p=activePage();if(!p)return;const i=state.pages.indexOf(p),j=i+d;if(j<0||j>=state.pages.length)return;[state.pages[i],state.pages[j]]=[state.pages[j],state.pages[i]];state.anchorIndex=j;renderAll();recordEdit();}
 function reorder(a,b){

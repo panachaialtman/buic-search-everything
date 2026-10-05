@@ -214,6 +214,22 @@ try{
     await page.locator('#nlpdfCancelCrop').click();
     assert.equal(await visible('#nlpdfCropLayer'),false);
   });
+  await run('Crop area rotates with the page and reopens in the rotated coordinates',async()=>{
+    await page.locator('[data-tool="crop"]').click();
+    const grip=page.locator('#nlpdfCropRegion [data-crop-handle="nw"]'),g=await grip.boundingBox();assert(g);
+    await page.mouse.move(g.x+5,g.y+5);await page.mouse.down();await page.mouse.move(g.x+45,g.y+31,{steps:6});await page.mouse.up();
+    const before=await page.locator('#nlpdfCropRegion').evaluate(el=>{const left=parseFloat(el.style.left),top=parseFloat(el.style.top),width=parseFloat(el.style.width),height=parseFloat(el.style.height);return{left,top,right:100-left-width,bottom:100-top-height};});
+    assert(before.left>1&&before.top>1,'test crop must be asymmetric before rotation');
+    await page.locator('#nlpdfApplyCrop').click();await page.locator('#nlpdfRotateRight').click();await page.locator('[data-tool="crop"]').click();
+    const after=await page.locator('#nlpdfCropRegion').evaluate(el=>{const left=parseFloat(el.style.left),top=parseFloat(el.style.top),width=parseFloat(el.style.width),height=parseFloat(el.style.height);return{left,top,right:100-left-width,bottom:100-top-height};});
+    const near=(a,b)=>Math.abs(a-b)<0.25;
+    assert(near(after.top,before.left),'90° crop top must come from previous left: '+JSON.stringify({before,after}));
+    assert(near(after.right,before.top),'90° crop right must come from previous top: '+JSON.stringify({before,after}));
+    assert(near(after.bottom,before.right),'90° crop bottom must come from previous right: '+JSON.stringify({before,after}));
+    assert(near(after.left,before.bottom),'90° crop left must come from previous bottom: '+JSON.stringify({before,after}));
+    await page.locator('#nlpdfCancelCrop').click();await page.keyboard.press('Control+z');await page.keyboard.press('Control+z');
+  });
+
   await run('Safe Area toggle and Make Space respond',async()=>{
     await page.locator('#nlpdfSafeArea').check();
     assert.equal(await visible('#nlpdfSafeGuide'),true);
