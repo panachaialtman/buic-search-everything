@@ -368,10 +368,17 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.keyboard.press('Control+z');
     assert.equal(await front.isChecked(),true);
   });
-  await run('Clear All removes only imported document pages and Undo restores them',async()=>{
+  await run('Clear All removes document pages and linked Content, and Undo restores both',async()=>{
     assert.equal(await count(),5);
     assert.equal(await page.locator('#nlpdfClearAll').isVisible(),true);
     assert.equal(await page.locator('text=Selection').count(),0);
+    await page.locator('#nlpdfFilmstrip [data-page-id]').first().click();
+    await page.locator('#nlpdfPageContentType').selectOption('passport');
+    await page.locator('#nlpdfContentName').fill('Clear All QA');
+    await page.locator('#nlpdfContentPassport').fill('CLEAR123');
+    await page.locator('#nlpdfContentPassport').press('Tab');
+    assert.equal(await page.locator('#nlpdfPageContentType').inputValue(),'passport');
+    assert.equal(await page.locator('#nlpdfContentName').inputValue(),'Clear All QA');
     const before={
       front:await page.locator('#nlpdfUseFront').isChecked(),
       back:await page.locator('#nlpdfUseBack').isChecked(),
@@ -384,6 +391,9 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(Number(await text('#nlpdfFileCount')),0);
     assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').count(),0);
     assert.equal(await page.locator('#nlpdfFilmstrip [data-stack]').count(),2);
+    assert.equal(await page.locator('#nlpdfPageContentType').inputValue(),'','Content classification must reset after Clear All');
+    assert.equal(await page.locator('#nlpdfContentPanel').isVisible(),false,'Content information panel must close after Clear All');
+    assert.equal(await page.locator('#nlpdfContentPanelBody').innerHTML(),'','Content form values must be removed after Clear All');
     assert.equal(await page.locator('#nlpdfUseFront').isChecked(),before.front);
     assert.equal(await page.locator('#nlpdfUseBack').isChecked(),before.back);
     assert.equal(await page.locator('#nlpdfUseSignature').isChecked(),before.signature);
@@ -393,6 +403,9 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.keyboard.press('Control+z');
     await awaitCount(5);
     assert.equal(Number(await text('#nlpdfFileCount')),5);
+    assert.equal(await page.locator('#nlpdfPageContentType').inputValue(),'passport','Undo should restore the page Content classification');
+    assert.equal(await page.locator('#nlpdfContentName').inputValue(),'Clear All QA','Undo should restore linked Content information');
+    assert.equal(await page.locator('#nlpdfContentPassport').inputValue(),'CLEAR123','Undo should restore linked passport information');
   });
 
   await run('PDF export rotation matches upright editor preview for intrinsically rotated source PDF',async()=>{

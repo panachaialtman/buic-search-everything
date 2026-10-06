@@ -601,12 +601,18 @@ function clearAllDocuments(){
   state.signaturePageId='';
   state.dragId='';
   state.contentBounds=null;
+  state.linkedData={};
+  state.referencePicker=null;
+  state.contentPanelCollapsed=false;
+  const contentType=$('#nlpdfPageContentType');if(contentType)contentType.value='';
+  const contentPanel=$('#nlpdfContentPanel'),contentBody=$('#nlpdfContentPanelBody');if(contentPanel)contentPanel.classList.add('hidden');if(contentBody)contentBody.innerHTML='';
+  closeReferencePicker();
   showSnapGuides(false,false);
   renderAll();
   recordEdit();
-  setStatus('Cleared imported document pages · Default assets and settings kept');
+  setStatus('Cleared imported document pages and linked Content · Default assets and settings kept');
   state.duplicateGroups=new Map();state.duplicatePageHashes=new Map();state.duplicateOnly=false;updateDuplicateControls();
-  toast('Document pages cleared. Default assets and settings were kept.');
+  toast('Document pages and linked Content cleared. Default assets and settings were kept.');
 }
 function rotateCropWithPage(crop,degrees){
   let c={...(crop||defaultCrop())},steps=((Math.round(degrees/90)%4)+4)%4;
