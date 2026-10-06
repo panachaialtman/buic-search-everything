@@ -51,15 +51,27 @@ try{
       }
     };
     window.showDirectoryPicker=async()=>window.__mockDirectory;
+    window.__studentMemoryRememberCalls=0;
+    const nativeFetch=window.fetch.bind(window);
+    window.fetch=async(input,init={})=>{
+      const url=typeof input==='string'?input:input?.url||'';
+      if(url==='https://buic-central-hub.vercel.app/api/staff/session'){
+        return new Response(JSON.stringify({ok:true}),{status:200,headers:{'Content-Type':'application/json'}});
+      }
+      if(url==='https://buic-central-hub.vercel.app/api/staff/students/remember'){
+        window.__studentMemoryRememberCalls++;
+        return new Response(JSON.stringify({student:{student_id:'QA',full_name:'QA'}}),{status:200,headers:{'Content-Type':'application/json'}});
+      }
+      return nativeFetch(input,init);
+    };
+    sessionStorage.setItem('buic-student-memory-staff-token-v1','qa-test-token');
   });
   await page.goto('http://127.0.0.1:8123/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.locator('[data-workspace="documents"]').click();
   await page.locator('#nlpdfAddFiles').waitFor({state:'visible',timeout:60000});
   await page.waitForTimeout(1500);
   await run('Student DB selection populates reusable New Letter identity without saving',async()=>{
-    let rememberRequests=0;
-    const watch=req=>{if(req.url().includes('/api/staff/students/remember'))rememberRequests++;};
-    page.on('request',watch);
+    const rememberBefore=await page.evaluate(()=>window.__studentMemoryRememberCalls||0);
     await page.evaluate(()=>{
       window.dispatchEvent(new CustomEvent('buic-student-memory-selected',{detail:{
         student:{student_id:'1690888888',full_name:'Remembered QA',nationality_en:'Myanmar',nationality_th:'เมียนมา',country_en:'Myanmar',country_th:'เมียนมา',extra_data:{recipientLocation:'Yangon, Myanmar'}},
@@ -72,8 +84,7 @@ try{
     assert.equal(await page.locator('#nlpdfExportPassport').inputValue(),'MEM12345');
     assert.equal(await page.locator('#nlpdfExportStudentId').inputValue(),'1690888888');
     await page.waitForTimeout(100);
-    assert.equal(rememberRequests,0,'selecting/typing a student must not persist central memory');
-    page.off('request',watch);
+    assert.equal(await page.evaluate(()=>window.__studentMemoryRememberCalls||0),rememberBefore,'selecting/typing a student must not persist central memory');
     await page.locator('[data-nlpdf-close]').last().click();
   });
 
@@ -617,7 +628,9 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('[data-letter-step="2"]').click();assert.match(await page.locator('#nlpdfLetterContentLabel').innerText(),/Visa Application/);await page.locator('#nlpdfLetterEmbassySearch').fill('Taipei');await page.locator('#nlpdfLetterEmbassyResults').waitFor({state:'visible'});const result=page.locator('#nlpdfLetterEmbassyResults [data-embassy-result]').filter({hasText:/Taipei/i}).first();assert.equal(await result.count()>0,true,'Taiwan Trade Office should be searchable');assert.match(await result.innerText(),/Thailand Trade and Economic Office in Taipei, Taiwan \(ROC\)/);await result.click();
     assert.equal(await page.locator('#nlpdfLetterEmbassyAddress').getAttribute('readonly'),null);await page.locator('#nlpdfLetterEmbassyAddress').fill('Custom Embassy Address\nSecond Line');
     await page.locator('[data-letter-step="3"]').click();assert.match(await page.locator('#nlpdfLetterReview').innerText(),/Linked Name/);await page.locator('#nlpdfLetterNext').click();assert.equal(await page.locator('#nlpdfLetterStepFinal').isVisible(),true);assert.equal(await page.locator('#nlpdfLetterFinalDocumentNo').inputValue(),'0789');assert.equal(await page.locator('#nlpdfLetterFinalStudentId').inputValue(),'1690000000');await page.locator('#nlpdfLetterFinalDate').fill('2026-10-08');
+    const memoryBeforeCreate=await page.evaluate(()=>window.__studentMemoryRememberCalls||0);
     await page.locator('#nlpdfCreateEditedLetter').click();await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
+    assert((await page.evaluate(()=>window.__studentMemoryRememberCalls||0))>memoryBeforeCreate,'final Create Letter must persist shared student memory');
     const out=await page.evaluate(async before=>{const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Linked Name_AB1234567_1690000000.docx');if(!file)return null;const zip=await JSZip.loadAsync(file.bytes),xml=await zip.file('word/document.xml').async('string'),doc=new DOMParser().parseFromString(xml,'application/xml'),ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const paras=[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join(''));const plain=paras.join('\n');return{finished:file.finished,highlight:/<w:highlight\b[^>]*(?:w:val|val)="yellow"/i.test(xml),name:(xml.match(/Linked Name/g)||[]).length,passport:(xml.match(/AB1234567/g)||[]).length,englishDate:xml.includes('October 8, 2026'),thaiDate:xml.includes('8 ตุลาคม 2569'),studyPeriod:xml.includes('January 11, 2027 to June 15, 2027'),editedOrientation:xml.includes('January 4 - 9, 2027'),customAddress:xml.includes('Custom Embassy Address'),englishSchoolCountry:plain.includes('QA Home University, Myanmar'),thaiSchoolComma:/QA Home University\s*,\s*[\u0E00-\u0E7F]/.test(plain),schoolLines:paras.filter(p=>p.includes('QA Home University')),taiwanMission:plain.includes('Thailand Trade and Economic Office in Taipei, Taiwan (ROC)'),oldTaipeiName:plain.includes('Thailand Trade and Economic Office (Taipei)'),directorCount:paras.filter(p=>p.trim()==='Dear The Director').length,staleConsul:paras.some(p=>/^(?:The Consul|Dear Consul\b)/i.test(p.trim())),thaiDirector:plain.includes('เรียน ผู้อำนวยการใหญ่'),myanmarCitizen:/\bMyanmar\s+Citizen\b/.test(plain),oldMyanmarNationality:plain.includes('Myanmar / Burmese Citizen')};},before);
     assert(out&&out.finished);assert.equal(out.highlight,true);assert(out.name>=1);assert(out.passport>=1);assert.equal(out.englishDate,true);assert.equal(out.thaiDate,true);assert.equal(out.studyPeriod,true);assert.equal(out.editedOrientation,true);assert.equal(out.customAddress,true,'manual Embassy address must be used in final Word output');assert.equal(out.taiwanMission,true,'Taiwan mission must use the full Taipei, Taiwan (ROC) wording');assert.equal(out.oldTaipeiName,false,'old Taiwan mission name must not remain');assert.equal(out.directorCount,1,'Taiwan must contain one Dear The Director addressee');assert.equal(out.staleConsul,false,'Taiwan must not retain The Consul or Dear Consul');assert.equal(out.thaiDirector,true,'Taiwan Thai addressee must be เรียน ผู้อำนวยการใหญ่');assert.equal(out.myanmarCitizen,true,'English nationality should be Myanmar Citizen');assert.equal(out.oldMyanmarNationality,false,'Myanmar / Burmese must not appear as the English nationality');assert.equal(out.englishSchoolCountry,true,'Exchange English school must be followed by comma then country; school lines: '+JSON.stringify(out.schoolLines));assert.equal(out.thaiSchoolComma,false,'Exchange Thai school must not have comma after the school name; school lines: '+JSON.stringify(out.schoolLines));
   });
