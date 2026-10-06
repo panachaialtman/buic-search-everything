@@ -67,6 +67,14 @@ try{
     sessionStorage.setItem('buic-student-memory-staff-token-v1','qa-test-token');
   });
   await page.goto('http://127.0.0.1:8123/',{waitUntil:'domcontentloaded',timeout:45000});
+  await page.locator('#buicWorkspaceAuth').waitFor({state:'hidden',timeout:15000});
+  await run('Workspace login replaces Student DB password and 2FA prompt',async()=>{
+    assert.equal(await page.locator('#buicWorkspaceUsername').count(),1);
+    assert.equal(await page.locator('#buicWorkspacePassword').count(),1);
+    assert.equal(await page.locator('#buicMemoryOtp,#buicMemoryPassword,#buicMemoryLogin').count(),0);
+    const memorySource=await page.evaluate(()=>fetch('/student-memory.js?v=4').then(r=>r.text()));
+    assert.equal(memorySource.includes('specialvisa'),false,'raw workspace password must not be present in public JavaScript');
+  });
   await page.locator('[data-workspace="documents"]').click();
   await page.locator('#nlpdfAddFiles').waitFor({state:'visible',timeout:60000});
   await page.waitForTimeout(1500);
