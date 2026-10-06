@@ -56,6 +56,23 @@ try{
   await page.locator('[data-workspace="documents"]').click();
   await page.locator('#nlpdfAddFiles').waitFor({state:'visible',timeout:60000});
   await page.waitForTimeout(1500);
+  await run('Student DB selection populates reusable New Letter identity without saving',async()=>{
+    window.__rememberCalls=0;
+    await page.evaluate(()=>{
+      window.dispatchEvent(new CustomEvent('buic-student-memory-selected',{detail:{
+        student:{student_id:'1690888888',full_name:'Remembered QA',nationality_en:'Myanmar',nationality_th:'เมียนมา',country_en:'Myanmar',country_th:'เมียนมา',extra_data:{recipientLocation:'Yangon, Myanmar'}},
+        passport:{passport_number:'MEM12345'},
+        academic:{faculty_en:'BU International',major_en:'Business Administration',extra_data:{semester:'Second',academicYear:'2026'}}
+      }}));
+    });
+    await page.locator('#nlpdfCreate').click();
+    assert.equal(await page.locator('#nlpdfExportName').inputValue(),'Remembered QA');
+    assert.equal(await page.locator('#nlpdfExportPassport').inputValue(),'MEM12345');
+    assert.equal(await page.locator('#nlpdfExportStudentId').inputValue(),'1690888888');
+    assert.equal(await page.evaluate(()=>window.__rememberCalls),0,'selecting/typing a student must not persist central memory');
+    await page.locator('[data-nlpdf-close]').last().click();
+  });
+
   await run('Editor starts without JavaScript runtime errors',async()=>{
     assert.deepEqual(errors,[]);
     assert.equal(await count(),0);

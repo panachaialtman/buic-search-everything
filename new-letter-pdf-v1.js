@@ -1959,6 +1959,90 @@ function applyEmbassyPostalBlock(context,doc,ns){
   for(let i=required;i<slots.length;i++)slots[i].remove();
 }
 
+function rememberedStudentLinkedPatch(record){
+  const s=record?.student||{},p=record?.passport||{},a=record?.academic||{},sx=s.extra_data&&typeof s.extra_data==='object'?s.extra_data:{},ax=a.extra_data&&typeof a.extra_data==='object'?a.extra_data:{};
+  return {
+    studentName:clean(s.full_name),studentId:clean(s.student_id),passport:clean(p.passport_number),
+    nationalityEn:clean(s.nationality_en),nationalityTh:clean(s.nationality_th),countryEn:clean(s.country_en),countryTh:clean(s.country_th),
+    facultyEn:clean(a.faculty_en),facultyTh:clean(a.faculty_th),programEn:clean(a.major_en),programTh:clean(a.major_th),
+    recipientLocation:clean(sx.recipientLocation),semester:clean(ax.semester),academicYear:clean(ax.academicYear),
+    startDate:clean(ax.startDate),finishDate:clean(ax.finishDate),orientationStart:clean(ax.orientationStart),orientationEnd:clean(ax.orientationEnd),
+    orientation:clean(ax.orientation),homeUniversity:clean(ax.homeUniversity),homeCountry:clean(ax.homeCountry)
+  };
+}
+function applyRememberedStudentRecord(record){
+  const patch=rememberedStudentLinkedPatch(record);
+  for(const [key,value] of Object.entries(patch))if(clean(value))state.linkedData[key]=value;
+  const exportOpen=$('#nlpdfExportModal')?.classList.contains('open');
+  if(exportOpen){
+    if(patch.studentName)$('#nlpdfExportName').value=patch.studentName;
+    if(patch.passport)$('#nlpdfExportPassport').value=patch.passport;
+    if(patch.studentId)$('#nlpdfExportStudentId').value=patch.studentId;
+    $('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();
+  }
+  const context=state.pendingLetter;
+  if(context&&!$('#nlpdfLetterEditor')?.classList.contains('hidden')){
+    Object.assign(context.values,Object.fromEntries(Object.entries(patch).filter(([,v])=>clean(v))));
+    if(patch.studentName)context.name=patch.studentName;if(patch.passport)context.passport=patch.passport;if(patch.studentId)context.studentId=patch.studentId;
+    populateCentralSelects(context);renderLetterFormValues(context);
+    if(patch.semester)setPackageField('semester',patch.semester);
+    if(patch.academicYear){fillAcademicYearSelect($('#nlpdfLetterAcademicYear'),patch.academicYear);setPackageField('academicYear',patch.academicYear);}
+    for(const kind of ['startDate','finishDate','orientationStart','orientationEnd'])if(patch[kind])setPackageField(kind,patch[kind]);
+    syncEditablePackageDates(context);
+  }else renderContentPanel();
+  toast('Student loaded from Student DB.');
+}
+function newLetterMemoryPayload(context){
+  const v=context.values||{},programRecord=bestFacultyRecord(v.programEn||''),program=programRecord?facultyValues(programRecord):null;
+  const countryRecord=bestCountryRecord(v.nationalityEn||v.countryEn||v.nationalityTh||v.countryTh||''),country=countryRecord?countryValues(countryRecord):null;
+  const studentId=clean(v.studentId||context.studentId),fullName=clean(v.studentName||context.name),documentNo=clean(v.documentNo||context.num);
+  if(!studentId||!fullName||!documentNo)return null;
+  const academicExtra={
+    semester:clean(v.semester||packageFieldValue('semester')),academicYear:clean(v.academicYear||packageFieldValue('academicYear')),
+    startDate:clean(v.startDate),finishDate:clean(v.finishDate),orientationStart:clean(v.orientationStart),orientationEnd:clean(v.orientationEnd),
+    orientation:clean(v.orientation),homeUniversity:clean(v.homeUniversity),homeCountry:clean(v.homeCountry)
+  };
+  const snapshot={...v,studentName:fullName,studentId,passport:clean(v.passport||context.passport),documentNo,letterType:context.type,letterTypeLabel:letterTypeLabel(context.type),letterFilename:context.letterName,sourceApp:'new_letter'};
+  return {
+    action:'create_letter',source_app:'new_letter',
+    student:{
+      student_id:studentId,full_name:fullName,title:null,nationality_code:country?.id||null,
+      nationality_en:clean(v.nationalityEn||country?.nationalityEn),nationality_th:clean(v.nationalityTh||country?.nationalityTh),
+      country_en:clean(v.countryEn||country?.countryEn),country_th:clean(v.countryTh||country?.countryTh),
+      degree_level_id:context.type,major_id:program?.id||null,faculty_id:program?.id||null,
+      extra_data:{recipientLocation:clean(v.recipientLocation),lastLetterType:context.type}
+    },
+    passport:clean(v.passport||context.passport)?{passport_number:clean(v.passport||context.passport),expiry_date:null,extra_data:{}}:null,
+    visa:null,
+    academic:{
+      degree_level_id:context.type,major_id:program?.id||null,faculty_id:program?.id||null,
+      major_en:clean(v.programEn||program?.programEn),major_th:clean(v.programTh||program?.programTh),
+      faculty_en:clean(v.facultyEn||program?.facultyEn),faculty_th:clean(v.facultyTh||program?.facultyTh),
+      required_credits:null,achieved_credits:null,study_period:clean(v.studyPeriod)||[clean(v.startDate),clean(v.finishDate)].filter(Boolean).join(' to '),
+      current_year:null,studied_hours:null,effective_date:clean(v.startDate)||null,source:'new_letter',extra_data:academicExtra
+    },
+    document:{
+      document_number:documentNo,document_type:context.type,template_key:context.type,template_version:'new-letter-v43',
+      letter_date:clean(v.letterDate)||todayIsoLocal(),proposed_extension_date:null,signatory_id:null
+    },
+    snapshot
+  };
+}
+async function rememberNewLetterAfterCreate(context){
+  const payload=newLetterMemoryPayload(context);
+  if(!payload){toast('Letter created, but Student DB was not updated: Student ID, name, and Document Number are required.');return false;}
+  if(!window.BUICStudentMemory?.remember){toast('Letter created, but Student DB is unavailable.');return false;}
+  try{
+    await window.BUICStudentMemory.remember(payload,{interactive:true});
+    toast('Letter created · student remembered.');
+    return true;
+  }catch(err){
+    console.warn('Student DB remember failed',err);
+    toast('Letter created, but Student DB was not updated'+(err?.message?': '+err.message:'.'));
+    return false;
+  }
+}
+
 async function createEditedLetter(){
   const context=state.pendingLetter;if(!context?.editor||state.busy)return;
   state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
@@ -1979,6 +2063,7 @@ async function createEditedLetter(){
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
     await writeFile(context.targetDir,context.letterName,new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
     $('#nlpdfLetterEditorStatus').textContent='Letter created successfully. Edited values remain highlighted for checking.';setStatus('Ready · Letter created');toast('Letter created · highlights kept.');
+    await rememberNewLetterAfterCreate(context);
     await new Promise(resolve=>setTimeout(resolve,650));finishLetterEditor();
   }catch(err){console.error(err);$('#nlpdfLetterEditorStatus').textContent=err?.message||'Could not create letter.';toast(err?.message||'Could not create letter.');}
   finally{state.busy=false;$('#nlpdfCreateEditedLetter').disabled=false;updateControls();}
@@ -2335,6 +2420,7 @@ async function build(){
   $('#nlpdfSchoolNew').addEventListener('click',resetSchoolForm);$('#nlpdfSchoolSave').addEventListener('click',saveSchoolEntryFromManager);
   $('#nlpdfSchoolList').addEventListener('click',e=>{const edit=e.target.closest('[data-school-edit]'),del=e.target.closest('[data-school-delete]');if(edit)editSchoolEntry(edit.dataset.schoolEdit);if(del&&confirm('Delete this remembered school?'))deleteSchoolEntry(del.dataset.schoolDelete);});
   window.addEventListener('buic-reference-data-updated',()=>{if(state.pendingLetter&&!$('#nlpdfLetterEditor').classList.contains('hidden')){populateCentralSelects(state.pendingLetter);renderLetterFormValues(state.pendingLetter);renderSchoolList();}renderContentPanel();if(state.referencePicker)renderReferencePickerResults($('#nlpdfReferencePickerSearch')?.value||'');});
+  window.addEventListener('buic-student-memory-selected',e=>applyRememberedStudentRecord(e.detail));
 
   $('#nlpdfCreate').addEventListener('click',openExport);
   document.querySelectorAll('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
