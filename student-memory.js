@@ -32,7 +32,7 @@
     if(document.querySelector('#buicStudentMemoryModal'))return;
     const style=document.createElement('style');
     style.textContent=`
-      .buic-memory-launch{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 12px;border:1px solid rgba(100,116,139,.28);border-radius:10px;background:var(--surface,#fff);color:var(--text,#13233b);font:inherit;font-size:11px;font-weight:800;cursor:pointer}
+      .buic-memory-launch{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 12px;border:1px solid rgba(100,116,139,.28);border-radius:10px;background:var(--surface,#fff);color:var(--text,#13233b);font:inherit;font-size:11px;font-weight:800;cursor:pointer}\n      @media(max-width:1550px){.buic-memory-launch{width:38px;min-width:38px;padding:0;justify-content:center}.buic-memory-launch span{display:none}}
       .buic-memory-launch i{width:8px;height:8px;border-radius:50%;background:#94a3b8}.buic-memory-launch.ready i{background:#16855b}.buic-memory-launch.warn i{background:#b7791f}
       .buic-memory-modal{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:rgba(15,23,42,.38);backdrop-filter:blur(2px)}
       .buic-memory-modal.hidden{display:none}.buic-memory-card{width:min(520px,calc(100vw - 28px));max-height:min(720px,calc(100vh - 28px));overflow:auto;background:#fff;color:#14213d;border-radius:16px;box-shadow:0 24px 70px rgba(15,23,42,.28);border:1px solid #dbe3ef}
