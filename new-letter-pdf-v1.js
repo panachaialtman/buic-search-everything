@@ -1143,13 +1143,17 @@ function facultyValues(r){
   };
 }
 function canonicalEmbassyEnglish(value){return clean(value).replace(/P\.R\.\s*CHINA/gi,'P.R. China').replace(/\bRussian Federation\b/gi,'Russia');}
+function isTaiwanTradeOfficeRecord(r){
+  const id=clean(r?.['Record ID']),country=clean(r?.['Country / Territory EN'])||clean(r?.['Current Country / Territory EN']),type=clean(r?.['Office Type'])||clean(r?.['Current Office Type']);
+  return id==='E096'||(country==='Taiwan'&&/Trade and Economic Office/i.test(type));
+}
 function embassyValues(r){
-  const address=canonicalEmbassyEnglish(clean(r['Address EN'])||clean(r['Current Address EN']));
+  const address=canonicalEmbassyEnglish(clean(r['Address EN'])||clean(r['Current Address EN'])),taiwanTrade=isTaiwanTradeOfficeRecord(r);
   const lines=address.split(/\r?\n|\s*\|\s*/).map(canonicalEmbassyEnglish).filter(Boolean);
   return {
     id:clean(r['Record ID']),
-    embassy:canonicalEmbassyEnglish(clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
-    embassyOffice:canonicalEmbassyEnglish(clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
+    embassy:taiwanTrade?'Thailand Trade and Economic Office in Taipei, Taiwan (ROC)':canonicalEmbassyEnglish(clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
+    embassyOffice:taiwanTrade?'Thailand Trade and Economic Office in Taipei':canonicalEmbassyEnglish(clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
     embassyThai:clean(r['Official Name TH'])||clean(r['Current Official Name TH']),
     embassyCountry:clean(r['Country / Territory EN'])||clean(r['Current Country / Territory EN']),
     embassyCity:clean(r['City EN'])||clean(r['Current City EN']),address,lines
@@ -1339,21 +1343,6 @@ function addressLines(address){
   const raw=canonicalEmbassyEnglish(address);if(!raw)return[];
   return raw.split(/\r?\n|\s*\|\s*/).map(canonicalEmbassyEnglish).filter(Boolean);
 }
-function isTaiwanTradeOfficeRecord(r){
-  const id=clean(r?.['Record ID']),country=clean(r?.['Country / Territory EN'])||clean(r?.['Current Country / Territory EN']),type=clean(r?.['Office Type'])||clean(r?.['Current Office Type']);
-  return id==='E096'||(country==='Taiwan'&&/Trade and Economic Office/i.test(type));
-}
-function embassyValues(r){
-  const address=canonicalEmbassyEnglish(clean(r['Address EN'])||clean(r['Current Address EN'])),taiwanTrade=isTaiwanTradeOfficeRecord(r);
-  return {
-    id:clean(r['Record ID']),
-    embassy:taiwanTrade?'Thailand Trade and Economic Office in Taipei, Taiwan (ROC)':canonicalEmbassyEnglish(clean(r['Current Display Name EN'])||clean(r['Display Name EN'])||clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
-    embassyOffice:taiwanTrade?'Thailand Trade and Economic Office in Taipei':canonicalEmbassyEnglish(clean(r['Office Name EN'])||clean(r['Current Office Name EN'])),
-    embassyThai:clean(r['Official Name TH'])||clean(r['Current Official Name TH']),
-    embassyCountry:clean(r['Country / Territory EN'])||clean(r['Current Country / Territory EN']),
-    embassyCity:clean(r['City EN'])||clean(r['Current City EN']),address,lines:addressLines(address)
-  };
-}
 function isoPad(n){return String(n).padStart(2,'0');}
 const MONTHS_EN=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_TH=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -1473,7 +1462,7 @@ function populateProgramSelect(context,facultyGroup=null){
   if(current&&rows.includes(current))el.value=facultyValues(current).id;
 }
 function countryLinkedPatch(r){
-  const x=countryValues(r);return {nationalityEn:x.nationalityEn,nationalityTh:x.nationalityTh,countryEn:x.countryEn,countryTh:x.countryTh};
+  const x=countryValues(r),nationalityEn=x.countryEn==='Myanmar'?'Myanmar':x.nationalityEn;return {nationalityEn,nationalityTh:x.nationalityTh,countryEn:x.countryEn,countryTh:x.countryTh};
 }
 function embassyLinkedPatch(r){
   const x=embassyValues(r),patch={embassyRecordId:x.id,embassy:x.embassy,embassyOffice:x.embassyOffice,embassyThai:x.embassyThai,embassyCountry:x.embassyCountry,embassyAddress:x.address};
@@ -1955,12 +1944,13 @@ function applyEmbassyPostalBlock(context,doc,ns){
   if(dearIndex<0)return;
   const dear=paragraphs[dearIndex],parent=dear.parentNode,between=paragraphs.slice(consulIndex+1,dearIndex);
   const template=between.find(p=>paragraphPlainText(p,ns))||between[0]||dear;
-  const slots=[...between];
-  while(slots.length<desired.length){
+  const slots=[...between],required=desired.length+1;
+  while(slots.length<required){
     const clone=template.cloneNode(true);setParagraphText(clone,'',doc,ns);parent.insertBefore(clone,dear);slots.push(clone);
   }
   for(let i=0;i<desired.length;i++)setParagraphText(slots[i],desired[i],doc,ns);
-  for(let i=desired.length;i<slots.length;i++)slots[i].remove();
+  setParagraphText(slots[desired.length],'',doc,ns);
+  for(let i=required;i<slots.length;i++)slots[i].remove();
 }
 
 async function createEditedLetter(){
