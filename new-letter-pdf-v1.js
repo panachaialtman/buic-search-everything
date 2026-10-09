@@ -1960,6 +1960,20 @@ async function applyInternationalCenterPhoneToLetter(zip,doc,ns){
   return changed;
 }
 
+// The orientation semantic field may include the template's final period.
+// Restore a missing sentence terminator after date replacement without
+// rewriting or re-highlighting the original Word runs.
+function ensureOrientationSentencePeriod(doc,ns){
+  let updated=0;
+  for(const p of [...doc.getElementsByTagNameNS(ns,'p')]){
+    const full=paragraphTextNodeMap(p,ns).map(part=>part.value).join('');
+    if(!/\borientation\b.*\b(?:on|during)\b.*\b\d{4}\s*$/i.test(full))continue;
+    const at=full.trimEnd().length;
+    if(insertParagraphTextAt(p,ns,at,'.'))updated++;
+  }
+  return updated;
+}
+
 function applyTaiwanTradeOfficeEnglishAddressee(context,doc,ns){
   if(!isTaiwanTradeOfficeContext(context))return;
   const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
@@ -2086,6 +2100,7 @@ async function createEditedLetter(){
     applyEmbassyPostalBlock(context,doc,ns);
     applyTaiwanTradeOfficeEnglishAddressee(context,doc,ns);
     applyExchangeHomeSchoolPunctuation(context,doc,ns);
+    ensureOrientationSentencePeriod(doc,ns);
     await applyInternationalCenterPhoneToLetter(zip,doc,ns);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
