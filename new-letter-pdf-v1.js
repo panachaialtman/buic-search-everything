@@ -1933,6 +1933,33 @@ function applyExchangeHomeSchoolPunctuation(context,doc,ns){
     insertParagraphTextAt(paragraph,ns,end,',');
   }
 }
+// Update the International Center's telephone line without replacing paragraph runs,
+// so footer/body font, spacing, alignment and other Word formatting remain intact.
+function replaceInternationalCenterPhoneInXml(doc,ns){
+  let changed=0;
+  for(const p of [...doc.getElementsByTagNameNS(ns,'p')]){
+    const full=[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join('');
+    const matches=[...full.matchAll(/โทร\s*0(?=\s*2407\s*3888\s*ต่อ\s*2441)/g)];
+    for(const match of matches.reverse()){
+      const start=match.index+match[0].length-1;
+      removeParagraphTextRange(p,ns,start,start+1);
+      insertParagraphTextAt(p,ns,start,'(+66)');
+      changed++;
+    }
+  }
+  return changed;
+}
+async function applyInternationalCenterPhoneToLetter(zip,doc,ns){
+  let changed=replaceInternationalCenterPhoneInXml(doc,ns);
+  // Some letter templates keep their bottom contact block in a Word footer.
+  for(const part of zip.file(/^word\/(?:footer|header)\d+\.xml$/i)){
+    const raw=await part.async('string'),xml=new DOMParser().parseFromString(raw,'application/xml');
+    const count=replaceInternationalCenterPhoneInXml(xml,ns);
+    if(count){zip.file(part.name,new XMLSerializer().serializeToString(xml));changed+=count;}
+  }
+  return changed;
+}
+
 function applyTaiwanTradeOfficeEnglishAddressee(context,doc,ns){
   if(!isTaiwanTradeOfficeContext(context))return;
   const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
@@ -2059,6 +2086,7 @@ async function createEditedLetter(){
     applyEmbassyPostalBlock(context,doc,ns);
     applyTaiwanTradeOfficeEnglishAddressee(context,doc,ns);
     applyExchangeHomeSchoolPunctuation(context,doc,ns);
+    await applyInternationalCenterPhoneToLetter(zip,doc,ns);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
     await writeFile(context.targetDir,context.letterName,new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
