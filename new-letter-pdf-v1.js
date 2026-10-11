@@ -173,7 +173,7 @@ function letterEditorMarkup(){
       '</nav>'+ 
       '<div class="nlpdf-letter-workspace">'+
         '<aside class="nlpdf-letter-content-preview">'+
-          '<div class="nlpdf-letter-content-head"><div class="nlpdf-letter-content-title"><strong>Content</strong><span id="nlpdfLetterContentLabel">No linked content</span></div><div class="nlpdf-letter-magnifier-controls"><span>Zoom area</span><label><input id="nlpdfLetterMagnifierWidth" type="number" min="20" max="600" step="1" value="300" aria-label="Magnifier width"> × <input id="nlpdfLetterMagnifierHeight" type="number" min="20" max="600" step="1" value="200" aria-label="Magnifier height"> px</label><label><input id="nlpdfLetterMagnifierZoom" type="number" min="1" max="10" step="0.5" value="2" aria-label="Magnifier zoom">× zoom</label></div><div class="nlpdf-letter-content-nav"><button id="nlpdfLetterContentPrev" type="button" aria-label="Previous content">‹</button><span id="nlpdfLetterContentCounter">—</span><button id="nlpdfLetterContentNext" type="button" aria-label="Next content">›</button></div></div>'+ 
+          '<div class="nlpdf-letter-content-head"><div class="nlpdf-letter-content-title"><strong>Content</strong><span id="nlpdfLetterContentLabel">No linked content</span></div><div class="nlpdf-letter-magnifier-controls"><span>Zoom area</span><label><input id="nlpdfLetterMagnifierWidth" type="number" min="0" max="600" step="1" value="300" aria-label="Magnifier width"> × <input id="nlpdfLetterMagnifierHeight" type="number" min="0" max="600" step="1" value="200" aria-label="Magnifier height"> px</label><label><input id="nlpdfLetterMagnifierZoom" type="number" min="1" max="10" step="0.5" value="2" aria-label="Magnifier zoom">× zoom</label></div><div class="nlpdf-letter-content-nav"><button id="nlpdfLetterContentPrev" type="button" aria-label="Previous content">‹</button><span id="nlpdfLetterContentCounter">—</span><button id="nlpdfLetterContentNext" type="button" aria-label="Next content">›</button></div></div>'+ 
           '<div class="nlpdf-letter-content-stage"><canvas id="nlpdfLetterContentCanvas" width="1040" height="1472"></canvas><canvas class="nlpdf-letter-magnifier hidden" id="nlpdfLetterMagnifier" width="100" height="100" aria-hidden="true"></canvas><div class="nlpdf-letter-content-empty" id="nlpdfLetterContentEmpty">No document page is assigned to this topic.</div></div>'+ 
         '</aside>'+ 
         '<main class="nlpdf-letter-form-pane">'+
@@ -1748,7 +1748,12 @@ function letterContentPagesForStep(step){
 }
 function loadLetterMagnifierPrefs(){
   let saved=null;try{saved=JSON.parse(localStorage.getItem(LETTER_MAGNIFIER_PREF_KEY)||'null');}catch{}
-  if(saved&&typeof saved==='object'){state.letterMagnifierWidth=clamp(Number(saved.width)||300,20,600);state.letterMagnifierHeight=clamp(Number(saved.height)||200,20,600);state.letterMagnifierZoom=clamp(Number(saved.zoom)||2,1,10);}
+  if(saved&&typeof saved==='object'){
+    const width=Number(saved.width),height=Number(saved.height),zoom=Number(saved.zoom);
+    if(saved.width!==null&&saved.width!==''&&Number.isFinite(width))state.letterMagnifierWidth=clamp(Math.round(width),0,600);
+    if(saved.height!==null&&saved.height!==''&&Number.isFinite(height))state.letterMagnifierHeight=clamp(Math.round(height),0,600);
+    if(saved.zoom!==null&&saved.zoom!==''&&Number.isFinite(zoom))state.letterMagnifierZoom=clamp(zoom,1,10);
+  }
 }
 function applyLetterMagnifierInputs(){
   if($('#nlpdfLetterMagnifierWidth'))$('#nlpdfLetterMagnifierWidth').value=String(state.letterMagnifierWidth);
@@ -1757,19 +1762,37 @@ function applyLetterMagnifierInputs(){
 }
 function saveLetterMagnifierPrefs(){try{localStorage.setItem(LETTER_MAGNIFIER_PREF_KEY,JSON.stringify({width:state.letterMagnifierWidth,height:state.letterMagnifierHeight,zoom:state.letterMagnifierZoom}));}catch{}}
 function letterMagnifierSettings(){
-  const width=clamp(Number($('#nlpdfLetterMagnifierWidth')?.value)||state.letterMagnifierWidth||300,20,600),height=clamp(Number($('#nlpdfLetterMagnifierHeight')?.value)||state.letterMagnifierHeight||200,20,600),zoom=clamp(Number($('#nlpdfLetterMagnifierZoom')?.value)||state.letterMagnifierZoom||2,1,10);
-  state.letterMagnifierWidth=width;state.letterMagnifierHeight=height;state.letterMagnifierZoom=zoom;applyLetterMagnifierInputs();return {width,height,zoom};
+  const read=(id,fallback,min,max,integer=false)=>{
+    const field=$('#'+id);if(!field)return fallback;
+    // Keep the field blank while typing; do not force a value back on each input event.
+    // An empty dimension means 0 px, whereas an empty zoom keeps the last valid zoom.
+    if(field.value==='')return integer?0:fallback;
+    const value=field.valueAsNumber;
+    return Number.isFinite(value)?clamp(integer?Math.round(value):value,min,max):fallback;
+  };
+  const width=read('nlpdfLetterMagnifierWidth',state.letterMagnifierWidth,0,600,true);
+  const height=read('nlpdfLetterMagnifierHeight',state.letterMagnifierHeight,0,600,true);
+  const zoom=read('nlpdfLetterMagnifierZoom',state.letterMagnifierZoom,1,10);
+  state.letterMagnifierWidth=width;state.letterMagnifierHeight=height;state.letterMagnifierZoom=zoom;
+  return {width,height,zoom};
 }
 function hideLetterMagnifier(){const lens=$('#nlpdfLetterMagnifier');if(lens){lens.classList.add('hidden');lens.setAttribute('aria-hidden','true');}state.letterMagnifierPoint=null;}
 function renderLetterMagnifierAt(event){
   const source=$('#nlpdfLetterContentCanvas'),lens=$('#nlpdfLetterMagnifier'),stage=$('.nlpdf-letter-content-stage');if(!source||!lens||!stage||source.classList.contains('hidden'))return hideLetterMagnifier();
   const r=source.getBoundingClientRect(),x=event.clientX-r.left,y=event.clientY-r.top;if(x<0||y<0||x>r.width||y>r.height)return hideLetterMagnifier();
-  const {width,height,zoom}=letterMagnifierSettings(),dpr=clamp(window.devicePixelRatio||1,1,3),scaleX=source.width/r.width,scaleY=source.height/r.height,sw=(width/zoom)*scaleX,sh=(height/zoom)*scaleY,sx=x*scaleX,sy=y*scaleY;
+  const {width,height,zoom}=letterMagnifierSettings();if(width===0||height===0)return hideLetterMagnifier();
+  const dpr=clamp(window.devicePixelRatio||1,1,3),scaleX=source.width/r.width,scaleY=source.height/r.height,sw=(width/zoom)*scaleX,sh=(height/zoom)*scaleY,sx=x*scaleX,sy=y*scaleY;
   lens.style.width=width+'px';lens.style.height=height+'px';lens.width=Math.max(1,Math.round(width*dpr));lens.height=Math.max(1,Math.round(height*dpr));lens.dataset.zoom=String(zoom);
   const ctx=lens.getContext('2d');ctx.clearRect(0,0,lens.width,lens.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(source,sx-sw/2,sy-sh/2,sw,sh,0,0,lens.width,lens.height);
   const sr=stage.getBoundingClientRect(),stageX=event.clientX-sr.left+stage.scrollLeft,stageY=event.clientY-sr.top+stage.scrollTop;lens.style.left=(stageX-width/2)+'px';lens.style.top=(stageY-height/2)+'px';lens.classList.remove('hidden');lens.setAttribute('aria-hidden','false');state.letterMagnifierPoint={clientX:event.clientX,clientY:event.clientY};
 }
-function refreshLetterMagnifier(save=false){letterMagnifierSettings();if(save)saveLetterMagnifierPrefs();if(state.letterMagnifierPoint)renderLetterMagnifierAt(state.letterMagnifierPoint);}
+function refreshLetterMagnifier(save=false,normalize=false){
+  letterMagnifierSettings();
+  // Normalize only after editing ends; otherwise clearing a number immediately refills it.
+  if(normalize)applyLetterMagnifierInputs();
+  if(save)saveLetterMagnifierPrefs();
+  if(state.letterMagnifierPoint)renderLetterMagnifierAt(state.letterMagnifierPoint);
+}
 async function renderLetterContentPreview(){
   const canvas=$('#nlpdfLetterContentCanvas'),empty=$('#nlpdfLetterContentEmpty'),label=$('#nlpdfLetterContentLabel'),counter=$('#nlpdfLetterContentCounter'),prev=$('#nlpdfLetterContentPrev'),next=$('#nlpdfLetterContentNext');if(!canvas||!empty||!label||!counter||!prev||!next)return;
   hideLetterMagnifier();const pages=letterContentPagesForStep(state.letterWizardStep),epoch=++state.letterPreviewEpoch;
@@ -1825,7 +1848,7 @@ async function prepareLetterEditor(context){
   $('#nlpdfLetterEmbassyResults').onclick=e=>{const b=e.target.closest('[data-embassy-result]');if(!b)return;const r=(centralReference().embassy||[]).find(x=>embassyValues(x).id===b.dataset.embassyResult);if(r)applyEmbassyRecord(context,r);};$('#nlpdfLetterEmbassyAddress').oninput=e=>{context.embassyAddressEdited=true;context.values.embassyAddress=e.target.value;state.linkedData.embassyAddress=e.target.value;for(const target of [context.values,state.linkedData])for(const key of Object.keys(target))if(/^embassyAddress\d+$/.test(key))target[key]='';addressLines(e.target.value).forEach((line,i)=>{context.values['embassyAddress'+(i+1)]=line;state.linkedData['embassyAddress'+(i+1)]=line;});};
   $('#nlpdfLetterHomeSchool').oninput=e=>{context.values.homeUniversity=e.target.value;applyRememberedSchool(context,e.target.value);};
   $('#nlpdfLetterHomeCountry').onchange=e=>{const r=(centralReference().countries||[]).find(x=>countryValues(x).id===e.target.value);if(r)context.values.homeCountry=countryValues(r).countryEn;};
-  $('#nlpdfLetterExtraFields').oninput=e=>{const el=e.target.closest('[data-letter-extra]');if(!el)return;context.values[el.dataset.letterExtra]=el.value;};document.querySelectorAll('[data-letter-step]').forEach(b=>b.onclick=()=>setLetterWizardStep(Number(b.dataset.letterStep),true));$('#nlpdfLetterBack').onclick=()=>moveLetterWizard(-1);$('#nlpdfLetterNext').onclick=()=>moveLetterWizard(1);$('#nlpdfLetterContentPrev').onclick=()=>changeLetterContentPreview(-1);$('#nlpdfLetterContentNext').onclick=()=>changeLetterContentPreview(1);const contentCanvas=$('#nlpdfLetterContentCanvas');contentCanvas.onpointerenter=renderLetterMagnifierAt;contentCanvas.onpointermove=renderLetterMagnifierAt;contentCanvas.onpointerleave=hideLetterMagnifier;['nlpdfLetterMagnifierWidth','nlpdfLetterMagnifierHeight','nlpdfLetterMagnifierZoom'].forEach(id=>{$('#'+id).oninput=()=>refreshLetterMagnifier(true);$('#'+id).onchange=()=>refreshLetterMagnifier(true);});applyLetterMagnifierInputs();letterMagnifierSettings();
+  $('#nlpdfLetterExtraFields').oninput=e=>{const el=e.target.closest('[data-letter-extra]');if(!el)return;context.values[el.dataset.letterExtra]=el.value;};document.querySelectorAll('[data-letter-step]').forEach(b=>b.onclick=()=>setLetterWizardStep(Number(b.dataset.letterStep),true));$('#nlpdfLetterBack').onclick=()=>moveLetterWizard(-1);$('#nlpdfLetterNext').onclick=()=>moveLetterWizard(1);$('#nlpdfLetterContentPrev').onclick=()=>changeLetterContentPreview(-1);$('#nlpdfLetterContentNext').onclick=()=>changeLetterContentPreview(1);const contentCanvas=$('#nlpdfLetterContentCanvas');contentCanvas.onpointerenter=renderLetterMagnifierAt;contentCanvas.onpointermove=renderLetterMagnifierAt;contentCanvas.onpointerleave=hideLetterMagnifier;['nlpdfLetterMagnifierWidth','nlpdfLetterMagnifierHeight','nlpdfLetterMagnifierZoom'].forEach(id=>{$('#'+id).oninput=()=>refreshLetterMagnifier(true);$('#'+id).onchange=()=>refreshLetterMagnifier(true,true);});applyLetterMagnifierInputs();letterMagnifierSettings();
   $('#nlpdfCreateEditedLetter').disabled=!model.fields.length;$('#nlpdfLetterEditor').classList.remove('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','false');setLetterWizardStep(0,true);
 }
 function hideLetterEditor(){

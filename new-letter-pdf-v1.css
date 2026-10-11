@@ -1941,6 +1941,10 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
 #workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls label{display:flex;align-items:center;gap:3px;color:var(--muted);font-size:8px;font-weight:750}
 #workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls input{width:42px;height:26px;box-sizing:border-box;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--text);padding:0 4px;text-align:center;font:inherit;font-size:9px;font-weight:800;outline:0}
 #workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls input:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+/* Let staff enter exact values without the native number arrows covering digits. */
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls input[type=number]{appearance:textfield;-moz-appearance:textfield}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls input[type=number]::-webkit-inner-spin-button,
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier-controls input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 #workspaceDocuments.nlpdf-primary .nlpdf-letter-content-stage{isolation:isolate}
 #workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier{position:absolute;z-index:8;pointer-events:none;border:2px solid color-mix(in srgb,var(--accent) 82%,#fff);border-radius:5px;background:#fff;box-shadow:0 8px 22px rgba(17,31,50,.24);box-sizing:content-box;image-rendering:auto}
 #workspaceDocuments.nlpdf-primary .nlpdf-letter-magnifier.hidden{display:none!important}
