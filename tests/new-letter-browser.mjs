@@ -739,6 +739,49 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.match(out.plain,/หนังสือเดินทางหมายเลข\s*QA998877/,'Thai passport value must remain in the paragraph');
   });
 
+  await run('Every other New Letter DOCX type uses the international-format phone number',async()=>{
+    for(const [type,title] of [
+      ['bachelor','Bachelor'],
+      ['current_no_ien','Current No IEN'],
+      ['master','Master'],
+      ['doctor','Doctor'],
+    ]){
+      const before=await page.evaluate(()=>window.__mockFiles.length);
+      await page.locator('#nlpdfCreate').click();
+      await page.locator('#nlpdfExportNumber').fill('9287');
+      await page.locator('#nlpdfExportName').fill('Phone QA '+title);
+      await page.locator('#nlpdfExportPassport').fill('PHONE99881');
+      await page.locator('#nlpdfExportStudentId').fill('1690999999');
+      await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
+      await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
+      await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
+      await page.locator('#nlpdfChooseDestination').click();
+      await page.locator('#nlpdfConfirmExport').click();
+      await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
+      await page.locator('#nlpdfExportLetterType').selectOption(type);
+      await page.locator('#nlpdfConfirmLetterType').click();
+      await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+      await page.locator('[data-letter-step="4"]').click();
+      await page.locator('#nlpdfCreateEditedLetter').click();
+      await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
+      const output=await page.evaluate(async start=>{
+        const file=window.__mockFiles.slice(start).find(f=>f.name.endsWith('.docx'));
+        if(!file)return null;
+        const zip=await JSZip.loadAsync(file.bytes);
+        const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        const parts=zip.file(/^word\/(?:document|header\d+|footer\d+)\.xml$/i);
+        const texts=await Promise.all(parts.map(async part=>{
+          const xml=await part.async('string'),doc=new DOMParser().parseFromString(xml,'application/xml');
+          return {part:part.name,paragraphs:[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join(''))};
+        }));
+        const phoneLines=texts.flatMap(x=>x.paragraphs.filter(p=>p.includes('2407')||p.includes('3888')));
+        return {finished:file.finished,name:file.name,phoneLines};
+      },before);
+      assert(output?.finished,`Document type ${type} must generate a finished Word letter`);
+      assert.deepEqual(output.phoneLines,['โทร (+66) 2407 3888 ต่อ 2441'],`Document type ${type} must update exactly one footer telephone line: ${JSON.stringify(output.phoneLines)}`);
+    }
+  });
+
 
   await run('Export modal shows processing, then success only after write completes',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
