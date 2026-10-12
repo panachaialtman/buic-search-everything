@@ -6,6 +6,7 @@ on:
       - 'new-letter-pdf-v1.css'
       - 'index.html'
       - 'tests/new-letter-browser.mjs'
+      - 'tests/audit-letter-phone.py'
       - '.github/workflows/new-letter-browser.yml'
   workflow_dispatch:
 
