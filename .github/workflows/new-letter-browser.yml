@@ -26,6 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Audit footer telephone formats across every DOCX template
+        run: python3 tests/audit-letter-phone.py
       - name: Install Playwright and Chromium
         run: |
           npm install --no-save playwright@1.55.1
