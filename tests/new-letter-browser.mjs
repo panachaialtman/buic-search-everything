@@ -711,6 +711,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
       return {finished:file.finished,plain,paras,rawParas,orientationParagraphs:paras.filter(p=>/\borientation\b/i.test(p)),contactUpdated:allContactText.includes('โทร (+66) 2407 3888 ต่อ 2441'),contactLegacy:/โทร\s*0\s*2407\s*3888\s*ต่อ\s*2441/.test(allContactText)};
     },before);
     assert(out&&out.finished,'Bachelor No IEN letter should be written');
+    assert.match(out.plain,/issuing\s+Thai QA\s+an extendable Non-Immigrant Visa/i,'Embassy letter must insert the current student name instead of the template placeholder');
+    assert.doesNotMatch(out.plain,/issuing\s+Name\s+an extendable/i,'Embassy letter must not retain the literal Name placeholder');
     assert.equal(out.contactUpdated,true,'Bachelor No IEN Word letter must use (+66) International Center telephone');
     assert.equal(out.contactLegacy,false,'Bachelor No IEN Word letter must not retain the legacy phone number');
     assert(out.orientationParagraphs.some(p=>/\bJanuary 4 - 8, 2027\.$/.test(p.trim())),'Bachelor No IEN orientation must end with period immediately after the date: '+JSON.stringify(out.orientationParagraphs));
