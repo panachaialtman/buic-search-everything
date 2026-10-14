@@ -1241,7 +1241,7 @@ function occurrenceParts(record,start,end){
   return record.runs.filter(r=>Math.max(start,r.start)<Math.min(end,r.end)).map(r=>({run:r.run,texts:r.texts,original:r.value,from:Math.max(0,start-r.start),to:Math.min(r.value.length,end-r.start),runStart:r.start}));
 }
 function addOccurrence(fields,record,kind,label,start,end,opts={}){
-  if(start<0||end<=start||!overlapsHighlighted(record,start,end))return null;
+  if(start<0||end<=start||(!opts.allowUnhighlighted&&!overlapsHighlighted(record,start,end)))return null;
   if(record.occurrences.some(o=>Math.max(start,o.start)<Math.min(end,o.end)))return null;
   const raw=record.full.slice(start,end);
   const key=kind;
@@ -1294,7 +1294,9 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/student at\s+([^,]+),/i,'homeUniversity','Home university / school');
     addRegexOccurrence(fields,rec,/student at\s+[^,]+,\s*([^,]+?)\s+has been admitted/i,'homeCountry','Home university country');
     addRegexOccurrence(fields,rec,/(?:Bachelor’s|Master’s|Doctor)\s+Degree Program in\s+(.+?)(?:\.|\s+The study period)/,'programEn','Program / Major',1,{reference:'faculty'});
-    addRegexOccurrence(fields,rec,/issuing\s+(.+?)\s+an extendable/i,'studentName','Student name');
+    // Some source templates contain a literal, non-highlighted 'Name' placeholder in the embassy letter.
+    // Only allow that exact placeholder through the semantic mapper without a Word highlight.
+    addRegexOccurrence(fields,rec,/issuing\s+(.+?)\s+an extendable/i,'studentName','Student name',1,{allowUnhighlighted:/\bissuing\s+Name\s+an extendable\b/i.test(t)});
     addRegexOccurrence(fields,rec,/ที่\s*มกท\/ศนช\.\s*([0-9]+)/,'documentNo','Document number');
     if(/^\d{1,2}\s+[\u0E00-\u0E7F]+\s+25\d{2}$/.test(trim))addOccurrence(fields,rec,'letterDate','Letter date',t.indexOf(trim),t.indexOf(trim)+trim.length,{format:'dateTh'});
     addRegexOccurrence(fields,rec,/เรื่อง[^\n]*ของ\s+(.+)$/,'studentName','Student name');
