@@ -859,7 +859,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
   });
 
 
-  await run('Current Letter fills the viewport, exposes reserved topics, and keeps fallback in Settings',async()=>{
+  await run('Current Letter fills the viewport, opens active letter case pages, and keeps fallback in Settings',async()=>{
     assert.equal((await page.locator('[data-workspace="extend"]').innerText()).trim(),'Current Letter');
     assert.equal((await page.locator('.brand-subtitle').innerText()).includes('Extend Letter'),false);
     await page.locator('[data-workspace="extend"]').click();
@@ -877,12 +877,17 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await page.locator('.extend-letter-fallback').count(),0);
     const visa=page.frameLocator('#workspaceExtend .extend-letter-frame');
     await visa.locator('[data-view="settings"]').waitFor({state:'visible',timeout:30000});
-    for(const [key,title] of [['cancel','Cancel'],['graduated','Graduated'],['criminal_record','Criminal Record']]){
-      const nav=visa.locator('[data-view="placeholder"][data-placeholder="'+key+'"]');
-      await nav.click();
+    // These topics were previously empty placeholders. They now have real
+    // saved-case lists and letter forms; assert the current navigation.
+    for(const [key,title,viewId,formId] of [
+      ['cancel','Cancel','cancelView','cancelLetterForm'],
+      ['graduated','Graduated','graduatedView','graduatedLetterForm'],
+      ['criminal','Criminal Record','criminalView','criminalLetterForm']
+    ]){
+      await visa.locator('[data-view="'+key+'"]').click();
       assert.equal((await visa.locator('#pageTitle').innerText()).trim(),title);
-      assert.equal((await visa.locator('#placeholderView').innerText()).trim(),'');
-      assert.equal(await visa.locator('#placeholderView').getAttribute('class').then(v=>v.includes('active')),true);
+      assert.equal(await visa.locator('#'+viewId).getAttribute('class').then(v=>v.includes('active')),true);
+      assert.equal(await visa.locator('#'+formId).isVisible(),true);
       assert.equal(await visa.locator('#draftsBtn').isVisible(),false);
       assert.equal(await visa.locator('#addStudentBtn').isVisible(),false);
     }
