@@ -1955,7 +1955,13 @@ function applyExchangeHomeSchoolPunctuation(context,doc,ns){
   if(context.type!=='exchange')return;const school=clean(context.values.homeUniversity);if(!school)return;
   const paragraphs=[...doc.getElementsByTagNameNS(ns,'p')];
   for(const paragraph of paragraphs){
-    const full=paragraphPlainText(paragraph,ns),schoolAt=full.indexOf(school);if(schoolAt<0)continue;
+    // Use raw (untrimmed) text for offsets. Thai Word paragraphs can start
+    // with a space or tab-bearing run; paragraphPlainText() trims that space
+    // and previously shifted the removal offset, deleting the last letter of
+    // the home university instead of the comma after its name.
+    const full=[...paragraph.getElementsByTagNameNS(ns,'t')]
+      .map(node=>node.textContent||'').join('');
+    const schoolAt=full.indexOf(school);if(schoolAt<0)continue;
     const end=schoolAt+school.length,after=full.slice(end),thai=/[\u0E00-\u0E7F]/.test(full);
     if(thai){
       const comma=after.match(/^(\s*),/);if(comma)removeParagraphTextRange(paragraph,ns,end+comma[1].length,end+comma[1].length+1);
