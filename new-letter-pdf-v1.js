@@ -1293,6 +1293,14 @@ function semanticLetterModel(doc,ns){
     addRegexOccurrence(fields,rec,/,\s+(?:an?\s+)?([^,]+?)\s+Citizen\b/,'nationalityEn','Nationality',1,{reference:'country'});
     addRegexOccurrence(fields,rec,/student at\s+([^,]+),/i,'homeUniversity','Home university / school');
     addRegexOccurrence(fields,rec,/student at\s+[^,]+,\s*([^,]+?)\s+has been admitted/i,'homeCountry','Home university country');
+    // The Exchange Bachelor Thai paragraph uses a highlighted literal
+    // "Theirschool" (sometimes "Their school") instead of a Thai school name.
+    // Map that single Thai-paragraph placeholder to the SAME homeUniversity
+    // input as the English "student at ..." sentence. Preserve its Word run
+    // and highlight using the normal occurrence replacement pipeline.
+    if(/[\u0E00-\u0E7F]/.test(t))
+      addRegexOccurrence(fields,rec,/\b(Their\s*school)\b/i,
+        'homeUniversity','Home university / school');
     addRegexOccurrence(fields,rec,/(?:Bachelor’s|Master’s|Doctor)\s+Degree Program in\s+(.+?)(?:\.|\s+The study period)/,'programEn','Program / Major',1,{reference:'faculty'});
     // Some source templates contain a literal, non-highlighted 'Name' placeholder in the embassy letter.
     // Only allow that exact placeholder through the semantic mapper without a Word highlight.
