@@ -1298,9 +1298,15 @@ function semanticLetterModel(doc,ns){
     // Map that single Thai-paragraph placeholder to the SAME homeUniversity
     // input as the English "student at ..." sentence. Preserve its Word run
     // and highlight using the normal occurrence replacement pipeline.
-    if(/[\u0E00-\u0E7F]/.test(t))
+    if(/[\u0E00-\u0E7F]/.test(t)){
       addRegexOccurrence(fields,rec,/\b(Their\s*school)\b/i,
         'homeUniversity','Home university / school');
+      // This Exchange Bachelor Thai sentence has a highlighted ประเทศ
+      // immediately after the school placeholder. It means the SCHOOL's
+      // country, not the student's own nationality.
+      addRegexOccurrence(fields,rec,/Their\s*school\s*,?\s*(ประเทศ)(?=\s*ตั้งแต่ภาคการศึกษาที่)/i,
+        'homeCountryThaiFull','Full school country (Thai)',1,{reference:'country'});
+    }
     addRegexOccurrence(fields,rec,/(?:Bachelor’s|Master’s|Doctor)\s+Degree Program in\s+(.+?)(?:\.|\s+The study period)/,'programEn','Program / Major',1,{reference:'faculty'});
     // Some source templates contain a literal, non-highlighted 'Name' placeholder in the embassy letter.
     // Only allow that exact placeholder through the semantic mapper without a Word highlight.
@@ -1432,6 +1438,12 @@ function occurrenceValue(context,field,occ){
     const start=context.values.startDate,end=context.values.finishDate;
     if(!start||!end)return occ.raw;
     return occ.format==='studyPeriodTh'?formatStudyPeriodTh(start,end):formatStudyPeriodEn(start,end);
+  }
+  if(field.kind==='homeCountryThaiFull'){
+    const match=bestCountryRecord(context.values.homeCountry);
+    const thai=match?countryValues(match).fullCountryTh:'';
+    if(!thai)throw new Error('Select a valid Home university country to insert its full Thai country name in the Exchange letter.');
+    return thai;
   }
   const value=fieldCurrentValue(context,field);
   if(occ.format==='semesterNumber')return semesterNumber(value);
@@ -1737,7 +1749,7 @@ function saveCurrentHomeSchool(context){
   let rows=schoolListEntries().filter(x=>normalizedLetterValue(x.school)!==normalizedLetterValue(school));rows.push({school,countryId:c.id,countryEn:c.countryEn,countryTh:c.countryTh,updatedAt:new Date().toISOString()});saveSchoolEntries(rows);
 }
 function recognizedExtraFields(context){
-  const covered=new Set(['studentName','passport','studentId','documentNo','recipientLocation','nationalityEn','nationalityTh','countryEn','countryTh','programEn','programTh','facultyEn','facultyTh','embassy','embassyOffice','embassyThai','embassyCountry','embassyAddress','embassyAddress1','embassyAddress2','embassyAddress3','embassyAddress4','semester','academicYear','academicYearThai','startDate','finishDate','orientation','homeUniversity','homeCountry','studyPeriod','letterDate']);
+  const covered=new Set(['studentName','passport','studentId','documentNo','recipientLocation','nationalityEn','nationalityTh','countryEn','countryTh','programEn','programTh','facultyEn','facultyTh','embassy','embassyOffice','embassyThai','embassyCountry','embassyAddress','embassyAddress1','embassyAddress2','embassyAddress3','embassyAddress4','semester','academicYear','academicYearThai','startDate','finishDate','orientation','homeUniversity','homeCountry','homeCountryThaiFull','studyPeriod','letterDate']);
   return context.editor.model.fields.filter(f=>!covered.has(f.kind)&&!covered.has(f.key)&&!f.package);
 }
 function renderLetterExtras(context){
