@@ -6,14 +6,81 @@
   const BASE='https://buic-central-hub.vercel.app';
   const TOKEN_KEY='buic-student-memory-staff-token-v1';
   let token='';
+  let sessionVerified=false;
+  let staffIdentity=null;
   let authPromise=null,authResolve=null;
   try{token=sessionStorage.getItem(TOKEN_KEY)||'';}catch{}
+
+// Versioned, local-only outbox for exact Student DB payloads.
+// A staff session never uploads unfinished drafts automatically.
+const PENDING_DB_NAME='buic-student-db-pending-v1';
+function pendingDb(){return new Promise((resolve,reject)=>{
+ const req=indexedDB.open(PENDING_DB_NAME,1);
+ req.onupgradeneeded=()=>req.result.createObjectStore('pending',{keyPath:'id'});
+ req.onsuccess=()=>resolve(req.result);
+ req.onerror=()=>reject(req.error||new Error('Pending-save database failed'));
+});}
+async function pendingTx(mode,callback){
+ const db=await pendingDb();
+ try{return await new Promise((resolve,reject)=>{
+   const tx=db.transaction('pending',mode),request=callback(tx.objectStore('pending'));
+   let value;
+   if(request)request.onsuccess=()=>{value=request.result};
+   tx.oncomplete=()=>resolve(value);
+   tx.onerror=()=>reject(tx.error||new Error('Pending-save transaction failed'));
+   tx.onabort=()=>reject(tx.error||new Error('Pending-save transaction aborted'));
+ });}finally{db.close();}
+}
+async function pendingRecords(){
+ const actor=staffIdentity?.id;
+ if(!actor)return [];
+ return (await pendingTx('readonly',s=>s.getAll())||[]).filter(x=>x.actor===actor);
+}
+function pendingStatus(text,isError=false){
+ let node=document.getElementById('buicPendingSaveStatus');
+ if(!node){
+   node=document.createElement('div');node.id='buicPendingSaveStatus';
+   node.setAttribute('role','status');
+   node.style.cssText='position:fixed;z-index:2147483645;bottom:10px;left:10px;max-width:min(460px,92vw);padding:10px 14px;border:1px solid #f5d87b;border-radius:10px;background:#fffbeb;color:#92400e;font:12px sans-serif';
+   document.body.appendChild(node);
+ }
+ node.textContent=text;
+ if(isError){
+  const button=document.createElement('button');button.textContent='Retry pending Student DB saves';button.type='button';
+  button.style.marginLeft='8px';button.addEventListener('click',()=>void retryPending());node.append(button);
+ }
+}
+async function enqueuePending(payload,error){
+ const actor=staffIdentity?.id;
+ if(!actor)throw new Error('Cannot retain pending save without validated staff identity');
+ const exact=structuredClone(payload);
+ const json=JSON.stringify(exact);
+ const checksum=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(json))))
+   .map(b=>b.toString(16).padStart(2,'0')).join('');
+ const entry={id:actor+':'+checksum,actor,checksum,payload:exact,
+   createdAt:new Date().toISOString(),lastError:String(error?.message||error)};
+ await pendingTx('readwrite',store=>store.put(entry));
+ pendingStatus('Letter saved locally. Student DB save pending ('+entry.lastError+').',true);
+ return entry;
+}
+async function retryPending(){
+ if(!sessionVerified){pendingStatus('Sign in or retry Hub connection before retrying shared saves.',true);return;}
+ const records=await pendingRecords();let done=0,failed=0;
+ for(const r of records){
+  try{await api('/api/staff/students/remember',{method:'POST',body:r.payload});
+      await pendingTx('readwrite',store=>store.delete(r.id));done++;}
+  catch(error){failed++;if(error.status===409){pendingStatus('Document conflict requires manual correction review. Pending record retained.',true);break;}}
+ }
+ pendingStatus(done+' shared save(s) completed · '+failed+' pending. '+
+   (failed?'Nothing was overwritten.':'Student DB is up to date.'),failed>0);
+}
 
   const esc=(v='')=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const clean=v=>String(v??'').trim();
 
   function setToken(value){
     token=value||'';
+    if(!token){sessionVerified=false;staffIdentity=null;}
     try{if(token)sessionStorage.setItem(TOKEN_KEY,token);else sessionStorage.removeItem(TOKEN_KEY);}catch{}
     renderState();
   }
@@ -23,14 +90,27 @@
     const headers={'Accept':'application/json'};
     if(body!==undefined)headers['Content-Type']='application/json';
     if(auth&&token)headers['Authorization']='Bearer '+token;
-    const response=await fetch(BASE+path,{
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),8000);
+    let response;
+    try{response=await fetch(BASE+path,{
       method,mode:'cors',credentials:'omit',cache:'no-store',headers,
+      signal:controller.signal,
       body:body===undefined?undefined:JSON.stringify(body)
-    });
+    });}
+    catch(error){throw Object.assign(new Error(error?.name==='AbortError'
+      ?'Hub connection timed out. Retry when connected.'
+      :'Cannot reach the Hub. Your sign-in token and drafts are preserved.'),
+      {status:0,kind:'connection',cause:error});}
+    finally{clearTimeout(timeout);}
     const raw=await response.text();let data={};
     try{data=raw?JSON.parse(raw):{};}catch{data={detail:raw||('HTTP '+response.status)};}
-    if(response.status===401&&auth)clearToken();
-    if(!response.ok)throw Object.assign(new Error(data.detail||('Hub returned HTTP '+response.status)),{status:response.status,data});
+    if(response.status===401&&auth){sessionVerified=false;clearToken();}
+    if(!response.ok){
+      const detail=data.detail;
+      const message=typeof detail==='string'?detail:(detail?.message||('Hub returned HTTP '+response.status));
+      throw Object.assign(new Error(message),{status:response.status,data});
+    }
     return data;
   }
 
@@ -90,6 +170,7 @@
           <label>Password<input id="buicWorkspacePassword" type="password" autocomplete="current-password" required></label>
           <div class="buic-auth-error" id="buicWorkspaceLoginError"></div>
           <button id="buicWorkspaceLoginButton" type="submit">Sign in</button>
+          <button id="buicWorkspaceRetry" type="button">Retry Hub connection</button>
         </form>
       </section>
     `;
@@ -120,6 +201,7 @@
     document.body.appendChild(modal);
 
     gate.querySelector('#buicWorkspaceLogin').addEventListener('submit',loginWorkspace);
+    gate.querySelector('#buicWorkspaceRetry').addEventListener('click',()=>void retryConnection());
     modal.addEventListener('click',e=>{if(e.target===modal||e.target.closest('.buic-memory-close'))closeUi();});
     modal.querySelector('#buicMemoryFind').addEventListener('click',findFromUi);
     modal.querySelector('#buicMemoryStudentId').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();findFromUi();}});
@@ -163,6 +245,7 @@
     if(gate)gate.classList.add('hidden');
     document.documentElement.classList.remove('buic-auth-pending');
     renderState();
+    window.dispatchEvent(new CustomEvent('buic-workspace-verified'));
   }
 
   async function loginWorkspace(event){
@@ -176,6 +259,8 @@
     try{
       const result=await api('/api/staff/login',{method:'POST',body:{username,password},auth:false});
       setToken(result.token);
+      sessionVerified=true;
+      staffIdentity={id:String(result.staff?.id||username),username};
       const passwordInput=document.querySelector('#buicWorkspacePassword');
       if(passwordInput)passwordInput.value='';
       unlockWorkspace();
@@ -188,28 +273,45 @@
   }
 
   function requestAuth(){
-    if(token)return Promise.resolve(token);
+    if(token&&sessionVerified)return Promise.resolve(token);
     showGate();
     if(!authPromise)authPromise=new Promise(resolve=>{authResolve=resolve;});
     return authPromise;
   }
 
   async function validateSession(){
-    if(!token)return false;
-    try{await api('/api/staff/session');return true;}
-    catch{return false;}
+    if(!token)return 'rejected';
+    try{
+      const response=await api('/api/staff/session');
+      sessionVerified=true;
+      staffIdentity=response.staff||null;
+      return 'valid';
+    }catch(error){
+      sessionVerified=false;
+      return error.status===401?'rejected':'unavailable';
+    }
   }
-
   async function bootstrapAuth(){
     ensureUi();
-    if(token&&await validateSession()){unlockWorkspace();return;}
-    clearToken();
-    showGate();
+    const state=await validateSession();
+    if(state==='valid'){unlockWorkspace();return;}
+    if(state==='rejected'){clearToken();showGate('Sign in to continue.');}
+    else showGate('The Hub is temporarily unreachable. Your token and local drafts are retained. Retry connection.');
+  }
+  async function retryConnection(){
+    showGate('Checking Hub connection…');
+    const state=await validateSession();
+    if(state==='valid'){
+      unlockWorkspace();
+      if(authResolve){const resolve=authResolve;authResolve=null;authPromise=null;resolve(token);}
+    }
+    else if(state==='rejected'){clearToken();showGate('Your session expired. Sign in again.');}
+    else showGate('Still unable to reach the Hub. Nothing has been deleted.');
   }
 
   async function openUi(){
     ensureUi();
-    if(!token)await requestAuth();
+    if(!sessionVerified)await requestAuth();
     document.querySelector('#buicStudentMemoryModal').classList.remove('hidden');
     document.querySelector('#buicMemorySearchError').textContent='';
     setTimeout(()=>document.querySelector('#buicMemoryStudentId')?.focus(),20);
@@ -218,6 +320,7 @@
   function closeUi(){document.querySelector('#buicStudentMemoryModal')?.classList.add('hidden');}
 
   function signOutWorkspace(){
+    if(token)void api('/api/staff/logout',{method:'POST'}).catch(e=>console.warn('Remote logout unavailable',e));
     closeUi();
     clearToken();
     showGate();
@@ -238,6 +341,7 @@
   }
 
   async function remember(payload,{interactive=true}={}){
+    payload=structuredClone(payload); // exact submitted document, not live form state
     if(!payload?.student?.student_id||!payload?.student?.full_name)throw new Error('Student ID and name are required before saving to Student DB.');
     if(!token){
       if(!interactive)throw Object.assign(new Error('Workspace sign in required'),{status:401});
@@ -245,7 +349,17 @@
     }
     try{return await api('/api/staff/students/remember',{method:'POST',body:payload});}
     catch(err){
-      if(err.status===401&&interactive){showGate('Your workspace session expired. Please sign in again.');await requestAuth();return api('/api/staff/students/remember',{method:'POST',body:payload});}
+      if(err.status===401&&interactive){
+        showGate('Your workspace session expired. Please sign in again.');await requestAuth();
+        try{return await api('/api/staff/students/remember',{method:'POST',body:payload});}
+        catch(retryError){
+          if(retryError.status===0||retryError.status===401||retryError.status===429||retryError.status>=500)
+            await enqueuePending(payload,retryError);
+          throw retryError;
+        }
+      }
+      if(err.status===0||err.status===401||err.status===429||err.status>=500)
+        await enqueuePending(payload,err);
       throw err;
     }
   }
@@ -271,10 +385,17 @@
 
   window.BUICStudentMemory=Object.freeze({
     baseUrl:BASE,open:openUi,logout:signOutWorkspace,getStudent,remember,rememberMany,validateSession,
-    requireAuth:requestAuth,isAuthenticated:()=>Boolean(token)
+    checkDocument:payload=>api('/api/staff/documents/check',{method:'POST',body:structuredClone(payload)}),
+    proposeRevision:(payload,fingerprint,reason,idempotencyKey)=>api('/api/staff/documents/revisions',{method:'POST',body:{
+      document_number:payload.document.document_number,expected_fingerprint:fingerprint,
+      proposed_document:structuredClone(payload.document),proposed_snapshot:structuredClone(payload.snapshot),
+      reason,idempotency_key:idempotencyKey}}),
+    requireAuth:requestAuth,isAuthenticated:()=>Boolean(token&&sessionVerified)
   });
   window.BUICWorkspaceAuth=Object.freeze({
-    login:requestAuth,logout:signOutWorkspace,isAuthenticated:()=>Boolean(token)
+    login:requestAuth,logout:signOutWorkspace,isAuthenticated:()=>Boolean(token&&sessionVerified),
+    getIdentity:()=>staffIdentity&&sessionVerified?{...staffIdentity}:null,
+    retryConnection
   });
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{void bootstrapAuth();},{once:true});

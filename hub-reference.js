@@ -69,6 +69,12 @@
     if (parent < 0 || alias < 0 || idCol < 0) throw new Error('Invalid alias sheet: ' + label);
     const existing = new Set(table.slice(1).map(row => String(row[parent] ?? '') + '\u0000' + normalized(row[alias])));
     const usedIds = new Set(table.slice(1).map(row => String(row[idCol] ?? '')));
+    const expected=new Set(remoteRows.flatMap(r=>(r.aliases||[]).map(a=>
+      String(r.recordId)+'\u0000'+normalized(a))));
+    for(const row of table.slice(1)){
+      const compound=String(row[parent]??'')+'\u0000'+normalized(row[alias]);
+      if(active>=0)row[active]=expected.has(compound)?'YES':'NO';
+    }
     let added = 0;
     for (const remote of remoteRows) {
       for (const value of (remote.aliases || [])) {
@@ -95,25 +101,53 @@
     const sheetCountry = tableIndex(local.Countries, 'Countries');
     const sheetProgram = tableIndex(local.Faculty_Major, 'Faculty_Major');
     const sheetEmbassy = embassies ? tableIndex(local.Embassy, 'Embassy') : null;
-    const matchSet = (table, remote, label) => {
-      const activeIndex = table.headers.indexOf('Active');
-      const keys = [...table.ids.entries()].filter(([,row]) =>
-        activeIndex < 0 || String(row[activeIndex] ?? 'YES').trim().toUpperCase() !== 'NO'
-      ).map(([id]) => id);
-      const remoteIds = remote.map(row => row.recordId);
-      if (remoteIds.length !== keys.length ||
-          new Set(remoteIds).size !== remoteIds.length ||
-          keys.some(key => !remoteIds.includes(key))) {
-        throw new Error(label + ' record IDs differ from the local master; update the full workbook before enabling this Hub version');
+    // Validate the complete published release BEFORE updating a cloned workbook.
+    const validateDataset=(remote,label,required)=>{
+      if(!Array.isArray(remote)||remote.length>6000)throw Error(label+' invalid record count');
+      const ids=new Set();
+      for(const row of remote){
+        if(!row||typeof row!=='object'||!/^[-A-Za-z0-9_]{2,80}$/.test(String(row.recordId||'')))
+          throw Error(label+' has an invalid record ID');
+        if(ids.has(row.recordId))throw Error(label+' contains duplicate record IDs');
+        ids.add(row.recordId);
+        for(const key of required)if(typeof row[key]!=='string'||!row[key].trim())
+          throw Error(label+' '+row.recordId+' lacks '+key);
+        if(row.aliases!==undefined&&(!Array.isArray(row.aliases)||
+          row.aliases.some(a=>typeof a!=='string'||a.length>300)))
+          throw Error(label+' '+row.recordId+' has invalid aliases');
+      }
+      return ids;
+    };
+    const countriesIds=validateDataset(countries,'Countries',['countryEnglish','countryThai']);
+    const nationalitiesIds=validateDataset(nationalities,'Nationalities',['english','thai']);
+    const programsIds=validateDataset(programs,'Programs',['programEnglish','facultyEnglish']);
+    const embassyIds=embassies?validateDataset(embassies,'Embassies',['displayNameEnglish']):null;
+    if(countriesIds.size!==nationalitiesIds.size||
+       [...countriesIds].some(id=>!nationalitiesIds.has(id)))
+      throw Error('Hub Countries and Nationalities IDs differ');
+    for(const record of programs){
+      const credit=record.credits?.['2026'];
+      if(credit!=null&&(!Number.isInteger(credit)||credit<1||credit>600))
+        throw Error('Invalid credits for '+record.recordId);
+    }
+    const syncRecords=(table,remote,ids)=>{
+      const idColumn=table.headers.indexOf('Record ID'),active=table.headers.indexOf('Active');
+      for(const [id,row] of table.ids){
+        if(active>=0)row[active]=ids.has(id)?'YES':'NO';
+      }
+      for(const record of remote){
+        if(table.ids.has(record.recordId))continue;
+        const row=Array(table.headers.length).fill('');row[idColumn]=record.recordId;
+        if(active>=0)row[active]='YES';
+        table.ids.set(record.recordId,row);
+        const target=table===sheetCountry?local.Countries:
+          table===sheetProgram?local.Faculty_Major:local.Embassy;
+        target.push(row);
       }
     };
-    if (countries.length !== nationalities.length ||
-        countries.some((country, i) => country.recordId !== nationalities[i]?.recordId)) {
-      throw new Error('Hub country and nationality datasets do not align');
-    }
-    matchSet(sheetCountry, countries, 'Country');
-    matchSet(sheetProgram, programs, 'Program');
-    if (embassies) matchSet(sheetEmbassy, embassies, 'Embassy');
+    syncRecords(sheetCountry,countries,countriesIds);
+    syncRecords(sheetProgram,programs,programsIds);
+    if(embassies)syncRecords(sheetEmbassy,embassies,embassyIds);
     for (const remote of countries) {
       updateFields(sheetCountry.ids.get(remote.recordId), sheetCountry.headers, FIELDS_COUNTRIES, remote);
     }
@@ -162,11 +196,12 @@
       // Never mutate the active source until every available dataset passes validation.
       const merged = applyRemote(structuredClone(sourceRows), ...responses.map(r => r.records));
       lastVersion = meta.version;
+      try{localStorage.setItem('buic-hub-last-applied-version-v1',String(meta.version));}catch{}
       return { status:'updated', version:meta.version, rows:merged };
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  window.BUICHubReference = Object.freeze({ update, baseUrl: BASE });
+  window.BUICHubReference = Object.freeze({ update, baseUrl: BASE, getAppliedVersion:()=>lastVersion });
 })();

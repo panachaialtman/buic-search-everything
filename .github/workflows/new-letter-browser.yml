@@ -6,6 +6,7 @@ on:
       - 'new-letter-pdf-v1.css'
       - 'index.html'
       - 'tests/new-letter-browser.mjs'
+      - 'tests/workspace-operation-barrier.test.cjs'
       - 'tests/audit-letter-phone.py'
       - '.github/workflows/new-letter-browser.yml'
   workflow_dispatch:
@@ -29,6 +30,8 @@ jobs:
           node-version: '22'
       - name: Audit footer telephone formats across every DOCX template
         run: python3 tests/audit-letter-phone.py
+      - name: Exercise draft operation barrier against the complete production module
+        run: node tests/workspace-operation-barrier.test.cjs
       - name: Install Playwright and Chromium
         run: |
           npm install --no-save playwright@1.55.1

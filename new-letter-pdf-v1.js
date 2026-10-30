@@ -19,6 +19,560 @@ const state={
   editLetterRequested:false, pendingLetter:null, packageHandoff:null, letterWizardStep:0, letterPreviewIndex:0, letterPreviewEpoch:0, letterMagnifierWidth:300, letterMagnifierHeight:200, letterMagnifierZoom:2, letterMagnifierPoint:null, linkedData:{}, referencePicker:null, contentPanelCollapsed:false,
   signatureUrl:'', sig:{xPct:.72,yPct:.80,widthPct:.22}
 };
+/* Review draft format v1: all source bytes and ordered page transforms stay local.
+   Identity is scoped to the validated staff account, not a shared global key.
+   IndexedDB transaction is the autosave boundary; no Hub upload occurs. */
+const REVIEW_DRAFT_DB='buic-new-letter-working-drafts-v1';
+let reviewDraftDirty=false,reviewDraftSaving=false,reviewDraftTimer=0,reviewDraftRevision=0;
+// A restore/import is a write barrier. Every already-started autosave drains
+// before candidate state is installed and before an accepted import commits.
+let reviewDraftPauseDepth=0,reviewDraftEpoch=0,reviewDraftSavePromise=null;
+// During slow import decoding, original controls remain editable. Count those
+// legitimate edits even while writes are paused; only suppress programmatic
+// changes while the already-validated candidate workspace is installed.
+let reviewDraftCandidateInstalling=false;
+// Explicit leases follow asynchronous calls across awaits. A replacement closes
+// admission, drains previously admitted work, then exclusively owns case state.
+// Nested imports reuse their caller's lease instead of deadlocking the drain.
+const reviewWorkspaceOperations=new Set();
+let reviewWorkspaceReplacement=null;
+function reviewOwnsReplacement(lease){
+ return Boolean(lease&&reviewWorkspaceReplacement===lease&&!lease.released);
+}
+async function reviewRunWorkspaceOperation(action,parentLease=null){
+ if(parentLease){
+   if(reviewWorkspaceOperations.has(parentLease)&&!parentLease.released)
+     return action(parentLease);
+   if(reviewOwnsReplacement(parentLease)&&reviewDraftCandidateInstalling)
+     return action(parentLease); // internal preparation of the validated candidate
+   throw new Error('Workspace operation has expired. Please retry.');
+ }
+ if(reviewWorkspaceReplacement||reviewDraftCandidateInstalling){
+   if(typeof toast==='function')toast('A draft is being restored. Please retry after it finishes.');
+   return;
+ }
+ let finish;
+ const lease={released:false,done:new Promise(resolve=>{finish=resolve})};
+ reviewWorkspaceOperations.add(lease);
+ try{return await action(lease);}
+ finally{
+   lease.released=true;
+   reviewWorkspaceOperations.delete(lease);
+   finish();
+ }
+}
+async function reviewAcquireReplacement(){
+ if(reviewWorkspaceReplacement)
+   throw new Error('Another draft operation is running. Please wait for it to finish.');
+ const lease={released:false};
+ reviewWorkspaceReplacement=lease; // close admission before the first await
+ try{
+   const admitted=[...reviewWorkspaceOperations];
+   await Promise.all(admitted.map(operation=>operation.done));
+   // Preserve completed work from the outgoing case before replacement. This
+   // flush runs only when an asynchronous operation actually had to drain.
+   if(admitted.length&&reviewDraftOwner()){
+     // An older autosave may contain the pre-import case. Drain it before
+     // capturing a fresh checkpoint containing all completed outgoing work.
+     if(reviewDraftSavePromise)await reviewDraftSavePromise;
+     const saved=await reviewSaveDraft();
+     if(!saved)throw new Error('The current work could not be saved. Keep this tab open and retry local save before restoring another draft.');
+   }
+   return lease;
+ }catch(error){
+   reviewWorkspaceReplacement=null;lease.released=true;
+   throw error;
+ }
+}
+function reviewReleaseReplacement(lease){
+ if(!reviewOwnsReplacement(lease))return;
+ lease.released=true;
+ reviewWorkspaceReplacement=null;
+}
+// Candidate installation replaces whole-case state while a transaction is
+// pending. Inert protects pointer/focus within the seven editor surfaces, but
+// it does not deactivate document-level shortcuts or callbacks already running.
+// Central guards below are also used by direct document mutators.
+function reviewBlockCandidateShortcut(event){
+ if(!reviewDraftCandidateInstalling)return false;
+ const key=String(event.key||'');
+ const cmd=event.ctrlKey||event.metaKey;
+ if(['Delete','Backspace','Escape','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(key)
+    ||(cmd&&!event.altKey&&['z','y'].includes(key.toLowerCase())))event.preventDefault();
+ // The handler has no reason to process *any* key while candidate state is
+ // installed. Non-workspace keyboard handlers remain independently scoped.
+ return true;
+}
+function reviewDraftDatabase(){
+ return new Promise((resolve,reject)=>{
+  const request=indexedDB.open(REVIEW_DRAFT_DB,1);
+  request.onupgradeneeded=()=>request.result.createObjectStore('cases',{keyPath:'id'});
+  request.onsuccess=()=>resolve(request.result);
+  request.onerror=()=>reject(request.error||new Error('Cannot open draft storage'));
+ });
+}
+async function reviewDraftTransaction(mode,operation){
+ const db=await reviewDraftDatabase();
+ try{return await new Promise((resolve,reject)=>{
+  const tx=db.transaction('cases',mode),store=tx.objectStore('cases');
+  const request=operation(store);
+  let value;
+  if(request){request.onsuccess=()=>{value=request.result};}
+  tx.oncomplete=()=>resolve(value);
+  tx.onabort=()=>reject(tx.error||new Error('Draft save aborted'));
+  tx.onerror=()=>reject(tx.error||new Error('Draft storage error'));
+ });}finally{db.close()}
+}
+function reviewDraftOwner(){return window.BUICWorkspaceAuth?.getIdentity?.()?.id||'';}
+function reviewDraftCaseKey(){
+ const student=clean(state.linkedData.studentId||$('#nlpdfExportStudentId')?.value||caseNumber());
+ if(student)return 'student:'+student;
+ let temp=sessionStorage.getItem('buic-new-letter-unsaved-case-id');
+ if(!temp){temp=uid();sessionStorage.setItem('buic-new-letter-unsaved-case-id',temp);}
+ return 'unsaved:'+temp;
+}
+function reviewDraftRecord(){
+ const owner=reviewDraftOwner();if(!owner)return null;
+ return {
+  id:owner+'|'+reviewDraftCaseKey(),owner,caseKey:reviewDraftCaseKey(),version:1,
+  updatedAt:new Date().toISOString(),
+  pages:structuredClone(state.pages.map(({previewUrl,...rest})=>rest)),
+  sources:[...state.sources.values()].map(({previewUrl,...source})=>({
+    ...source,bytes:source.bytes.slice()})),
+  linkedData:structuredClone(state.linkedData),
+  pendingLetter:state.pendingLetter?{
+    type:state.pendingLetter.type,values:structuredClone(state.pendingLetter.values),
+    frozenReferences:structuredClone(state.pendingLetter.frozenReferences||null),
+    referenceVersion:state.pendingLetter.referenceVersion||null,
+    num:state.pendingLetter.num,name:state.pendingLetter.name,
+    studentId:state.pendingLetter.studentId,passport:state.pendingLetter.passport,
+    letterName:state.pendingLetter.letterName,
+    letterWizardStep:state.letterWizardStep}:null,
+  activeId:state.activeId,viewMode:state.viewMode,
+  selected:[...(state.selected||[])],anchorIndex:state.anchorIndex,
+  letterPreviewIndex:state.letterPreviewIndex||0,
+  packageHandoff:state.packageHandoff?{
+    type:state.packageHandoff.type,num:state.packageHandoff.num,
+    name:state.packageHandoff.name,passport:state.packageHandoff.passport,
+    studentId:state.packageHandoff.studentId,
+    letterName:state.packageHandoff.letterName}:null,
+  settings:{safeArea:state.safeArea,duplicateDetection:state.duplicateDetection,
+    signaturePageId:state.signaturePageId}
+ };
+}
+function reviewArmDraftTimer(delay=600){
+ clearTimeout(reviewDraftTimer);
+ reviewDraftTimer=0;
+ if(reviewDraftPauseDepth||!reviewDraftDirty)return;
+ const epoch=reviewDraftEpoch;
+ reviewDraftTimer=setTimeout(()=>{
+   reviewDraftTimer=0;
+   if(epoch===reviewDraftEpoch&&!reviewDraftPauseDepth)void reviewSaveDraft();
+ },delay);
+}
+async function reviewSaveDraft(){
+ if(reviewDraftPauseDepth)return false;
+ if(reviewDraftSavePromise)return reviewDraftSavePromise;
+ const record=reviewDraftRecord();if(!record)return false;
+ const revision=reviewDraftRevision,epoch=reviewDraftEpoch;
+ reviewDraftSaving=true;
+ const work=(async()=>{
+   try{
+     // A queued microtask must not begin a write after restoration pauses.
+     if(reviewDraftPauseDepth||epoch!==reviewDraftEpoch)return false;
+     await reviewDraftTransaction('readwrite',store=>store.put(record));
+     // A committed old save cannot change the state of a replacement import.
+     if(epoch!==reviewDraftEpoch)return true;
+     reviewDraftDirty=revision!==reviewDraftRevision;
+     if(reviewDraftDirty)reviewArmDraftTimer(800);
+     setStatus('Draft saved locally · '+new Date().toLocaleTimeString());
+     return true;
+   }catch(error){
+     if(epoch===reviewDraftEpoch){
+       reviewDraftDirty=true;
+       setStatus('DRAFT NOT SAVED: '+(error?.name==='QuotaExceededError'
+         ?'browser storage full; export a backup':'storage permission/error'),'error');
+     }
+     console.error('Draft save failed',error);
+     return false;
+   }
+ })();
+ reviewDraftSavePromise=work;
+ try{return await work;}
+ finally{
+   if(reviewDraftSavePromise===work)reviewDraftSavePromise=null;
+   reviewDraftSaving=false;
+   if(!reviewDraftPauseDepth&&reviewDraftDirty&&!reviewDraftTimer)reviewArmDraftTimer(800);
+ }
+}
+function reviewScheduleDraft(){
+ // The old editor is still live while an import ZIP is being decoded. Its
+ // input/drag/linked-data edits MUST be dirty even though durable writes are
+ // paused. The temporary candidate is locked and its programmatic changes
+ // are ignored. No timer may write until the outermost restore resumes.
+ if(reviewDraftPauseDepth&&reviewDraftCandidateInstalling)return;
+ reviewDraftRevision++;
+ reviewDraftDirty=true;
+ if(!reviewDraftPauseDepth)reviewArmDraftTimer();
+}
+async function reviewSuspendDraftAutosave(){
+ // Increment before awaiting: prevents a pending timer from beginning work.
+ reviewDraftPauseDepth++;
+ reviewDraftEpoch++;
+ clearTimeout(reviewDraftTimer);
+ reviewDraftTimer=0;
+ const inFlight=reviewDraftSavePromise;
+ if(inFlight)await inFlight.catch(error=>console.warn('Old draft save failed before restore',error));
+ let released=false;
+ return ()=>{
+   if(released)return;
+   released=true;
+   reviewDraftPauseDepth=Math.max(0,reviewDraftPauseDepth-1);
+   if(!reviewDraftPauseDepth&&reviewDraftDirty)reviewArmDraftTimer();
+ };
+}
+async function reviewSavedDrafts(){
+ const owner=reviewDraftOwner();if(!owner)return [];
+ return reviewDraftTransaction('readonly',store=>store.getAll())
+  .then(rows=>(rows||[]).filter(row=>row.owner===owner&&row.version===1));
+}
+// Validate the entire draft before touching live page state. IndexedDB may
+// contain stale or damaged source blobs, e.g. after a quota failure.
+function reviewValidateDraft(row){
+ if(!row||row.owner!==reviewDraftOwner()||row.version!==1)
+   throw new Error('Draft staff identity or version mismatch');
+ if(!Array.isArray(row.sources)||!Array.isArray(row.pages)||
+    row.sources.length>100||row.pages.length>500)
+   throw new Error('Damaged draft source/page collection');
+ const keys=new Set();let total=0;
+ for(const source of row.sources){
+   if(!source||typeof source.key!=='string'||!source.key||keys.has(source.key)||
+      !['pdf','image'].includes(source.kind))throw new Error('Damaged or repeated draft source');
+   keys.add(source.key);
+   const bytes=source.bytes;
+   if(!(bytes instanceof ArrayBuffer)&&!ArrayBuffer.isView(bytes))
+     throw new Error('Draft is missing original source bytes');
+   const size=bytes.byteLength;
+   if(size<1||size>70*1024*1024)throw new Error('Draft source size is invalid');
+   total+=size;
+ }
+ if(total>150*1024*1024)throw new Error('Draft exceeds local safety limit');
+ const pageIds=new Set();
+ for(const page of row.pages){
+   if(!page||typeof page.id!=='string'||!page.id||pageIds.has(page.id)||!keys.has(page.sourceKey))
+     throw new Error('Draft page refers to a missing source or duplicate page');
+   if(!Number.isSafeInteger(page.sourcePage)||page.sourcePage<1||
+      !['pdf','image'].includes(page.kind))throw new Error('Draft page metadata is invalid');
+   pageIds.add(page.id);
+ }
+ if(row.activeId&&!pageIds.has(row.activeId))throw new Error('Draft selected page is missing');
+ if(row.selected!==undefined&&(!Array.isArray(row.selected)||
+    row.selected.some(id=>!pageIds.has(id))))throw new Error('Draft selection is invalid');
+ if(row.packageHandoff&&(!row.packageHandoff.type||typeof row.packageHandoff.type!=='string'))
+   throw new Error('Draft package handoff is invalid');
+ if(row.pendingLetter&&(!row.pendingLetter.type||
+   !row.pendingLetter.values||typeof row.pendingLetter.values!=='object'))
+   throw new Error('Unfinished letter metadata is invalid');
+ return true;
+}
+// Production workspaceMarkup() closes #newLetterPdfWorkspace before appending
+// the letter editor and its sibling dialogs. They MUST be locked individually.
+// Keep each node's preexisting inert state (including pre-inert dialogs) and
+// restore exactly that state, even when candidate rendering or commit throws.
+const REVIEW_DRAFT_EDIT_SURFACES=Object.freeze([
+ 'newLetterPdfWorkspace','nlpdfLetterEditor','nlpdfExportModal',
+ 'nlpdfLetterTypeModal','nlpdfPackageManager','nlpdfSchoolManager',
+ 'nlpdfReferencePicker'
+]);
+function reviewLockCandidateSurfaces(){
+ const original=[];
+ try{
+   for(const id of REVIEW_DRAFT_EDIT_SURFACES){
+     const element=document.getElementById?.(id);
+     if(!element)continue;
+     original.push({element,inert:Boolean(element.inert)});
+     element.inert=true;
+   }
+ }catch(error){
+   for(const item of original)item.element.inert=item.inert;
+   throw error;
+ }
+ let released=false;
+ return ()=>{
+   if(released)return;
+   released=true;
+   for(const item of original)item.element.inert=item.inert;
+ };
+}
+async function reviewRestoreDraft(row,onPrepared=null,replacementLease=null){
+ reviewValidateDraft(row);
+ const ownsReplacement=!replacementLease;
+ const reviewReplacementLease=replacementLease||await reviewAcquireReplacement();
+ if(!reviewOwnsReplacement(reviewReplacementLease))throw new Error('Draft replacement has expired.');
+ let resumeAutosave=()=>{};
+ try{
+ resumeAutosave=await reviewSuspendDraftAutosave();
+ // Load libraries BEFORE decoding PDF sources, including on a brand-new tab.
+ if(row.sources.some(source=>source.kind==='pdf'))await ensurePdfLibs();
+ const stagedSources=new Map(),stagedPdfDocs=new Map(),stagedUrls=[];
+ try{
+   for(const source of row.sources){
+     const restored={...source,bytes:new Uint8Array(source.bytes)};
+     if(restored.kind==='image'){
+       restored.previewUrl=URL.createObjectURL(new Blob([restored.bytes],{type:restored.mime||'image/png'}));
+       stagedUrls.push(restored.previewUrl);
+     }
+     stagedSources.set(restored.key,restored);
+     if(restored.kind==='pdf'){
+       const pdf=await window.pdfjsLib.getDocument({data:restored.bytes.slice()}).promise;
+       stagedPdfDocs.set(restored.key,pdf);
+     }
+   }
+   const stagedPages=structuredClone(row.pages).map(page=>{
+     const source=stagedSources.get(page.sourceKey);
+     if(page.kind!==source.kind)throw new Error('Draft page/source kind mismatch');
+     return {...page,previewUrl:source.kind==='image'?source.previewUrl:undefined};
+   });
+   // The ordinary preview catches errors inside renderActive, and renderAll
+   // settles even when a thumbnail rejects. Preflight *each* candidate page
+   // through the production sourceRaster PDF renderer / Image decoder BEFORE
+   // installing any of its state, with a separate temporary preview cache.
+   const stagedPreviewCache=new Map();
+   const validationResources={pdfJsDocs:stagedPdfDocs,previewCache:stagedPreviewCache};
+   for(const page of stagedPages){
+     try{
+       const decoded=await sourceRaster(page,validationResources);
+       const cropped=cropRotateRaster(decoded,page);
+       if(!cropped||cropped.width<1||cropped.height<1)
+         throw new Error('Invalid cropped page canvas');
+     }catch(error){
+       throw new Error('Draft page '+page.id+' cannot be rendered: '+
+         (error?.message||String(error)));
+     }
+   }
+   // Preserve editor visibility and event handlers as well as state pointers.
+   // prepareLetterEditor changes DOM handlers before its asynchronous work ends.
+   const editorNode=$('#nlpdfLetterEditor');
+   const oldEditorVisible=Boolean(editorNode&&!editorNode.classList.contains('hidden'));
+   const oldHandlers=[...document.querySelectorAll('#nlpdfLetterEditor input, #nlpdfLetterEditor select, #nlpdfLetterEditor button, #nlpdfLetterEditor textarea')]
+     .map(node=>({node,oninput:node.oninput,onchange:node.onchange,onclick:node.onclick}));
+   const oldHistory=state.history?{current:state.history.current,
+     undo:[...state.history.undo],redo:[...state.history.redo],
+     restoring:state.history.restoring}:null;
+   const oldDirty=reviewDraftDirty,oldRevision=reviewDraftRevision;
+   // Only now swap state; preserve all old state for a render/editor rollback.
+   // Lock live editing while temporary candidate controls are installed. The
+   // original remains editable during the preceding asynchronous ZIP decode.
+   const releaseCandidateSurfaces=reviewLockCandidateSurfaces();
+   reviewDraftCandidateInstalling=true;
+   const old={pages:state.pages,sources:state.sources,pdfJsDocs:state.pdfJsDocs,
+     pdfLibDocs:state.pdfLibDocs,previewCache:state.previewCache,linkedData:state.linkedData,
+     activeId:state.activeId,viewMode:state.viewMode,safeArea:state.safeArea,
+     duplicateDetection:state.duplicateDetection,signaturePageId:state.signaturePageId,
+     pendingLetter:state.pendingLetter,packageHandoff:state.packageHandoff,
+     letterWizardStep:state.letterWizardStep,selected:state.selected,
+     anchorIndex:state.anchorIndex,letterPreviewIndex:state.letterPreviewIndex};
+   try{
+     state.pages=stagedPages;
+     state.sources=stagedSources;
+     state.pdfJsDocs=stagedPdfDocs;
+     state.pdfLibDocs=new Map();state.previewCache=stagedPreviewCache;
+     state.linkedData=structuredClone(row.linkedData||{});
+     state.activeId=row.activeId||stagedPages[0]?.id||'';
+     state.selected=new Set(row.selected||[]);
+     state.anchorIndex=Number.isSafeInteger(row.anchorIndex)?row.anchorIndex:-1;
+     state.letterPreviewIndex=Number.isSafeInteger(row.letterPreviewIndex)?row.letterPreviewIndex:0;
+     // Never let a previous student's handoff or editor survive case switching.
+     state.pendingLetter=row.pendingLetter?.frozenReferences?
+       {frozenReferences:structuredClone(row.pendingLetter.frozenReferences)}:null;
+     state.packageHandoff=row.packageHandoff?
+       {...structuredClone(row.packageHandoff),targetDir:null}:null;
+     state.letterWizardStep=0;
+     state.viewMode=row.viewMode||'single';
+     state.safeArea=Boolean(row.settings?.safeArea);
+     state.duplicateDetection=row.settings?.duplicateDetection!==false;
+     state.signaturePageId=row.settings?.signaturePageId||'';
+     $('#nlpdfSafeArea').checked=state.safeArea;
+     $('#nlpdfDetectDuplicates').checked=state.duplicateDetection;
+     await renderAll();updateControls();
+     if(row.pendingLetter){
+       const stage=row.pendingLetter;
+       state.packageHandoff={...stage,targetDir:null};
+       await prepareLetterEditor({...stage,targetDir:null},reviewReplacementLease);
+       Object.assign(state.pendingLetter.values,structuredClone(stage.values));
+       if(stage.frozenReferences)state.pendingLetter.frozenReferences=structuredClone(stage.frozenReferences);
+       state.pendingLetter.referenceVersion=stage.referenceVersion||null;
+       state.letterWizardStep=stage.letterWizardStep||0;
+       renderLetterFormValues(state.pendingLetter);
+       setLetterWizardStep(state.letterWizardStep,true);
+       setStatus('Draft restored · Choose output destination before generating');
+     }else{
+       // No pending letter is a deliberate, complete case state, not an omission.
+       state.pendingLetter=null;
+       state.packageHandoff=row.packageHandoff?
+         {...structuredClone(row.packageHandoff),targetDir:null}:null;
+       state.letterWizardStep=0;
+       state.letterPreviewIndex=0;
+       hideLetterEditor();
+       closeLetterTypeModal();
+       renderContentPanel();
+     }
+     resetHistory();
+     // Import hook runs only after the entire candidate restored and rendered.
+     // An IndexedDB failure rejects here and triggers the same UI rollback.
+     if(onPrepared)await onPrepared();
+     // The old source URLs are not needed once the replacement rendered.
+     for(const source of old.sources.values())if(source.previewUrl){try{URL.revokeObjectURL(source.previewUrl)}catch(e){console.warn('Old preview cleanup failed',e)}}
+     reviewDraftDirty=false;
+   }catch(error){
+     Object.assign(state,old);
+     // resetHistory() mutates the existing undo/redo arrays, so restore those
+     // too after a failed imported draft's final IndexedDB transaction.
+     if(oldHistory&&state.history){
+       state.history.undo.splice(0,state.history.undo.length,...oldHistory.undo);
+       state.history.redo.splice(0,state.history.redo.length,...oldHistory.redo);
+       state.history.current=oldHistory.current;
+       state.history.restoring=oldHistory.restoring;
+     }
+     reviewDraftDirty=oldDirty;reviewDraftRevision=oldRevision;
+     $('#nlpdfSafeArea').checked=old.safeArea;
+     $('#nlpdfDetectDuplicates').checked=old.duplicateDetection;
+     await renderAll().catch(e=>console.error('Could not repaint preserved workspace',e));
+     updateControls();
+     // Restore previous DOM handlers, visible editor and controls as well as state.
+     for(const h of oldHandlers){h.node.oninput=h.oninput;h.node.onchange=h.onchange;h.node.onclick=h.onclick;}
+     if(editorNode){
+       editorNode.classList.toggle('hidden',!oldEditorVisible);
+       editorNode.setAttribute('aria-hidden',oldEditorVisible?'false':'true');
+     }
+     // Restore the prior editor's controls, not merely its state pointers.
+     if(old.pendingLetter?.editor){
+       renderLetterFormValues(old.pendingLetter);
+       setLetterWizardStep(old.letterWizardStep,true);
+     }else hideLetterEditor();
+     renderContentPanel();
+     throw error;
+   }finally{
+     reviewDraftCandidateInstalling=false;
+     releaseCandidateSurfaces();
+   }
+ }catch(error){
+   for(const url of stagedUrls)URL.revokeObjectURL(url);
+   for(const pdf of stagedPdfDocs.values()){
+     try{await pdf.destroy?.();}catch(cleanupError){console.warn('Staged PDF cleanup failed',cleanupError)}
+   }
+   throw error;
+ }
+ }finally{
+   resumeAutosave();
+   if(ownsReplacement)reviewReleaseReplacement(reviewReplacementLease);
+ }
+}
+async function reviewExportDraft(){
+ const row=reviewDraftRecord();if(!row)throw new Error('Sign in to back up your draft');
+ await ensureZip();
+ const zip=new window.JSZip();
+ const sources=row.sources.map((source,i)=>{
+  const file='sources/'+i+'.bin';zip.file(file,source.bytes);
+  return {...source,bytes:undefined,file};
+ });
+ zip.file('manifest.json',JSON.stringify({...row,sources,version:1}));
+ const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+ a.download='BUIC-draft-'+new Date().toISOString().slice(0,10)+'.zip';a.click();
+ setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+async function reviewImportDraft(file){
+ // Pause before even opening the ZIP: a queued autosave must not rewrite the
+ // previous durable draft during a slow or damaged import's decode phase.
+ const replacementLease=await reviewAcquireReplacement();
+ let resumeAutosave=()=>{};
+ try{
+ resumeAutosave=await reviewSuspendDraftAutosave();
+ await ensureZip();
+ const zip=await window.JSZip.loadAsync(file);
+ const manifest=JSON.parse(await zip.file('manifest.json').async('string'));
+ if(manifest.version!==1||!Array.isArray(manifest.sources)||!Array.isArray(manifest.pages))throw new Error('Unsupported draft backup');
+ const owner=reviewDraftOwner();if(!owner||manifest.owner!==owner)throw new Error('Backup belongs to a different staff account');
+ if(manifest.sources.length>100||manifest.pages.length>500)throw new Error('Draft exceeds review limits');
+ const sources=[];
+ for(const item of manifest.sources){
+  if(!/^sources\/\d+\.bin$/.test(item.file))throw new Error('Unexpected source path');
+  const entry=zip.file(item.file);if(!entry)throw new Error('Missing source bytes');
+  sources.push({...item,bytes:await entry.async('uint8array')});
+ }
+ if(typeof manifest.caseKey!=='string'||!/^((student|unsaved):)[^|\n]{1,180}$/.test(manifest.caseKey))
+   throw new Error('Draft backup has an invalid case key');
+ const row={...manifest,sources,id:owner+'|'+manifest.caseKey};
+ reviewValidateDraft(row);
+ // A failed PDF decode, editor load, or render must NEVER overwrite the
+ // previously saved valid record with this possibly damaged archive.
+ // The callback runs after full staging+render, inside restoration rollback.
+ await reviewRestoreDraft(row,()=>reviewDraftTransaction('readwrite',store=>store.put(row)),replacementLease);
+ }finally{
+   resumeAutosave();
+   reviewReleaseReplacement(replacementLease);
+ }
+}
+let reviewAutoRecoveryPrompted=false;
+async function reviewOfferSavedDraftOnReopen(){
+ if(reviewAutoRecoveryPrompted||state.pages.length||state.pendingLetter||!reviewDraftOwner())return;
+ const drafts=await reviewSavedDrafts();if(!drafts.length)return;
+ drafts.sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
+ reviewAutoRecoveryPrompted=true;
+ const recent=drafts[0];
+ const yes=window.confirm('Unfinished New Letter draft found ('+recent.caseKey+'; '+
+   new Date(recent.updatedAt).toLocaleString()+'). Restore your saved work?');
+ if(yes)await reviewRestoreDraft(recent);
+}
+// Inert cannot stop an event dispatched before the lock or a captured drag
+// callback whose target is still inside the original workspace. Guard DOM
+// events at capture phase as an additional boundary; do not affect the rest of
+// the parent application, and permit normal edits during ZIP decoding.
+function reviewBindCandidateEventShield(){
+ const root=document.getElementById?.('workspaceDocuments');
+ if(!root||!document.addEventListener)return;
+ for(const kind of ['pointerdown','pointermove','pointerup','click','drop','dragstart','input','change']){
+   document.addEventListener(kind,event=>{
+     if(!reviewDraftCandidateInstalling||!root.contains(event.target))return;
+     if(event.cancelable)event.preventDefault();
+     event.stopImmediatePropagation();
+   },true);
+ }
+}
+function reviewBindDraftControls(){
+ if(typeof reviewBindCandidateEventShield==='function')reviewBindCandidateEventShield();
+ const footer=$('#nlpdfCreate')?.parentElement;if(!footer)return;
+ for(const [label,action] of [
+  ['Restore draft',async()=>{
+   const rows=await reviewSavedDrafts();if(!rows.length){toast('No saved draft for this staff account');return;}
+   rows.sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));
+   const choice=window.prompt('Restore draft? Enter its number:\n'+rows.map((r,i)=>
+    (i+1)+'. '+r.caseKey+' · '+r.updatedAt).join('\n'),'1');
+   const row=rows[Number(choice)-1];if(row)await reviewRestoreDraft(row);
+  }],['Backup draft',reviewExportDraft],['Import draft',async()=>{
+   const picker=document.createElement('input');picker.type='file';picker.accept='.zip';
+   picker.onchange=async()=>{
+     try{if(picker.files?.[0])await reviewImportDraft(picker.files[0]);}
+     catch(error){toast(error?.message||'Could not import draft.');}
+   };picker.click();
+  }]]){
+  const button=document.createElement('button');button.type='button';button.textContent=label;
+  button.className='nlpdf-btn';button.addEventListener('click',()=>void action().catch(e=>toast(e.message)));
+  footer.insertBefore(button,$('#nlpdfCreate'));
+ }
+ window.addEventListener('buic-workspace-verified',()=>void reviewOfferSavedDraftOnReopen().catch(e=>toast(e.message)));
+ if(window.BUICWorkspaceAuth?.isAuthenticated?.())
+   queueMicrotask(()=>void reviewOfferSavedDraftOnReopen().catch(e=>toast(e.message)));
+ window.addEventListener('beforeunload',event=>{
+  if(!reviewDraftDirty)return;
+  event.preventDefault();event.returnValue='';
+ });
+ const stored=document.querySelector('#nlpdfLetterEditor');
+ stored?.addEventListener('input',reviewScheduleDraft);
+ stored?.addEventListener('change',reviewScheduleDraft);
+}
+
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const clean=v=>String(v??'').trim(), clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const uid=()=> 'p-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
@@ -288,6 +842,7 @@ function resetHistory(){
 }
 function recordEdit(){
   if(state.history.restoring)return;
+  reviewScheduleDraft();
   const next=snapshot(),hist=state.history;
   if(!hist.current){hist.current=next;updateHistoryButtons();return;}
   if(snapshotFingerprint(hist.current)===snapshotFingerprint(next)){
@@ -303,7 +858,8 @@ function updateHistoryButtons(){
   if(u)u.disabled=!hist.undo.length||hist.restoring;
   if(r)r.disabled=!hist.redo.length||hist.restoring;
 }
-async function restoreSnapshot(next){
+async function restoreSnapshot(next,reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{
   const hist=state.history;hist.restoring=true;updateHistoryButtons();
   const before={...state.assets};
   state.pages=next.pages.map(p=>({...p,crop:{...p.crop},transform:{...p.transform}}));
@@ -329,16 +885,24 @@ async function restoreSnapshot(next){
     renderAssets();refreshSignatureUrl();savePrefs();
     await updateAssetInfo();await renderAll();updateControls();await scanDuplicates();
   }finally{hist.restoring=false;updateHistoryButtons();}
+
+  },reviewParentOperation);
 }
-async function undoEdit(){
+async function undoEdit(reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;
   const h=state.history;if(!h.undo.length||h.restoring)return;
   const previous=h.undo.pop();h.redo.push(h.current);h.current=previous;
-  await restoreSnapshot(previous);
+  await restoreSnapshot(previous,reviewOperation);
+
+  },reviewParentOperation);
 }
-async function redoEdit(){
+async function redoEdit(reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;
   const h=state.history;if(!h.redo.length||h.restoring)return;
   const next=h.redo.pop();h.undo.push(h.current);h.current=next;
-  await restoreSnapshot(next);
+  await restoreSnapshot(next,reviewOperation);
+
+  },reviewParentOperation);
 }
 
 /* Assets */
@@ -381,15 +945,21 @@ async function convertImageBlob(file){
   if(file.type==='image/jpeg'||file.type==='image/png')return file;
   const url=URL.createObjectURL(file);try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;}),c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);return await new Promise(res=>c.toBlob(res,'image/png'));}finally{URL.revokeObjectURL(url);}
 }
-async function importAsset(id,file){
+async function importAsset(id,file,reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;
   if(!file)return;const sig=id==='signature';
   if(sig&&!/^image\//.test(file.type)&&!/\.(png|jpe?g|webp)$/i.test(file.name))throw new Error('Signature must be PNG, JPG or WebP.');
   if(!sig&&file.type!=='application/pdf'&&!/^image\//.test(file.type)&&!/\.(pdf|png|jpe?g|webp)$/i.test(file.name))throw new Error('Front/Back must be PDF or image.');
   let blob=file,name=file.name,type=file.type||'application/octet-stream';
   if(/^image\//.test(type)&&type!=='image/png'&&type!=='image/jpeg'){blob=await convertImageBlob(file);type='image/png';name=file.name.replace(/\.[^.]+$/,'.png');}
   const rec={id,name,type,blob,updatedAt:new Date().toISOString()};await dbPut(rec);state.assets[id]=rec;renderAssets();const t=$('#'+(id==='front'?'nlpdfUseFront':id==='back'?'nlpdfUseBack':'nlpdfUseSignature'));t.disabled=false;t.checked=true;savePrefs();refreshSignatureUrl();await updateAssetInfo();renderActive();recordEdit();toast((sig?'Signature':'Default '+id)+' saved.');
+
+  },reviewParentOperation);
 }
-async function removeAsset(id){await dbDelete(id);state.assets[id]=null;renderAssets();savePrefs();refreshSignatureUrl();await updateAssetInfo();renderActive();recordEdit();toast('Default '+id+' removed.');}
+async function removeAsset(id,reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;await dbDelete(id);state.assets[id]=null;renderAssets();savePrefs();refreshSignatureUrl();await updateAssetInfo();renderActive();recordEdit();toast('Default '+id+' removed.');
+  },reviewParentOperation);
+}
 
 /* Imports */
 async function normalizeImage(file){
@@ -397,8 +967,9 @@ async function normalizeImage(file){
   if(file.type==='image/png'||/\.png$/i.test(file.name))return{mime:'image/png',bytes:new Uint8Array(await file.arrayBuffer()),previewUrl:URL.createObjectURL(file)};
   const b=await convertImageBlob(file);return{mime:'image/png',bytes:new Uint8Array(await b.arrayBuffer()),previewUrl:URL.createObjectURL(b)};
 }
-async function importFile(file){
-  if(/\.zip$/i.test(file.name)||file.type==='application/zip'||file.type==='application/x-zip-compressed')return importZip(file);
+async function importFile(file,reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;
+  if(/\.zip$/i.test(file.name)||file.type==='application/zip'||file.type==='application/x-zip-compressed')return importZip(file,reviewOperation);
   const key=uid();
   if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)){
     const bytes=new Uint8Array(await file.arrayBuffer()),doc=await window.pdfjsLib.getDocument({data:bytes.slice()}).promise;
@@ -411,36 +982,44 @@ async function importFile(file){
     state.pages.push({id:uid(),sourceKey:key,fileName:file.name,kind:'image',sourcePage:1,rotation:0,crop:defaultCrop(),transform:defaultTransform(),spaceMM:0,contentType:'',previewUrl:im.previewUrl});return 1;
   }
   throw new Error(file.name+' is not supported.');
+
+  },reviewParentOperation);
 }
-async function importZip(file){
+async function importZip(file,reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;
   await ensureZip();const zip=await window.JSZip.loadAsync(file);
   const entries=Object.values(zip.files).filter(x=>!x.dir&&/\.(pdf|png|jpe?g|webp)$/i.test(x.name));let count=0;
-  for(const z of entries){const ext=(z.name.split('.').pop()||'').toLowerCase(),mime=ext==='pdf'?'application/pdf':ext==='png'?'image/png':ext==='webp'?'image/webp':'image/jpeg',blob=await z.async('blob'),f=new File([blob],z.name.split('/').pop(),{type:mime});count+=await importFile(f);}
+  for(const z of entries){const ext=(z.name.split('.').pop()||'').toLowerCase(),mime=ext==='pdf'?'application/pdf':ext==='png'?'image/png':ext==='webp'?'image/webp':'image/jpeg',blob=await z.async('blob'),f=new File([blob],z.name.split('/').pop(),{type:mime});count+=await importFile(f,reviewOperation);}
   if(!entries.length)toast('ZIP contained no supported PDF/image files.');return count;
+
+  },reviewParentOperation);
 }
-async function addFiles(files){
+async function addFiles(files,reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;
   const list=[...files];if(!list.length)return;state.busy=true;updateControls();setStatus('Importing '+list.length+' item'+(list.length===1?'':'s')+'…');
   try{
     await ensurePdfLibs();let added=0;
-    for(const f of list){try{added+=await importFile(f);}catch(err){console.error(err);toast(err.message||('Could not import '+f.name));}}
+    for(const f of list){try{added+=await importFile(f,reviewOperation);}catch(err){console.error(err);toast(err.message||('Could not import '+f.name));}}
     if(!state.activeId&&state.pages[0]){state.activeId=state.pages[0].id;state.selected.add(state.activeId);state.anchorIndex=0;}if($('#nlpdfSigScope')?.value==='page'&&!state.signaturePageId)state.signaturePageId=state.activeId;
     await renderAll();recordEdit();setStatus('Added '+added+' page'+(added===1?'':'s')+'.');state.duplicateDismissed.clear();scanDuplicates().catch(console.error);
   }finally{state.busy=false;updateControls();}
+
+  },reviewParentOperation);
 }
 
 /* Preview source cache */
-async function sourceRaster(p){
+async function sourceRaster(p,resources=state){
   const key=p.kind==='pdf'?'pdf:'+p.sourceKey+':'+p.sourcePage:'img:'+p.sourceKey;
-  if(state.previewCache.has(key))return state.previewCache.get(key);
+  if(resources.previewCache.has(key))return resources.previewCache.get(key);
   let canvas;
   if(p.kind==='pdf'){
-    const doc=state.pdfJsDocs.get(p.sourceKey),page=await doc.getPage(p.sourcePage),base=page.getViewport({scale:1}),scale=Math.min(2,1500/base.width),vp=page.getViewport({scale});
+    const doc=resources.pdfJsDocs.get(p.sourceKey),page=await doc.getPage(p.sourcePage),base=page.getViewport({scale:1}),scale=Math.min(2,1500/base.width),vp=page.getViewport({scale});
     canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.floor(vp.width));canvas.height=Math.max(1,Math.floor(vp.height));await page.render({canvasContext:canvas.getContext('2d',{alpha:false}),viewport:vp,intent:'display',annotationMode:pdfCanvasAnnotationMode()}).promise;
   }else{
     const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=p.previewUrl;});
     canvas=document.createElement('canvas');const scale=Math.min(1,1800/img.naturalWidth,2400/img.naturalHeight);canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
   }
-  state.previewCache.set(key,canvas);return canvas;
+  resources.previewCache.set(key,canvas);return canvas;
 }
 function rotateRaster(src,rotation){
   const rot=((rotation||0)%360+360)%360;
@@ -584,14 +1163,14 @@ function updateControls(){
   $('#nlpdfClearAll').disabled=!state.pages.length||state.busy;
   $('#nlpdfSelectionLabel').textContent=sel.length?sel.length+' selected · active page '+(i+1):'No page selected';$('#nlpdfPageCount').textContent=state.pages.length;$('#nlpdfFileCount').textContent=new Set(state.pages.map(p=>p.sourceKey)).size;
 }
-function selectPage(id,event={}){const i=state.pages.findIndex(p=>p.id===id);if(i<0)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}state.activeId=id;const multi=event.ctrlKey||event.metaKey;
+function selectPage(id,event={}){if(reviewDraftCandidateInstalling)return;const i=state.pages.findIndex(p=>p.id===id);if(i<0)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}state.activeId=id;const multi=event.ctrlKey||event.metaKey;
   if(event.shiftKey&&state.anchorIndex>=0){const [a,b]=[state.anchorIndex,i].sort((x,y)=>x-y);if(!multi)state.selected.clear();for(let n=a;n<=b;n++)state.selected.add(state.pages[n].id);}
   else if(multi){state.selected.has(id)?state.selected.delete(id):state.selected.add(id);state.anchorIndex=i;}
   else{state.selected.clear();state.selected.add(id);state.anchorIndex=i;}
   renderAll();
 }
-function deleteSelected(){if(!state.selected.size)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}const ids=new Set(state.selected),old=state.pages.findIndex(p=>p.id===state.activeId);state.pages=state.pages.filter(p=>!ids.has(p.id));state.selected.clear();const n=state.pages[Math.min(Math.max(old,0),state.pages.length-1)];state.activeId=n?.id||'';if(n){state.selected.add(n.id);state.anchorIndex=state.pages.indexOf(n);}else state.anchorIndex=-1;if(!state.pages.some(p=>p.id===state.signaturePageId))state.signaturePageId=n?.id||'';renderAll();recordEdit();scanDuplicates().catch(console.error);}
-function clearAllDocuments(){
+function deleteSelected(){if(reviewDraftCandidateInstalling)return;if(!state.selected.size)return;if(state.cropMode){state.cropMode=false;state.cropDraft=null;}const ids=new Set(state.selected),old=state.pages.findIndex(p=>p.id===state.activeId);state.pages=state.pages.filter(p=>!ids.has(p.id));state.selected.clear();const n=state.pages[Math.min(Math.max(old,0),state.pages.length-1)];state.activeId=n?.id||'';if(n){state.selected.add(n.id);state.anchorIndex=state.pages.indexOf(n);}else state.anchorIndex=-1;if(!state.pages.some(p=>p.id===state.signaturePageId))state.signaturePageId=n?.id||'';renderAll();recordEdit();scanDuplicates().catch(console.error);}
+function clearAllDocuments(){if(reviewDraftCandidateInstalling)return;
   if(!state.pages.length||state.busy)return;
   if(state.cropMode){state.cropMode=false;state.cropDraft=null;state.cropBounds=null;}
   state.pages=[];
@@ -619,14 +1198,14 @@ function rotateCropWithPage(crop,degrees){
   while(steps--){c={top:c.left,right:c.top,bottom:c.right,left:c.bottom};}
   return c;
 }
-function rotateSelected(d){
+function rotateSelected(d){if(reviewDraftCandidateInstalling)return;
   if(state.cropMode)return;
   for(const p of state.pages)if(state.selected.has(p.id)){p.crop=rotateCropWithPage(p.crop,d);p.rotation=((p.rotation||0)+d+360)%360;}
   renderAll();recordEdit();
 }
-function duplicateSelected(){const ids=[...state.selected],newIds=[];for(const id of ids){const i=state.pages.findIndex(p=>p.id===id);if(i<0)continue;const p=state.pages[i],cp={...p,id:uid(),crop:{...p.crop},transform:{...p.transform}};state.pages.splice(i+1,0,cp);newIds.push(cp.id);}if(newIds.length){state.selected=new Set(newIds);state.activeId=newIds[newIds.length-1];state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);}renderAll();recordEdit();state.duplicateDismissed.clear();scanDuplicates().catch(console.error);}
-function moveActive(d){const p=activePage();if(!p)return;const i=state.pages.indexOf(p),j=i+d;if(j<0||j>=state.pages.length)return;[state.pages[i],state.pages[j]]=[state.pages[j],state.pages[i]];state.anchorIndex=j;renderAll();recordEdit();}
-function reorder(a,b){
+function duplicateSelected(){if(reviewDraftCandidateInstalling)return;const ids=[...state.selected],newIds=[];for(const id of ids){const i=state.pages.findIndex(p=>p.id===id);if(i<0)continue;const p=state.pages[i],cp={...p,id:uid(),crop:{...p.crop},transform:{...p.transform}};state.pages.splice(i+1,0,cp);newIds.push(cp.id);}if(newIds.length){state.selected=new Set(newIds);state.activeId=newIds[newIds.length-1];state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);}renderAll();recordEdit();state.duplicateDismissed.clear();scanDuplicates().catch(console.error);}
+function moveActive(d){if(reviewDraftCandidateInstalling)return;const p=activePage();if(!p)return;const i=state.pages.indexOf(p),j=i+d;if(j<0||j>=state.pages.length)return;[state.pages[i],state.pages[j]]=[state.pages[j],state.pages[i]];state.anchorIndex=j;renderAll();recordEdit();}
+function reorder(a,b){if(reviewDraftCandidateInstalling)return;
   if(!a||!b||a===b)return;
   const ids=state.selected.has(a)?new Set(state.selected):new Set([a]);
   const moving=state.pages.filter(p=>ids.has(p.id)),rest=state.pages.filter(p=>!ids.has(p.id));
@@ -647,27 +1226,27 @@ function moveToEdge(edge,draggedId=null){
   state.anchorIndex=state.pages.findIndex(p=>p.id===state.activeId);renderAll();recordEdit();
 }
 function resetTransform(){const p=activePage();if(!p||state.cropMode)return;p.transform=defaultTransform();renderAll();recordEdit();}
-function centerContent(){const p=activePage();if(!p||state.cropMode)return;p.transform.xMM=0;p.transform.yMM=0;renderAll();recordEdit();}
-function applySpace(clear=false){
+function centerContent(){if(reviewDraftCandidateInstalling)return;const p=activePage();if(!p||state.cropMode)return;p.transform.xMM=0;p.transform.yMM=0;renderAll();recordEdit();}
+function applySpace(clear=false){if(reviewDraftCandidateInstalling)return;
   if(!clear&&(!state.assets.signature||!$('#nlpdfUseSignature')?.checked)){toast('Enable a saved Signature first.');return;}
   const scope=$('input[name="nlpdfSpaceScope"]:checked')?.value||'current';
   const pages=scope==='all'?state.pages:(activePage()?[activePage()]:[]);
   for(const p of pages){p.makeSpace=!clear;p.spaceMM=0;}
   renderAll();recordEdit();toast((clear?'Cleared':'Applied')+' signature clearance on '+pages.length+' page(s).');
 }
-function startCrop(){
+function startCrop(){if(reviewDraftCandidateInstalling)return;
   const p=activePage();if(!p)return;state.cropMode=true;state.cropDraft={...p.crop};renderActive();
 }
-function applyCrop(){
+function applyCrop(){if(reviewDraftCandidateInstalling)return;
   const p=activePage();if(!p||!state.cropMode)return;
   p.crop={...state.cropDraft};state.cropMode=false;state.cropDraft=null;state.cropBounds=null;
   state.closeToolFlyout?.();renderAll();recordEdit();
 }
-function cancelCrop(){
+function cancelCrop(){if(reviewDraftCandidateInstalling)return;
   state.cropMode=false;state.cropDraft=null;state.cropBounds=null;
   state.closeToolFlyout?.();renderActive();
 }
-function resetCrop(){const p=activePage();if(!p)return;state.cropMode=false;state.cropDraft=null;p.crop=defaultCrop();renderAll();recordEdit();}
+function resetCrop(){if(reviewDraftCandidateInstalling)return;const p=activePage();if(!p)return;state.cropMode=false;state.cropDraft=null;p.crop=defaultCrop();renderAll();recordEdit();}
 function updateCropOverlay(){
   const layer=$('#nlpdfCropLayer'),box=$('#nlpdfCropRegion'),b=state.cropBounds;
   if(!state.cropMode||!b||b.pageId!==state.activeId){layer.classList.add('hidden');return;}
@@ -861,7 +1440,7 @@ async function renderGrid(){
 async function renderAll(){updateControls();const tasks=[renderActive()];if(state.viewMode==='grid')tasks.push(renderGrid());else tasks.push(renderFilmstrip());await Promise.allSettled(tasks);}
 
 /* View switching */
-function setView(mode){state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSingleView').classList.toggle('active',state.viewMode==='single');$('#nlpdfGridView').classList.toggle('active',state.viewMode==='grid');$('#nlpdfStage').classList.toggle('hidden',state.viewMode==='grid');$('#nlpdfGridStage').classList.toggle('hidden',state.viewMode!=='grid');$('#nlpdfFilmstripWrap').classList.toggle('hidden',state.viewMode==='grid');if(state.viewMode==='grid')renderGrid();else{renderFilmstrip();renderActive();requestAnimationFrame(fitPaper);}}
+function setView(mode){if(reviewDraftCandidateInstalling)return;state.viewMode=mode==='grid'?'grid':'single';$('#nlpdfSingleView').classList.toggle('active',state.viewMode==='single');$('#nlpdfGridView').classList.toggle('active',state.viewMode==='grid');$('#nlpdfStage').classList.toggle('hidden',state.viewMode==='grid');$('#nlpdfGridStage').classList.toggle('hidden',state.viewMode!=='grid');$('#nlpdfFilmstripWrap').classList.toggle('hidden',state.viewMode==='grid');if(state.viewMode==='grid')renderGrid();else{renderFilmstrip();renderActive();requestAnimationFrame(fitPaper);}}
 
 /* Export */
 async function sourcePdfDoc(k){if(state.pdfLibDocs.has(k))return state.pdfLibDocs.get(k);const s=state.sources.get(k),d=await window.PDFLib.PDFDocument.load(s.bytes.slice());state.pdfLibDocs.set(k,d);return d;}
@@ -1036,7 +1615,32 @@ async function buildPdf(progress=()=>{}){
 }
 function customNoIenTemplate(){try{const e=JSON.parse(localStorage.getItem(NO_IEN_OVERRIDE_KEY)||'null');if(e&&typeof e.base64==='string'&&e.base64.length>100)return e;}catch{}return null;}
 function letterBytes(key){const t=(key==='bachelor_no_ien'?customNoIenTemplate():null)||window.LETTER_TEMPLATES?.[key];if(!t?.base64)throw new Error('Selected Word template is missing.');const bin=atob(t.base64),b=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i);return b;}
-async function writeFile(dir,name,data){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();await w.write(data);await w.close();}
+async function writeFile(dir,name,data){
+  let finalName=name;
+  let exists=false;
+  try{await dir.getFileHandle(name,{create:false});exists=true;}
+  catch(e){if(e.name!=='NotFoundError')throw e;}
+  if(exists){
+    // Explicitly choose one of three actions; default must never overwrite.
+    const response=window.prompt('"'+name+'" already exists. Type REPLACE, COPY or CANCEL.','CANCEL');
+    const action=String(response||'CANCEL').trim().toUpperCase();
+    if(action==='CANCEL')throw Object.assign(new Error('File creation cancelled; existing file preserved.'),{code:'USER_CANCELLED'});
+    if(action==='COPY'){
+      const dot=name.lastIndexOf('.'),base=dot>0?name.slice(0,dot):name,ext=dot>0?name.slice(dot):'';
+      let free=false;
+      for(let i=1;i<=9999;i++){
+        finalName=base+' (copy '+i+')'+ext;
+        try{await dir.getFileHandle(finalName,{create:false});}
+        catch(e){if(e.name==='NotFoundError'){free=true;break;}throw e;}
+      }
+      if(!free)throw new Error('No available copy filename; select another destination.');
+    }else if(action!=='REPLACE')throw new Error('Choose REPLACE, COPY or CANCEL; no files were changed.');
+  }
+  const handle=await dir.getFileHandle(finalName,{create:true}),w=await handle.createWritable();
+  try{await w.write(data);await w.close();}
+  catch(e){try{await w.abort();}catch{}throw e;}
+  return {name:finalName,replaced:exists&&finalName===name};
+}
 function caseNumber(){return clean($('#caseStudentNumber')?.value)||clean($('#studentNumber')?.value);}
 function caseName(){return clean($('#caseStudentName')?.value)||clean($('#studentName')?.value);}
 function splitCaseIdentity(raw){
@@ -1084,16 +1688,29 @@ function openLetterTypeModal(preferredType=''){
   modal.classList.add('open');modal.setAttribute('aria-hidden','false');
 }
 function closeLetterTypeModal(){const modal=$('#nlpdfLetterTypeModal');if(!modal)return;modal.classList.remove('open');modal.setAttribute('aria-hidden','true');}
-function cancelLetterType(){closeLetterTypeModal();state.pendingLetter=null;state.packageHandoff=null;renderContentPanel();setStatus('Ready');}
-async function confirmLetterType(){
+function cancelLetterType(){
+  closeLetterTypeModal();
+  const result=state.exportOutcome||{};
+  state.pendingLetter=null;state.packageHandoff=null;renderContentPanel();
+  setStatus(result.pdf?.status==='written'
+    ?'PDF saved · Letter cancelled (package incomplete)':'Letter cancelled · no letter created');
+  state.exportOutcome=null;
+}
+async function confirmLetterType(reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{
   if(state.busy||!state.packageHandoff)return;
   const type=$('#nlpdfExportLetterType').value,handoff={...state.packageHandoff,type};state.packageHandoff={...handoff};
   closeLetterTypeModal();
-  try{await prepareLetterEditor(handoff);}catch(err){console.error(err);toast(err?.message||'Could not open the selected letter.');openLetterTypeModal(type);}
+  try{await prepareLetterEditor(handoff,reviewOperation);}catch(err){console.error(err);toast(err?.message||'Could not open the selected letter.');openLetterTypeModal(type);}
+
+  },reviewParentOperation);
 }
-async function chooseDestination(){
+async function chooseDestination(reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{
   if(!window.showDirectoryPicker){toast('Folder selection requires Chrome or Edge.');return false;}
   try{state.destinationHandle=await window.showDirectoryPicker({mode:'readwrite'});$('#nlpdfDestinationName').textContent=state.destinationHandle.name||'Selected folder';$('#nlpdfDestinationHelp').textContent='Selected outputs will be created here.';return true;}catch(err){if(err?.name!=='AbortError')toast(err.message||'Could not select destination.');return false;}
+
+  },reviewParentOperation);
 }
 function exportProgress(title,detail='',done=0,total=0,mode='active'){
   const layer=$('#nlpdfExportProgress'),heading=$('#nlpdfProgressTitle'),body=$('#nlpdfProgressDetail');
@@ -1130,6 +1747,7 @@ function snapshotRows(sheet){
   const headers=rows[0].map(clean);return rows.slice(1).map(row=>Object.fromEntries(headers.map((h,i)=>[h,row[i]??''])));
 }
 function centralReference(){
+  if(state.pendingLetter?.frozenReferences)return state.pendingLetter.frozenReferences;
   const live=window.BUIC_REFERENCE_DATA;
   if(live?.countries&&live?.faculty&&live?.embassy)return live;
   return {countries:snapshotRows('Countries'),faculty:snapshotRows('Faculty_Major'),embassy:snapshotRows('Embassy')};
@@ -1848,10 +2466,18 @@ function inferInitialPackage(context){
   const saved=clean(localStorage.getItem(LETTER_LAST_ACADEMIC_YEAR_KEY)||''),templateYear=year?(Number(year)>2500?String(Number(year)-543):String(year)):'';
   fillAcademicYearSelect($('#nlpdfLetterAcademicYear'),/^20\d{2}$/.test(saved)?saved:(templateYear||lastAcademicYear()));
 }
-async function prepareLetterEditor(context){
+async function prepareLetterEditor(context,reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{
   await ensureZip();const bytes=letterBytes(context.type),zip=await window.JSZip.loadAsync(bytes),xmlFile=zip.file('word/document.xml');if(!xmlFile)throw new Error('The selected Word template has no editable document body.');
   const xml=await xmlFile.async('string'),doc=new DOMParser().parseFromString(xml,'application/xml');if(doc.querySelector('parsererror'))throw new Error('The selected Word template could not be read.');
-  const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main',model=semanticLetterModel(doc,ns);context.editor={zip,doc,ns,model};context.values={};state.pendingLetter=context;
+  const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main',model=semanticLetterModel(doc,ns);context.editor={zip,doc,ns,model};context.values={};
+   context.frozenReferences=structuredClone(centralReference());
+   const refBytes=new TextEncoder().encode(JSON.stringify(context.frozenReferences));
+   const refHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',refBytes)))
+      .map(b=>b.toString(16).padStart(2,'0')).join('');
+   const hubRelease=window.BUICHubReference?.getAppliedVersion?.();
+   context.referenceVersion=(hubRelease?'hub:'+hubRelease+'|':'local|')+'sha256:'+refHash;
+   state.pendingLetter=context;
   for(const field of model.fields)context.values[field.key]=field.kind==='letterDate'?(toIsoDate(field.value)||''):field.value;
   for(const [key,value] of Object.entries(state.linkedData))if(clean(value))context.values[key]=value;
   if(context.name)context.values.studentName=context.name;if(context.passport)context.values.passport=context.passport;if(context.studentId)context.values.studentId=context.studentId;if(context.num)context.values.documentNo=context.num;if(!context.values.letterDate)context.values.letterDate=todayIsoLocal();context.embassyAddressEdited=false;
@@ -1872,6 +2498,8 @@ async function prepareLetterEditor(context){
   $('#nlpdfLetterHomeCountry').onchange=e=>{const r=(centralReference().countries||[]).find(x=>countryValues(x).id===e.target.value);if(r)context.values.homeCountry=countryValues(r).countryEn;};
   $('#nlpdfLetterExtraFields').oninput=e=>{const el=e.target.closest('[data-letter-extra]');if(!el)return;context.values[el.dataset.letterExtra]=el.value;};document.querySelectorAll('[data-letter-step]').forEach(b=>b.onclick=()=>setLetterWizardStep(Number(b.dataset.letterStep),true));$('#nlpdfLetterBack').onclick=()=>moveLetterWizard(-1);$('#nlpdfLetterNext').onclick=()=>moveLetterWizard(1);$('#nlpdfLetterContentPrev').onclick=()=>changeLetterContentPreview(-1);$('#nlpdfLetterContentNext').onclick=()=>changeLetterContentPreview(1);const contentCanvas=$('#nlpdfLetterContentCanvas');contentCanvas.onpointerenter=renderLetterMagnifierAt;contentCanvas.onpointermove=renderLetterMagnifierAt;contentCanvas.onpointerleave=hideLetterMagnifier;['nlpdfLetterMagnifierWidth','nlpdfLetterMagnifierHeight','nlpdfLetterMagnifierZoom'].forEach(id=>{$('#'+id).oninput=()=>refreshLetterMagnifier(true);$('#'+id).onchange=()=>refreshLetterMagnifier(true,true);});applyLetterMagnifierInputs();letterMagnifierSettings();
   $('#nlpdfCreateEditedLetter').disabled=!model.fields.length;$('#nlpdfLetterEditor').classList.remove('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','false');setLetterWizardStep(0,true);
+
+  },reviewParentOperation);
 }
 function hideLetterEditor(){
   $('#nlpdfLetterEmbassyResults')?.classList.add('hidden');$('#nlpdfLetterEditor').classList.add('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','true');
@@ -2063,6 +2691,7 @@ function rememberedStudentLinkedPatch(record){
   };
 }
 function applyRememberedStudentRecord(record){
+  if(reviewDraftCandidateInstalling){toast('A draft is being restored. Please retry after it finishes.');return;}
   const patch=rememberedStudentLinkedPatch(record);
   for(const [key,value] of Object.entries(patch))if(clean(value))state.linkedData[key]=value;
   const exportOpen=$('#nlpdfExportModal')?.classList.contains('open');
@@ -2082,6 +2711,7 @@ function applyRememberedStudentRecord(record){
     for(const kind of ['startDate','finishDate','orientationStart','orientationEnd'])if(patch[kind])setPackageField(kind,patch[kind]);
     syncEditablePackageDates(context);
   }else renderContentPanel();
+  reviewScheduleDraft();
   toast('Student loaded from Student DB.');
 }
 function newLetterMemoryPayload(context){
@@ -2094,7 +2724,7 @@ function newLetterMemoryPayload(context){
     startDate:clean(v.startDate),finishDate:clean(v.finishDate),orientationStart:clean(v.orientationStart),orientationEnd:clean(v.orientationEnd),
     orientation:clean(v.orientation),homeUniversity:clean(v.homeUniversity),homeCountry:clean(v.homeCountry)
   };
-  const snapshot={...v,studentName:fullName,studentId,passport:clean(v.passport||context.passport),documentNo,letterType:context.type,letterTypeLabel:letterTypeLabel(context.type),letterFilename:context.letterName,sourceApp:'new_letter'};
+  const snapshot={...v,studentName:fullName,studentId,passport:clean(v.passport||context.passport),documentNo,letterType:context.type,letterTypeLabel:letterTypeLabel(context.type),letterFilename:context.letterName,sourceApp:'new_letter',referenceVersion:context.referenceVersion||null};
   return {
     action:'create_letter',source_app:'new_letter',
     student:{
@@ -2114,14 +2744,14 @@ function newLetterMemoryPayload(context){
       current_year:null,studied_hours:null,effective_date:clean(v.startDate)||null,source:'new_letter',extra_data:academicExtra
     },
     document:{
-      document_number:documentNo,document_type:context.type,template_key:context.type,template_version:'new-letter-v43',
+      document_number:documentNo,document_type:context.type,template_key:context.type,template_version:context.templateVersion||null,
       letter_date:clean(v.letterDate)||todayIsoLocal(),proposed_extension_date:null,signatory_id:null
     },
     snapshot
   };
 }
-async function rememberNewLetterAfterCreate(context){
-  const payload=newLetterMemoryPayload(context);
+async function rememberNewLetterAfterCreate(context,exactPayload=null){
+  const payload=exactPayload?structuredClone(exactPayload):newLetterMemoryPayload(context);
   if(!payload){toast('Letter created, but Student DB was not updated: Student ID, name, and Document Number are required.');return false;}
   if(!window.BUICStudentMemory?.remember){toast('Letter created, but Student DB is unavailable.');return false;}
   try{
@@ -2135,56 +2765,143 @@ async function rememberNewLetterAfterCreate(context){
   }
 }
 
-async function createEditedLetter(){
-  const context=state.pendingLetter;if(!context?.editor||state.busy)return;
-  state.busy=true;$('#nlpdfCreateEditedLetter').disabled=true;$('#nlpdfLetterEditorStatus').textContent='Creating letter…';
+// Single-snapshot generation: freeze editable case values, template bytes and
+// source Word DOM before any asynchronous hashing, preflight, or file writes.
+// Do not write metadata from mutable UI state after generating the document.
+async function createEditedLetter(reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{
+  const live=state.pendingLetter;
+  if(!live?.editor||state.busy)return;
+  state.busy=true;
+  $('#nlpdfCreateEditedLetter').disabled=true;
+  $('#nlpdfLetterEditorStatus').textContent='Creating letter…';
   try{
-    syncEditablePackageDates(context);context.values.letterDate=clean($('#nlpdfLetterFinalDate')?.value)||context.values.letterDate||todayIsoLocal();syncFormText(context,'documentNo',clean($('#nlpdfLetterFinalDocumentNo')?.value)||context.values.documentNo);syncFormText(context,'studentId',clean($('#nlpdfLetterFinalStudentId')?.value)||context.values.studentId);
-    if(context.values.startDate&&context.values.finishDate&&context.values.startDate>context.values.finishDate)throw new Error('Finishing Date must be on or after Starting Date.');
-    if(context.values.orientationStart&&context.values.orientationEnd&&context.values.orientationStart>context.values.orientationEnd)throw new Error('Orientation finish must be on or after Orientation start.');
-    saveCurrentHomeSchool(context);refreshSelectedEmbassyContext(context);
-    const {zip,doc,ns,model}=context.editor,all=[];
+    // These synchronous reads are the generation boundary. Later form edits
+    // must not modify the document bytes or the Hub/audit snapshot.
+    syncEditablePackageDates(live);
+    live.values.letterDate=clean($('#nlpdfLetterFinalDate')?.value)||live.values.letterDate||todayIsoLocal();
+    syncFormText(live,'documentNo',clean($('#nlpdfLetterFinalDocumentNo')?.value)||live.values.documentNo);
+    syncFormText(live,'studentId',clean($('#nlpdfLetterFinalStudentId')?.value)||live.values.studentId);
+    if(live.values.startDate&&live.values.finishDate&&live.values.startDate>live.values.finishDate)
+      throw new Error('Finishing Date must be on or after Starting Date.');
+    if(live.values.orientationStart&&live.values.orientationEnd&&live.values.orientationStart>live.values.orientationEnd)
+      throw new Error('Orientation finish must be on or after Orientation start.');
+    saveCurrentHomeSchool(live);
+    refreshSelectedEmbassyContext(live);
+    const originalXml=new XMLSerializer().serializeToString(live.editor.doc);
+    const doc=new DOMParser().parseFromString(originalXml,'application/xml');
+    if(doc.querySelector('parsererror'))throw new Error('The frozen Word template is invalid.');
+    const ns=live.editor.ns;
+    const zip=live.editor.zip.clone();
+    const model=semanticLetterModel(doc,ns);
+    const generation={...live,values:Object.freeze(structuredClone(live.values)),
+      frozenReferences:structuredClone(live.frozenReferences||null),
+      editor:{zip,doc,ns,model},targetDir:live.targetDir,
+      letterName:live.letterName};
+    const templateData=new Uint8Array(letterBytes(live.type));
+    const exactPayload=newLetterMemoryPayload(generation);
+    // No read of live.values or form controls is permitted after this point.
+    const templateHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',templateData)))
+      .map(b=>b.toString(16).padStart(2,'0')).join('');
+    generation.templateVersion='sha256:'+templateHash;
+    if(exactPayload){
+      exactPayload.document.template_version=generation.templateVersion;
+      exactPayload.snapshot.referenceVersion=generation.referenceVersion||null;
+    }
+    if(exactPayload){
+      if(!window.BUICStudentMemory?.checkDocument)
+        throw new Error('Hub document conflict check is unavailable. Your edits remain open.');
+      try{await window.BUICStudentMemory.checkDocument(structuredClone(exactPayload));}
+      catch(error){
+        const previous=error?.data?.detail;
+        if(error.status===409&&previous?.fingerprint){
+          const review=window.confirm('The document number already has DIFFERENT finalized content. Original history is protected. Request an administrator correction review?');
+          if(review){
+            const reason=clean(window.prompt('Correction reason (at least 12 characters):',''));
+            if(reason.length>=12){
+              generation.revisionRequestId=generation.revisionRequestId||crypto.randomUUID();
+              const proposal=await window.BUICStudentMemory.proposeRevision(
+                structuredClone(exactPayload),previous.fingerprint,reason,generation.revisionRequestId);
+              setStatus('Correction request '+proposal.revisionId+' queued for review. Existing official letter unchanged.');
+            }
+          }
+          throw new Error('Original finalized document retained. No corrected output was created.');
+        }
+        throw error;
+      }
+    }else setStatus('Missing Student DB identity · local-only letter; not entered into finalized history');
+    if(!generation.targetDir){
+      const ready=await chooseDestination(reviewOperation);
+      if(!ready)throw new Error('Select an output folder to resume this restored draft.');
+      generation.targetDir=state.destinationHandle;
+    }
+    const all=[];
     for(const field of model.fields)for(const occ of field.occurrences)all.push({field,occ});
     all.sort((a,b)=>b.occ.record.index-a.occ.record.index||b.occ.start-a.occ.start);
-    for(const {field,occ} of all){if(field.kind==='embassyThai')continue;replaceOccurrence(occ,occurrenceValue(context,field,occ),doc,ns);}
-    applyThaiEmbassyAddressee(context,model,doc,ns);
-    applyEmbassyPostalBlock(context,doc,ns);
-    applyTaiwanTradeOfficeEnglishAddressee(context,doc,ns);
-    applyExchangeHomeSchoolPunctuation(context,doc,ns);
+    for(const {field,occ} of all){
+      if(field.kind==='embassyThai')continue;
+      replaceOccurrence(occ,occurrenceValue(generation,field,occ),doc,ns);
+    }
+    applyThaiEmbassyAddressee(generation,model,doc,ns);
+    applyEmbassyPostalBlock(generation,doc,ns);
+    applyTaiwanTradeOfficeEnglishAddressee(generation,doc,ns);
+    applyExchangeHomeSchoolPunctuation(generation,doc,ns);
     ensureOrientationSentencePeriod(doc,ns);
     await applyInternationalCenterPhoneToLetter(zip,doc,ns);
     zip.file('word/document.xml',new XMLSerializer().serializeToString(doc));
     const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
-    await writeFile(context.targetDir,context.letterName,new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
-    $('#nlpdfLetterEditorStatus').textContent='Letter created successfully. Edited values remain highlighted for checking.';setStatus('Ready · Letter created');toast('Letter created · highlights kept.');
-    await rememberNewLetterAfterCreate(context);
-    await new Promise(resolve=>setTimeout(resolve,650));finishLetterEditor();
-  }catch(err){console.error(err);$('#nlpdfLetterEditorStatus').textContent=err?.message||'Could not create letter.';toast(err?.message||'Could not create letter.');}
-  finally{state.busy=false;$('#nlpdfCreateEditedLetter').disabled=false;updateControls();}
+    const savedLetter=await writeFile(generation.targetDir,generation.letterName,
+      new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+    state.exportOutcome={...(state.exportOutcome||{}),letter:{status:'written',...savedLetter}};
+    $('#nlpdfLetterEditorStatus').textContent='Letter created successfully. Edited values remain highlighted for checking.';
+    setStatus('Ready · Letter created');toast('Letter created · highlights kept.');
+    const savedToHub=await rememberNewLetterAfterCreate(generation,exactPayload);
+    if(savedToHub){
+      await new Promise(resolve=>setTimeout(resolve,650));
+      finishLetterEditor();
+    }else{
+      $('#nlpdfLetterEditorStatus').textContent='Letter saved locally; Student DB save pending. Keep this editor open for safe retry.';
+    }
+  }catch(err){
+    console.error(err);
+    $('#nlpdfLetterEditorStatus').textContent=err?.message||'Could not create letter.';
+    toast(err?.message||'Could not create letter.');
+  }finally{
+    state.busy=false;
+    $('#nlpdfCreateEditedLetter').disabled=false;
+    updateControls();
+  }
+
+  },reviewParentOperation);
 }
-async function confirmExport(){
+
+async function confirmExport(reviewParentOperation=null){
+  return reviewRunWorkspaceOperation(async reviewOperation=>{
   if(state.busy)return;
   const name=safePath($('#nlpdfExportName').value),num=safePath($('#nlpdfExportNumber').value),passport=clean($('#nlpdfExportPassport').value),studentId=clean($('#nlpdfExportStudentId').value),outputs=selectedOutputs(),stem=automaticIdentityStem();
   if(!outputs.any){toast('Select Folder, PDF, or Letter.');return;}
-  if(!state.destinationHandle){const ok=await chooseDestination();if(!ok)return;}
+  if(!state.destinationHandle){const ok=await chooseDestination(reviewOperation);if(!ok)return;}
   state.busy=true;$('#nlpdfConfirmExport').disabled=true;
   exportProgress('Creating in progress…','Preparing Create 1/2.',0,outputs.pdf?state.pages.length:0);
   setStatus('Creating package…');updateControls();await allowExportProgressToPaint();
   let handoff=null;
   try{
     let targetDir=state.destinationHandle;
+    state.exportOutcome={folder:{status:'not_selected'},pdf:{status:'not_selected'},letter:{status:'not_selected'}};
     if(outputs.folder){
       exportProgress('Creating in progress…','Creating student folder.',0,outputs.pdf?state.pages.length:0);
       const folderName=[num,stem].filter(Boolean).join(' ')||'Student';
       targetDir=await state.destinationHandle.getDirectoryHandle(folderName,{create:true});
+      state.exportOutcome.folder={status:'written',name:folderName};
     }
     if(outputs.pdf){
       const bytes=await buildPdf((phase,done,total)=>exportProgress('Creating in progress…',phase,done,total));
       let pdfName=safeFile($('#nlpdfExportPdfName').value||('Documents_'+stem+'.pdf'));if(!/\.pdf$/i.test(pdfName))pdfName+='.pdf';
       exportProgress('Creating in progress…','Writing PDF…',state.pages.length,state.pages.length);
-      await writeFile(targetDir,pdfName,new Blob([bytes],{type:'application/pdf'}));
+      const savedPdf=await writeFile(targetDir,pdfName,new Blob([bytes],{type:'application/pdf'}));
+      state.exportOutcome.pdf={status:'written',...savedPdf};
     }
-    if(outputs.letter)handoff={num,name,passport,studentId,letterName:'Letter_'+stem+'.docx',targetDir,type:state.packageHandoff?.type||'bachelor_no_ien'};
+    if(outputs.letter){state.exportOutcome.letter={status:'pending'};handoff={num,name,passport,studentId,letterName:'Letter_'+stem+'.docx',targetDir,type:state.packageHandoff?.type||'bachelor_no_ien'};}
     if(handoff){
       state.packageHandoff=handoff;hideExportProgress();closeExport();state.busy=false;$('#nlpdfConfirmExport').disabled=false;updateControls();
       if(outputs.folder||outputs.pdf){setStatus('Create 1/2 complete · Select document type');toast('Create 1/2 complete.');}else setStatus('Select document type · Letter not created yet');openLetterTypeModal(handoff.type);return;
@@ -2197,6 +2914,8 @@ async function confirmExport(){
   }finally{
     if(!handoff){hideExportProgress();state.busy=false;$('#nlpdfConfirmExport').disabled=false;updateControls();syncExportPreview();}
   }
+
+  },reviewParentOperation);
 }
 
 /* Movable floating tool panels */
@@ -2458,6 +3177,7 @@ async function build(){
   document.addEventListener('keydown',e=>{
     const visible=$('#workspaceDocuments');
     if(!visible||visible.classList.contains('hidden')||getComputedStyle(visible).display==='none')return;
+    if(reviewBlockCandidateShortcut(e))return;
     if(ignoreDeleteKey(e))return;
     const cmd=e.ctrlKey||e.metaKey;
     if(cmd&&!e.altKey&&e.key.toLowerCase()==='z'){
@@ -2513,17 +3233,23 @@ async function build(){
   $$('[data-school-close]').forEach(x=>x.addEventListener('click',closeSchoolManager));
   $('#nlpdfSchoolNew').addEventListener('click',resetSchoolForm);$('#nlpdfSchoolSave').addEventListener('click',saveSchoolEntryFromManager);
   $('#nlpdfSchoolList').addEventListener('click',e=>{const edit=e.target.closest('[data-school-edit]'),del=e.target.closest('[data-school-delete]');if(edit)editSchoolEntry(edit.dataset.schoolEdit);if(del&&confirm('Delete this remembered school?'))deleteSchoolEntry(del.dataset.schoolDelete);});
-  window.addEventListener('buic-reference-data-updated',()=>{if(state.pendingLetter&&!$('#nlpdfLetterEditor').classList.contains('hidden')){populateCentralSelects(state.pendingLetter);renderLetterFormValues(state.pendingLetter);renderSchoolList();}renderContentPanel();if(state.referencePicker)renderReferencePickerResults($('#nlpdfReferencePickerSearch')?.value||'');});
+  window.addEventListener('buic-reference-data-updated',()=>{
+    if(state.pendingLetter&&!$('#nlpdfLetterEditor').classList.contains('hidden')){
+      setStatus('References refreshed · active letter values kept unchanged');
+    }else renderContentPanel();
+    if(state.referencePicker)renderReferencePickerResults($('#nlpdfReferencePickerSearch')?.value||'');
+  });
   window.addEventListener('buic-student-memory-selected',e=>applyRememberedStudentRecord(e.detail));
 
   $('#nlpdfCreate').addEventListener('click',openExport);
-  document.querySelectorAll('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',chooseDestination);$('#nlpdfConfirmExport').addEventListener('click',confirmExport);
-  document.querySelectorAll('[data-nlpdf-letter-type-close]').forEach(x=>x.addEventListener('click',cancelLetterType));$('#nlpdfLetterTypeBack').addEventListener('click',cancelLetterType);$('#nlpdfConfirmLetterType').addEventListener('click',confirmLetterType);
-  $('#nlpdfCancelLetterEdit').addEventListener('click',backToDocumentType);$('#nlpdfCreateEditedLetter').addEventListener('click',createEditedLetter);
+  document.querySelectorAll('[data-nlpdf-close]').forEach(x=>x.addEventListener('click',closeExport));$('#nlpdfChooseDestination').addEventListener('click',()=>chooseDestination());$('#nlpdfConfirmExport').addEventListener('click',()=>confirmExport());
+  document.querySelectorAll('[data-nlpdf-letter-type-close]').forEach(x=>x.addEventListener('click',cancelLetterType));$('#nlpdfLetterTypeBack').addEventListener('click',cancelLetterType);$('#nlpdfConfirmLetterType').addEventListener('click',()=>confirmLetterType());
+  $('#nlpdfCancelLetterEdit').addEventListener('click',backToDocumentType);$('#nlpdfCreateEditedLetter').addEventListener('click',()=>createEditedLetter());
   ['nlpdfExportNumber','nlpdfExportName','nlpdfExportPassport','nlpdfExportStudentId'].forEach(id=>$('#'+id).addEventListener('input',()=>{if(id==='nlpdfExportName')$('#nlpdfExportPdfName').dataset.auto='1';syncExportPreview();}));
   $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutput"]').forEach(x=>x.addEventListener('change',syncExportPreview));
 
   renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();resetHistory();updateDuplicateControls();renderPackageProfileList();
+  reviewBindDraftControls();
 }
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>build().catch(console.error),{once:true});else build().catch(console.error);
