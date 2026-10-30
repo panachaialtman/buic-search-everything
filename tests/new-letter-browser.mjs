@@ -5,6 +5,10 @@ import { mkdir } from 'node:fs/promises';
 await mkdir('test-results',{recursive:true});
 const tests=[];
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+bCrkAAAAASUVORK5CYII=','base64');
+const assertSignatory=(lines,label)=>{
+  assert(lines?.length,label+' must contain the Somyot signature');
+  for(const line of lines)assert.equal(line.trim(),'Asst. Prof. Somyot Wattanakamolchai, Ph.D.',label+' must remove only Dr.');
+};
 let browser,page;
 const run=async(name,fn)=>{try{await fn();tests.push({name,result:'PASS'});console.log('PASS '+name);}catch(err){tests.push({name,result:'FAIL',message:String(err.stack||err)});console.error('FAIL '+name+' '+(err.stack||err));throw err;}};
 const text=async selector=>page.locator(selector).innerText();
@@ -668,11 +672,23 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     const memoryBeforeCreate=await page.evaluate(()=>window.__studentMemoryRememberCalls||0);
     await page.locator('#nlpdfCreateEditedLetter').click();await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
     assert((await page.evaluate(()=>window.__studentMemoryRememberCalls||0))>memoryBeforeCreate,'final Create Letter must persist shared student memory');
-    const out=await page.evaluate(async before=>{const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Linked Name_AB1234567_1690000000.docx');if(!file)return null;const zip=await JSZip.loadAsync(file.bytes),xml=await zip.file('word/document.xml').async('string'),doc=new DOMParser().parseFromString(xml,'application/xml'),ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const paras=[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join(''));const plain=paras.join('\n');const footerXmls=await Promise.all(zip.file(/^word\/(?:footer|header)\d+\.xml$/i).map(f=>f.async('string')));const allContactText=[xml,...footerXmls].map(content=>[...new DOMParser().parseFromString(content,'application/xml').getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join('')).join('\n')).join('\n');return{contactUpdated:allContactText.includes('โทร (+66) 2407 3888 ต่อ 2441'),contactLegacy:/โทร\s*0\s*2407\s*3888\s*ต่อ\s*2441/.test(allContactText),finished:file.finished,highlight:/<w:highlight\b[^>]*(?:w:val|val)="yellow"/i.test(xml),name:(xml.match(/Linked Name/g)||[]).length,passport:(xml.match(/AB1234567/g)||[]).length,englishDate:xml.includes('October 8, 2026'),thaiDate:xml.includes('8 ตุลาคม 2569'),studyPeriod:xml.includes('January 11, 2027 to June 15, 2027'),editedOrientation:xml.includes('January 4 - 9, 2027'),customAddress:xml.includes('Custom Embassy Address'),englishSchoolCountry:plain.includes('QA Home University, France'),thaiSchoolComma:/QA Home University\s*,\s*[\u0E00-\u0E7F]/.test(plain),thaiSchoolPresent:paras.some(p=>/[\u0E00-\u0E7F]/.test(p)&&p.includes('QA Home University สาธารณรัฐฝรั่งเศส')),staleThaiCountryPlaceholder:/\bประเทศ\s+ตั้งแต่ภาคการศึกษา/.test(plain),staleThaiSchoolPlaceholder:/Their\s*school/i.test(plain),schoolLines:paras.filter(p=>p.includes('QA Home University')),thaiParagraphs:paras.filter(p=>/[\u0E00-\u0E7F]/.test(p)&&/(?:school|มหาวิทยาลัย|ประเทศ)/i.test(p)).slice(0,12),taiwanMission:plain.includes('Thailand Trade and Economic Office in Taipei, Taiwan (ROC)'),oldTaipeiName:plain.includes('Thailand Trade and Economic Office (Taipei)'),directorCount:paras.filter(p=>p.trim()==='Dear The Director').length,staleConsul:paras.some(p=>/^(?:The Consul|Dear Consul\b)/i.test(p.trim())),thaiDirector:plain.includes('เรียน ผู้อำนวยการใหญ่'),myanmarCitizen:/\bMyanmar\s+Citizen\b/.test(plain),oldMyanmarNationality:plain.includes('Myanmar / Burmese Citizen'),orientationParagraphs:paras.filter(p=>/\borientation\b/i.test(p))};},before);
+    const out=await page.evaluate(async before=>{const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Linked Name_AB1234567_1690000000.docx');if(!file)return null;const zip=await JSZip.loadAsync(file.bytes),xml=await zip.file('word/document.xml').async('string'),doc=new DOMParser().parseFromString(xml,'application/xml'),ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const paras=[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join(''));const plain=paras.join('\n');const footerXmls=await Promise.all(zip.file(/^word\/(?:footer|header)\d+\.xml$/i).map(f=>f.async('string')));const allContactText=[xml,...footerXmls].map(content=>[...new DOMParser().parseFromString(content,'application/xml').getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join('')).join('\n')).join('\n');return{signatoryLines:paras.filter(p=>p.includes('Somyot Wattanakamolchai')),contactUpdated:allContactText.includes('โทร (+66) 2407 3888 ต่อ 2441'),contactLegacy:/โทร\s*0\s*2407\s*3888\s*ต่อ\s*2441/.test(allContactText),finished:file.finished,highlight:/<w:highlight\b[^>]*(?:w:val|val)="yellow"/i.test(xml),name:(xml.match(/Linked Name/g)||[]).length,passport:(xml.match(/AB1234567/g)||[]).length,englishDate:xml.includes('October 8, 2026'),thaiDate:xml.includes('8 ตุลาคม 2569'),studyPeriod:xml.includes('January 11, 2027 to June 15, 2027'),editedOrientation:xml.includes('January 4 - 9, 2027'),customAddress:xml.includes('Custom Embassy Address'),englishSchoolCountry:plain.includes('QA Home University, France'),thaiSchoolComma:/QA Home University\s*,\s*[\u0E00-\u0E7F]/.test(plain),thaiSchoolPresent:paras.some(p=>/[\u0E00-\u0E7F]/.test(p)&&p.includes('QA Home University สาธารณรัฐฝรั่งเศส')),staleThaiCountryPlaceholder:/\bประเทศ\s+ตั้งแต่ภาคการศึกษา/.test(plain),staleThaiSchoolPlaceholder:/Their\s*school/i.test(plain),schoolLines:paras.filter(p=>p.includes('QA Home University')),thaiParagraphs:paras.filter(p=>/[\u0E00-\u0E7F]/.test(p)&&/(?:school|มหาวิทยาลัย|ประเทศ)/i.test(p)).slice(0,12),taiwanMission:plain.includes('Thailand Trade and Economic Office in Taipei, Taiwan (ROC)'),oldTaipeiName:plain.includes('Thailand Trade and Economic Office (Taipei)'),directorCount:paras.filter(p=>p.trim()==='Dear The Director').length,staleConsul:paras.some(p=>/^(?:The Consul|Dear Consul\b)/i.test(p.trim())),thaiDirector:plain.includes('เรียน ผู้อำนวยการใหญ่'),myanmarCitizen:/\bMyanmar\s+Citizen\b/.test(plain),oldMyanmarNationality:plain.includes('Myanmar / Burmese Citizen'),orientationParagraphs:paras.filter(p=>/\borientation\b/i.test(p))};},before);
+    assertSignatory(out?.signatoryLines,'Exchange');
     assert(out&&out.finished);assert.equal(out.contactUpdated,true,'Exchange Word letter must use (+66) International Center telephone');assert.equal(out.contactLegacy,false,'Exchange Word letter must not retain the legacy phone number');assert.equal(out.highlight,true);assert(out.name>=1);assert(out.passport>=1);assert.equal(out.englishDate,true);assert.equal(out.thaiDate,true);assert.equal(out.studyPeriod,true);assert.equal(out.editedOrientation,true);assert.equal(out.customAddress,true,'manual Embassy address must be used in final Word output');assert.equal(out.taiwanMission,true,'Taiwan mission must use the full Taipei, Taiwan (ROC) wording');assert.equal(out.oldTaipeiName,false,'old Taiwan mission name must not remain');assert.equal(out.directorCount,1,'Taiwan must contain one Dear The Director addressee');assert.equal(out.staleConsul,false,'Taiwan must not retain The Consul or Dear Consul');assert.equal(out.thaiDirector,true,'Taiwan Thai addressee must be เรียน ผู้อำนวยการใหญ่');assert.equal(out.myanmarCitizen,true,'English nationality should be Myanmar Citizen');assert.equal(out.oldMyanmarNationality,false,'Myanmar / Burmese must not appear as the English nationality');assert.equal(out.englishSchoolCountry,true,'Exchange English school must be followed by comma then country; school lines: '+JSON.stringify(out.schoolLines));assert.equal(out.thaiSchoolPresent,true,'Exchange Thai paragraph must use the full official Thai school country name สาธารณรัฐฝรั่งเศส after the untruncated university name, with no comma; Thai paragraphs: '+JSON.stringify(out.thaiParagraphs));assert.equal(out.staleThaiCountryPlaceholder,false,'Exchange Thai paragraph must not retain the literal ประเทศ placeholder');assert.equal(out.staleThaiSchoolPlaceholder,false,'Exchange Thai paragraph must not retain Theirschool or Their school');assert.equal(out.thaiSchoolComma,false,'Exchange Thai school must not have comma after the school name; school lines: '+JSON.stringify(out.schoolLines));assert(out.orientationParagraphs.some(p=>/\bJanuary 4 - 9, 2027\.$/.test(p.trim())),'Exchange orientation sentence must end with one period after the updated date: '+JSON.stringify(out.orientationParagraphs));assert(out.orientationParagraphs.every(p=>!/\.\.$/.test(p.trim())),'Orientation line must not contain duplicate periods');
   });
 
   await run('Bachelor No IEN maps Xian source data, linked package dates, and Thai addressee exactly',async()=>{
+    // Saved custom templates must receive the same title correction as built-ins.
+    await page.evaluate(async()=>{
+      const template=window.LETTER_TEMPLATES.bachelor_no_ien;
+      const zip=await JSZip.loadAsync(template.base64,{base64:true});
+      const xml=await zip.file('word/document.xml').async('string');
+      const legacy=xml.replaceAll('Asst. Prof. Somyot','Asst. Prof. Dr. Somyot');
+      if(legacy===xml)throw new Error('Legacy signatory fixture was not constructed');
+      zip.file('word/document.xml',legacy);
+      localStorage.setItem('bu-ic-bachelor-no-ien-template-override-v1',JSON.stringify({
+        ...template,base64:await zip.generateAsync({type:'base64'})}));
+    });
     const before=await page.evaluate(()=>window.__mockFiles.length);
     await page.evaluate(()=>{
       const profiles=JSON.parse(localStorage.getItem('buic-letter-package-dates-v1')||'{}');
@@ -717,9 +733,11 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
       const paras=rawParas.filter(Boolean),plain=paras.join('\n');
       const footerXmls=await Promise.all(zip.file(/^word\/(?:footer|header)\d+\.xml$/i).map(f=>f.async('string')));
       const allContactText=[xml,...footerXmls].map(content=>[...new DOMParser().parseFromString(content,'application/xml').getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join('')).join('\n')).join('\n');
-      return {finished:file.finished,plain,paras,rawParas,orientationParagraphs:paras.filter(p=>/\borientation\b/i.test(p)),contactUpdated:allContactText.includes('โทร (+66) 2407 3888 ต่อ 2441'),contactLegacy:/โทร\s*0\s*2407\s*3888\s*ต่อ\s*2441/.test(allContactText)};
+      return {finished:file.finished,plain,paras,rawParas,signatoryLines:paras.filter(p=>p.includes('Somyot Wattanakamolchai')),orientationParagraphs:paras.filter(p=>/\borientation\b/i.test(p)),contactUpdated:allContactText.includes('โทร (+66) 2407 3888 ต่อ 2441'),contactLegacy:/โทร\s*0\s*2407\s*3888\s*ต่อ\s*2441/.test(allContactText)};
     },before);
+    await page.evaluate(()=>localStorage.removeItem('bu-ic-bachelor-no-ien-template-override-v1'));
     assert(out&&out.finished,'Bachelor No IEN letter should be written');
+    assertSignatory(out.signatoryLines,'Bachelor No IEN with legacy custom template');
     assert.match(out.plain,/issuing\s+Thai QA\s+an extendable Non-Immigrant Visa/i,'Embassy letter must insert the current student name instead of the template placeholder');
     assert.doesNotMatch(out.plain,/issuing\s+Name\s+an extendable/i,'Embassy letter must not retain the literal Name placeholder');
     assert.equal(out.contactUpdated,true,'Bachelor No IEN Word letter must use (+66) International Center telephone');
@@ -750,7 +768,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.match(out.plain,/หนังสือเดินทางหมายเลข\s*QA998877/,'Thai passport value must remain in the paragraph');
   });
 
-  await run('Every other New Letter DOCX type uses the international-format phone number',async()=>{
+  await run('Every other New Letter DOCX type uses the updated Somyot title and international-format phone number',async()=>{
     for(const [type,title] of [
       ['bachelor','Bachelor'],
       ['current_no_ien','Current No IEN'],
@@ -786,9 +804,10 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
           return {part:part.name,paragraphs:[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join(''))};
         }));
         const phoneLines=texts.flatMap(x=>x.paragraphs.filter(p=>p.includes('2407')||p.includes('3888')));
-        return {finished:file.finished,name:file.name,phoneLines};
+        return {finished:file.finished,name:file.name,phoneLines,signatoryLines:texts.flatMap(x=>x.paragraphs.filter(p=>p.includes('Somyot Wattanakamolchai')))};
       },before);
       assert(output?.finished,`Document type ${type} must generate a finished Word letter`);
+      assertSignatory(output.signatoryLines,type);
       assert.deepEqual(output.phoneLines,['โทร (+66) 2407 3888 ต่อ 2441'],`Document type ${type} must update exactly one footer telephone line: ${JSON.stringify(output.phoneLines)}`);
     }
   });

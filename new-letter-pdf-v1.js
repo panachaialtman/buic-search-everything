@@ -2466,11 +2466,30 @@ function inferInitialPackage(context){
   const saved=clean(localStorage.getItem(LETTER_LAST_ACADEMIC_YEAR_KEY)||''),templateYear=year?(Number(year)>2500?String(Number(year)-543):String(year)):'';
   fillAcademicYearSelect($('#nlpdfLetterAcademicYear'),/^20\d{2}$/.test(saved)?saved:(templateYear||lastAcademicYear()));
 }
+function normalizeNewVisaSignatory(doc,ns){
+  // Keep each Word run and its formatting; remove only this signatory's Dr. title.
+  for(const paragraph of doc.getElementsByTagNameNS(ns,'p')){
+    const nodes=[...paragraph.getElementsByTagNameNS(ns,'t')];
+    const text=nodes.map(node=>node.textContent||'').join('');
+    const match=/\bAsst\.\s*Prof\.\s+(Dr\.\s*)(?=Somyot\s+Wattanakamolchai\b)/.exec(text);
+    if(!match)continue;
+    const start=match.index+match[0].length-match[1].length,end=start+match[1].length;
+    let offset=0;
+    for(const node of nodes){
+      const value=node.textContent||'',next=offset+value.length;
+      const from=Math.max(start,offset),to=Math.min(end,next);
+      if(from<to)node.textContent=value.slice(0,from-offset)+value.slice(to-offset);
+      offset=next;
+    }
+  }
+}
 async function prepareLetterEditor(context,reviewParentOperation=null){
   return reviewRunWorkspaceOperation(async reviewOperation=>{
   await ensureZip();const bytes=letterBytes(context.type),zip=await window.JSZip.loadAsync(bytes),xmlFile=zip.file('word/document.xml');if(!xmlFile)throw new Error('The selected Word template has no editable document body.');
   const xml=await xmlFile.async('string'),doc=new DOMParser().parseFromString(xml,'application/xml');if(doc.querySelector('parsererror'))throw new Error('The selected Word template could not be read.');
-  const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main',model=semanticLetterModel(doc,ns);context.editor={zip,doc,ns,model};context.values={};
+  const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  normalizeNewVisaSignatory(doc,ns);
+  const model=semanticLetterModel(doc,ns);context.editor={zip,doc,ns,model};context.values={};
    context.frozenReferences=structuredClone(centralReference());
    const refBytes=new TextEncoder().encode(JSON.stringify(context.frozenReferences));
    const refHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',refBytes)))
@@ -2792,6 +2811,7 @@ async function createEditedLetter(reviewParentOperation=null){
     const doc=new DOMParser().parseFromString(originalXml,'application/xml');
     if(doc.querySelector('parsererror'))throw new Error('The frozen Word template is invalid.');
     const ns=live.editor.ns;
+    normalizeNewVisaSignatory(doc,ns);
     const zip=live.editor.zip.clone();
     const model=semanticLetterModel(doc,ns);
     const generation={...live,values:Object.freeze(structuredClone(live.values)),
