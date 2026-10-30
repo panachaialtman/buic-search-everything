@@ -2523,7 +2523,7 @@ async function prepareLetterEditor(context,reviewParentOperation=null){
 function hideLetterEditor(){
   $('#nlpdfLetterEmbassyResults')?.classList.add('hidden');$('#nlpdfLetterEditor').classList.add('hidden');$('#nlpdfLetterEditor').setAttribute('aria-hidden','true');
 }
-function finishLetterEditor(){hideLetterEditor();state.pendingLetter=null;state.packageHandoff=null;renderContentPanel();}
+function finishLetterEditor(){hideLetterEditor();state.pendingLetter=null;state.packageHandoff=null;renderContentPanel();reviewScheduleDraft();}
 function backToDocumentType(){
   const context=state.pendingLetter;if(context)syncEditablePackageDates(context);
   const preferred=context?.type||state.packageHandoff?.type||'bachelor_no_ien';
@@ -2876,7 +2876,9 @@ async function createEditedLetter(reviewParentOperation=null){
     $('#nlpdfLetterEditorStatus').textContent='Letter created successfully. Edited values remain highlighted for checking.';
     setStatus('Ready · Letter created');toast('Letter created · highlights kept.');
     const savedToHub=await rememberNewLetterAfterCreate(generation,exactPayload);
-    if(savedToHub){
+    // Missing optional Hub identity is a completed local-only letter, not a
+    // failed shared save. Return once the file is fully written in either case.
+    if(savedToHub||!exactPayload){
       await new Promise(resolve=>setTimeout(resolve,650));
       finishLetterEditor();
     }else{

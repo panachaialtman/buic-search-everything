@@ -40,6 +40,10 @@ try{
         return { async createWritable(){return {
           async write(data){
             record.started=true;
+            if(name.endsWith('.docx')&&window.__failNextLetterWrite){
+              window.__failNextLetterWrite=false;
+              throw new Error('QA letter write rejected');
+            }
             await new Promise(r=>setTimeout(r,800));
             record.bytes=new Uint8Array(await data.arrayBuffer());
           },
@@ -56,6 +60,7 @@ try{
     };
     window.showDirectoryPicker=async()=>window.__mockDirectory;
     window.__studentMemoryRememberCalls=0;
+    window.__studentMemoryPreflightCalls=0;
     const nativeFetch=window.fetch.bind(window);
     window.fetch=async(input,init={})=>{
       const url=typeof input==='string'?input:input?.url||'';
@@ -63,6 +68,7 @@ try{
         return new Response(JSON.stringify({ok:true,staff:{id:'qa-browser-staff',username:'qa-browser'}}),{status:200,headers:{'Content-Type':'application/json'}});
       }
       if(url==='https://buic-central-hub.vercel.app/api/staff/documents/check'){
+        window.__studentMemoryPreflightCalls++;
         return new Response(JSON.stringify({status:'new'}),{status:200,headers:{'Content-Type':'application/json'}});
       }
       if(url==='https://buic-central-hub.vercel.app/api/staff/students/remember'){
@@ -812,6 +818,50 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     }
   });
 
+
+  await run('A local-only letter returns to the PDF builder after saving, and failed writes preserve the editor',async()=>{
+    const pagesBefore=await count();
+    const hubBefore=await page.evaluate(()=>({remember:window.__studentMemoryRememberCalls,preflight:window.__studentMemoryPreflightCalls}));
+    await page.locator('#nlpdfCreate').click();
+    await page.locator('#nlpdfExportNumber').fill('0000');
+    await page.locator('#nlpdfExportName').fill('Local Return QA');
+    await page.locator('#nlpdfExportPassport').fill('LOCALQA001');
+    await page.locator('#nlpdfExportStudentId').fill('');
+    await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();
+    await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();
+    await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
+    await page.locator('#nlpdfChooseDestination').click();
+    await page.locator('#nlpdfConfirmExport').click();
+    await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
+    await page.locator('#nlpdfExportLetterType').selectOption('bachelor_no_ien');
+    await page.locator('#nlpdfConfirmLetterType').click();
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+    await page.locator('#nlpdfLetterStudentId').fill('');
+    await page.locator('[data-letter-step="4"]').click();
+    await page.locator('#nlpdfLetterFinalStudentId').fill('');
+    await page.evaluate(()=>{window.__failNextLetterWrite=true;});
+    await page.locator('#nlpdfCreateEditedLetter').click();
+    await page.waitForFunction(()=>document.querySelector('#nlpdfLetterEditorStatus')?.textContent.includes('QA letter write rejected'));
+    assert.equal(await visible('#nlpdfLetterEditor'),true,'A rejected file write must preserve the editable letter');
+    assert.equal(await count(),pagesBefore);
+    const beforeRetry=await page.evaluate(()=>window.__mockFiles.length);
+    await page.locator('#nlpdfCreateEditedLetter').click();
+    await page.waitForFunction(start=>window.__mockFiles.slice(start).some(file=>file.name.endsWith('.docx')&&file.started&&!file.finished),beforeRetry);
+    assert.equal(await visible('#nlpdfLetterEditor'),true,'Do not leave the editor before the Word file has finished saving');
+    await page.locator('#nlpdfLetterEditor').waitFor({state:'hidden',timeout:20000});
+    assert.equal(await visible('#nlpdfCreate'),true,'The PDF builder must be visible after a successful local-only letter');
+    assert.equal(await count(),pagesBefore,'Returning to the PDF builder must preserve imported pages');
+    assert.equal(await page.evaluate(start=>window.__mockFiles.slice(start).some(file=>file.name.endsWith('.docx')&&file.finished),beforeRetry),true);
+    assert.deepEqual(await page.evaluate(()=>({remember:window.__studentMemoryRememberCalls,preflight:window.__studentMemoryPreflightCalls})),hubBefore,'Missing Student Number must skip shared-memory writes');
+    await page.waitForFunction(async expected=>{
+      const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+      try{return await new Promise(resolve=>{
+        const request=db.transaction('cases','readonly').objectStore('cases').getAll();
+        request.onsuccess=()=>resolve(request.result.some(row=>row.linkedData?.studentName==='Local Return QA'&&row.pendingLetter===null&&row.pages.length===expected));
+        request.onerror=()=>resolve(false);
+      });}finally{db.close();}
+    },pagesBefore,{timeout:10000});
+  });
 
   await run('Export modal shows processing, then success only after write completes',async()=>{
     const before=await page.evaluate(()=>window.__mockFiles.length);
