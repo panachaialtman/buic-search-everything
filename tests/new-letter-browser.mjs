@@ -56,12 +56,18 @@ try{
     window.fetch=async(input,init={})=>{
       const url=typeof input==='string'?input:input?.url||'';
       if(url==='https://buic-central-hub.vercel.app/api/staff/session'){
-        return new Response(JSON.stringify({ok:true}),{status:200,headers:{'Content-Type':'application/json'}});
+        return new Response(JSON.stringify({ok:true,staff:{id:'qa-browser-staff',username:'qa-browser'}}),{status:200,headers:{'Content-Type':'application/json'}});
+      }
+      if(url==='https://buic-central-hub.vercel.app/api/staff/documents/check'){
+        return new Response(JSON.stringify({status:'new'}),{status:200,headers:{'Content-Type':'application/json'}});
       }
       if(url==='https://buic-central-hub.vercel.app/api/staff/students/remember'){
         window.__studentMemoryRememberCalls++;
         return new Response(JSON.stringify({student:{student_id:'QA',full_name:'QA'}}),{status:200,headers:{'Content-Type':'application/json'}});
       }
+      if(url.startsWith('https://buic-central-hub.vercel.app/api/staff/')&&
+          !['GET','HEAD'].includes(String(init.method||'GET').toUpperCase()))
+        throw new Error('Unmocked Hub write in isolated browser test: '+url);
       return nativeFetch(input,init);
     };
     sessionStorage.setItem('buic-student-memory-staff-token-v1','qa-test-token');
@@ -72,8 +78,10 @@ try{
     assert.equal(await page.locator('#buicWorkspaceUsername').count(),1);
     assert.equal(await page.locator('#buicWorkspacePassword').count(),1);
     assert.equal(await page.locator('#buicMemoryOtp,#buicMemoryPassword,#buicMemoryLogin').count(),0);
-    const memorySource=await page.evaluate(()=>fetch('/student-memory.js?v=4').then(r=>r.text()));
+    const memoryScript=await page.locator('script[src^="student-memory.js"]').getAttribute('src');
+    const memorySource=await page.evaluate(src=>fetch(src).then(r=>r.text()),memoryScript);
     assert.equal(memorySource.includes('specialvisa'),false,'raw workspace password must not be present in public JavaScript');
+    assert.equal(await page.evaluate(()=>window.BUICWorkspaceAuth.getIdentity()?.id),'qa-browser-staff');
   });
   await page.locator('[data-workspace="documents"]').click();
   await page.locator('#nlpdfAddFiles').waitFor({state:'visible',timeout:60000});
@@ -164,8 +172,9 @@ try{
     assert.equal(await page.locator('#nlpdfSigSize').isVisible(),true);
     assert.equal(await page.locator('.nlpdf-signature-controls .nlpdf-field').count(),0);
   });
-  await run('Footer has one Create Package action and header has Add new file',async()=>{
-    assert.deepEqual(await page.locator('.nlpdf-footer-actions > button').evaluateAll(nodes=>nodes.map(n=>n.id)),['nlpdfCreate']);
+  await run('Footer includes draft recovery and one Create Package action; header has Add new file',async()=>{
+    assert.deepEqual(await page.locator('.nlpdf-footer-actions > button').evaluateAll(nodes=>nodes.map(n=>n.textContent.trim())),['Restore draft','Backup draft','Import draft','Create Package']);
+    assert.equal(await page.locator('.nlpdf-footer-actions > #nlpdfCreate').count(),1);
     assert.equal(await page.locator('#nlpdfCreateFolderOnly').count(),0);
     assert.equal(await page.locator('#nlpdfAddNewFile').isVisible(),true);
     assert.match(await text('#nlpdfAddNewFile'),/Add new file/);
