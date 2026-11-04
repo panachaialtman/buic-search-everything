@@ -46,10 +46,10 @@ jobs:
           python3 -m http.server 8123 --bind 127.0.0.1 > /tmp/new-letter-http.log 2>&1 &
           sleep 2
           curl -fsS http://127.0.0.1:8123/ >/dev/null
-      - name: Exercise New Letter in Chromium
-        run: node tests/new-letter-browser.mjs
       - name: Exercise Student DB recovery with real IndexedDB and Web Locks
         run: node tests/student-memory-outbox-browser.mjs
+      - name: Exercise New Letter in Chromium
+        run: node tests/new-letter-browser.mjs
       - name: Upload browser screenshots and logs
         if: always()
         uses: actions/upload-artifact@v4

@@ -66,7 +66,11 @@ try{
  delay=150;maxActive=0;
  await page.evaluate(()=>{const button=document.querySelector('#buicPendingSaveStatus button');button.dispatchEvent(new MouseEvent('click'));button.dispatchEvent(new MouseEvent('click'));});
  await page.waitForFunction(()=>document.querySelector('#buicPendingSaveStatus button')?.disabled===true);
- await page.locator('#buicPendingSaveStatus').filter({hasText:'6 shared save(s) completed · 0 pending'}).waitFor();
+ try{await page.locator('#buicPendingSaveStatus').filter({hasText:'6 shared save(s) completed · 0 pending'}).waitFor({timeout:15000});}
+ catch(error){
+  console.error('OUTBOX RECOVERY DIAGNOSTIC',JSON.stringify({status:await page.locator('#buicPendingSaveStatus').textContent(),remaining:(await readRows()).map(row=>({id:row.id,lastError:row.lastError})),attempted:writes.slice(before).map(row=>row.document.document_number)}));
+  throw error;
+ }
  assert.equal(writes.length-before,6);assert.equal(maxActive,1);assert.equal((await readRows()).length,0);
  console.log('PASS six existing pending letters recover once with repeated retry clicks');
 
