@@ -14,6 +14,16 @@
 // Versioned, local-only outbox for exact Student DB payloads.
 // A staff session never uploads unfinished drafts automatically.
 const PENDING_DB_NAME='buic-student-db-pending-v1';
+let pendingRetry=null;
+let saveTail=Promise.resolve();
+// Serialize explicit saves across the parent workspace, iframe and other tabs.
+// The fallback preserves ordering within this document on older browsers.
+function withSaveLock(actor,callback){
+ if(navigator.locks?.request)return navigator.locks.request('buic-student-db-save:'+actor,callback);
+ const result=saveTail.then(callback,callback);
+ saveTail=result.catch(()=>{});
+ return result;
+}
 function pendingDb(){return new Promise((resolve,reject)=>{
  const req=indexedDB.open(PENDING_DB_NAME,1);
  req.onupgradeneeded=()=>req.result.createObjectStore('pending',{keyPath:'id'});
@@ -31,10 +41,10 @@ async function pendingTx(mode,callback){
    tx.onabort=()=>reject(tx.error||new Error('Pending-save transaction aborted'));
  });}finally{db.close();}
 }
-async function pendingRecords(){
- const actor=staffIdentity?.id;
+async function pendingRecords(actor=staffIdentity?.id){
  if(!actor)return [];
- return (await pendingTx('readonly',s=>s.getAll())||[]).filter(x=>x.actor===actor);
+ return (await pendingTx('readonly',s=>s.getAll())||[]).filter(x=>x.actor===actor)
+   .sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
 }
 function pendingStatus(text,isError=false){
  let node=document.getElementById('buicPendingSaveStatus');
@@ -47,32 +57,89 @@ function pendingStatus(text,isError=false){
  node.textContent=text;
  if(isError){
   const button=document.createElement('button');button.textContent='Retry pending Student DB saves';button.type='button';
-  button.style.marginLeft='8px';button.addEventListener('click',()=>void retryPending());node.append(button);
+  button.disabled=Boolean(pendingRetry);button.style.marginLeft='8px';
+  button.addEventListener('click',()=>void retryPending());node.append(button);
  }
 }
-async function enqueuePending(payload,error){
- const actor=staffIdentity?.id;
+async function pendingEntry(payload,actor){
  if(!actor)throw new Error('Cannot retain pending save without validated staff identity');
  const exact=structuredClone(payload);
  const json=JSON.stringify(exact);
  const checksum=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(json))))
    .map(b=>b.toString(16).padStart(2,'0')).join('');
- const entry={id:actor+':'+checksum,actor,checksum,payload:exact,
-   createdAt:new Date().toISOString(),lastError:String(error?.message||error)};
+ return {id:actor+':'+checksum,actor,checksum,payload:exact};
+}
+async function refreshPendingStatus(actor=staffIdentity?.id){
+ if(!actor||!sessionVerified)return;
+ const records=await pendingRecords(actor);
+ if(actor!==staffIdentity?.id||!sessionVerified)return;
+ if(records.length)pendingStatus(records.length+' Student DB save(s) are waiting. Your local letters are safe.',true);
+ else document.getElementById('buicPendingSaveStatus')?.remove();
+}
+async function enqueuePending(payload,error,actor=staffIdentity?.id){
+ const entry=await pendingEntry(payload,actor);
+ const prior=await pendingTx('readonly',store=>store.get(entry.id));
+ entry.createdAt=prior?.createdAt||new Date().toISOString();
+ entry.lastError=String(error?.message||error);
  await pendingTx('readwrite',store=>store.put(entry));
- pendingStatus('Letter saved locally. Student DB save pending ('+entry.lastError+').',true);
+ if(actor===staffIdentity?.id)pendingStatus('Letter saved locally. Student DB save pending: '+entry.lastError,true);
  return entry;
 }
-async function retryPending(){
- if(!sessionVerified){pendingStatus('Sign in or retry Hub connection before retrying shared saves.',true);return;}
- const records=await pendingRecords();let done=0,failed=0;
- for(const r of records){
-  try{await api('/api/staff/students/remember',{method:'POST',body:r.payload});
-      await pendingTx('readwrite',store=>store.delete(r.id));done++;}
-  catch(error){failed++;if(error.status===409){pendingStatus('Document conflict requires manual correction review. Pending record retained.',true);break;}}
+function requireSaveActor(actor){
+ if(!sessionVerified||staffIdentity?.id!==actor)
+  throw Object.assign(new Error('Sign in with the staff account that created this pending save.'),{status:401,kind:'identity'});
+}
+async function saveExact(payload,actor){
+ return withSaveLock(actor,async()=>{
+  requireSaveActor(actor);
+  const entry=await pendingEntry(payload,actor);
+  const result=await api('/api/staff/students/remember',{method:'POST',body:payload});
+  // A response can be lost after the Hub commits. Its exact idempotent retry
+  // must clear the original outbox record when success is finally confirmed.
+  await pendingTx('readwrite',store=>store.delete(entry.id));
+  return result;
+ });
+}
+async function performPendingRetry(){
+ if(!sessionVerified){showGate('Sign in before retrying pending Student DB saves.');return;}
+ const actor=staffIdentity?.id,records=await pendingRecords(actor);
+ let done=0,lastError='';
+ for(let i=0;i<records.length;i++){
+  const r=records[i];
+  pendingStatus('Saving pending Student DB record '+(i+1)+' of '+records.length+'…',true);
+  try{
+   requireSaveActor(actor);
+   const exact=await pendingEntry(r.payload,actor);
+   if(exact.id!==r.id||exact.checksum!==r.checksum)
+    throw Object.assign(new Error('A pending record needs manual recovery; its saved checksum does not match.'),{status:422});
+   await saveExact(r.payload,actor);done++;
+  }catch(error){
+   lastError=error.status===409
+     ?'A document number has a different finalized letter. Review the conflict before correcting it.'
+     :String(error.message||error);
+   await pendingTx('readwrite',store=>store.put({...r,lastError,lastAttemptAt:new Date().toISOString()}));
+   if(error.status===401){showGate('Your session expired. Sign in with the same staff account, then retry pending saves.');break;}
+   // Stop during an outage instead of sending every retained record into it.
+   if(error.status===0||error.status===429||error.status>=500)break;
+  }
  }
- pendingStatus(done+' shared save(s) completed · '+failed+' pending. '+
-   (failed?'Nothing was overwritten.':'Student DB is up to date.'),failed>0);
+ const remaining=(await pendingRecords(actor)).length;
+ if(actor!==staffIdentity?.id&&sessionVerified)return;
+ pendingStatus(done+' shared save(s) completed · '+remaining+' pending. '+
+   (remaining?(lastError||'Retry to finish saving the remaining local letters.'):'Student DB is up to date.'),remaining>0);
+}
+function retryPending(){
+ if(pendingRetry)return pendingRetry;
+ pendingRetry=performPendingRetry().catch(error=>{
+  pendingStatus('Pending letters are retained. '+String(error.message||error),true);
+ }).finally(()=>{
+  pendingRetry=null;
+  const button=document.querySelector('#buicPendingSaveStatus button');
+  if(button)button.disabled=false;
+ });
+ const button=document.querySelector('#buicPendingSaveStatus button');
+ if(button)button.disabled=true;
+ return pendingRetry;
 }
 
   const esc=(v='')=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -89,26 +156,31 @@ async function retryPending(){
   async function api(path,{method='GET',body,auth=true}={}){
     const headers={'Accept':'application/json'};
     if(body!==undefined)headers['Content-Type']='application/json';
-    if(auth&&token)headers['Authorization']='Bearer '+token;
+    const requestToken=token;
+    if(auth&&requestToken)headers['Authorization']='Bearer '+requestToken;
     const controller=new AbortController();
-    const timeout=setTimeout(()=>controller.abort(),8000);
-    let response;
+    // Cold serverless starts, database transactions and lock waits can exceed
+    // eight seconds. Keep the deadline through reading the complete response.
+    const timeout=setTimeout(()=>controller.abort(),45000);
+    let response,raw;
     try{response=await fetch(BASE+path,{
       method,mode:'cors',credentials:'omit',cache:'no-store',headers,
       signal:controller.signal,
       body:body===undefined?undefined:JSON.stringify(body)
-    });}
+    });raw=await response.text();}
     catch(error){throw Object.assign(new Error(error?.name==='AbortError'
       ?'Hub connection timed out. Retry when connected.'
       :'Cannot reach the Hub. Your sign-in token and drafts are preserved.'),
       {status:0,kind:'connection',cause:error});}
     finally{clearTimeout(timeout);}
-    const raw=await response.text();let data={};
+    let data={};
     try{data=raw?JSON.parse(raw):{};}catch{data={detail:raw||('HTTP '+response.status)};}
-    if(response.status===401&&auth){sessionVerified=false;clearToken();}
+    if(response.status===401&&auth&&token===requestToken){sessionVerified=false;clearToken();}
     if(!response.ok){
       const detail=data.detail;
-      const message=typeof detail==='string'?detail:(detail?.message||('Hub returned HTTP '+response.status));
+      const message=typeof detail==='string'?detail:(detail?.message||
+        (Array.isArray(detail)?detail.map(x=>[x.loc?.slice(1).join('.'),x.msg].filter(Boolean).join(': ')).join('; '):null)||
+        ('Hub returned HTTP '+response.status));
       throw Object.assign(new Error(message),{status:response.status,data});
     }
     return data;
@@ -246,6 +318,7 @@ async function retryPending(){
     document.documentElement.classList.remove('buic-auth-pending');
     renderState();
     window.dispatchEvent(new CustomEvent('buic-workspace-verified'));
+    void refreshPendingStatus().catch(error=>console.warn('Could not read pending Student DB saves',error));
   }
 
   async function loginWorkspace(event){
@@ -347,19 +420,27 @@ async function retryPending(){
       if(!interactive)throw Object.assign(new Error('Workspace sign in required'),{status:401});
       await requestAuth();
     }
-    try{return await api('/api/staff/students/remember',{method:'POST',body:payload});}
+    const actor=staffIdentity?.id;
+    try{
+      const result=await saveExact(payload,actor);
+      await refreshPendingStatus(actor);return result;
+    }
     catch(err){
       if(err.status===401&&interactive){
+        await enqueuePending(payload,err,actor);
         showGate('Your workspace session expired. Please sign in again.');await requestAuth();
-        try{return await api('/api/staff/students/remember',{method:'POST',body:payload});}
+        try{
+          const result=await saveExact(payload,actor);
+          await refreshPendingStatus(actor);return result;
+        }
         catch(retryError){
           if(retryError.status===0||retryError.status===401||retryError.status===429||retryError.status>=500)
-            await enqueuePending(payload,retryError);
+            await enqueuePending(payload,retryError,actor);
           throw retryError;
         }
       }
       if(err.status===0||err.status===401||err.status===429||err.status>=500)
-        await enqueuePending(payload,err);
+        await enqueuePending(payload,err,actor);
       throw err;
     }
   }

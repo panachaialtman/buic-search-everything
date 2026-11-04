@@ -5,6 +5,9 @@ on:
       - 'new-letter-pdf-v1.js'
       - 'new-letter-pdf-v1.css'
       - 'index.html'
+      - 'student-memory.js'
+      - 'tests/student-memory-outbox.test.cjs'
+      - 'tests/student-memory-outbox-browser.mjs'
       - 'tests/new-letter-browser.mjs'
       - 'tests/workspace-operation-barrier.test.cjs'
       - 'tests/audit-letter-phone.py'
@@ -32,6 +35,8 @@ jobs:
         run: python3 tests/audit-letter-phone.py
       - name: Exercise draft operation barrier against the complete production module
         run: node tests/workspace-operation-barrier.test.cjs
+      - name: Exercise Student DB pending saves and authentication recovery
+        run: node --test tests/student-memory-outbox.test.cjs
       - name: Install Playwright and Chromium
         run: |
           npm install --no-save playwright@1.55.1
@@ -43,6 +48,8 @@ jobs:
           curl -fsS http://127.0.0.1:8123/ >/dev/null
       - name: Exercise New Letter in Chromium
         run: node tests/new-letter-browser.mjs
+      - name: Exercise Student DB recovery with real IndexedDB and Web Locks
+        run: node tests/student-memory-outbox-browser.mjs
       - name: Upload browser screenshots and logs
         if: always()
         uses: actions/upload-artifact@v4
