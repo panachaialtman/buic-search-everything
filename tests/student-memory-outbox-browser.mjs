@@ -9,7 +9,7 @@ try{
  let mode='success',delay=0,active=0,maxActive=0;
  const writes=[];
  const sample=n=>({action:'create_letter',source_app:'new_letter',student:{student_id:'OUTBOX-QA-'+n,full_name:'Synthetic Outbox QA'},document:{document_number:'OUTBOX-QA-'+n,document_type:'bachelor',letter_date:'2026-11-04'},snapshot:{studentName:'Synthetic Outbox QA',documentNo:'OUTBOX-QA-'+n}});
- await context.route('**/__outbox-qa.html',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html><head></head><body><script src="/student-memory.js"></script></body></html>'}));
+ await context.route('**/__outbox-qa.html',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:'<!doctype html><html><head><meta charset="utf-8"></head><body><script src="/student-memory.js"></script></body></html>'}));
  await context.route('https://buic-central-hub.vercel.app/**',async route=>{
   const url=new URL(route.request().url());
   if(url.pathname==='/api/staff/session')return route.fulfill({json:{ok:true,staff:{id:'outbox-browser-staff',username:'outbox-browser-staff'}}});
