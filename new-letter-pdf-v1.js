@@ -3259,6 +3259,7 @@ async function build(){
     const visible=$('#workspaceDocuments');
     if(!visible||visible.classList.contains('hidden')||getComputedStyle(visible).display==='none')return;
     if(reviewBlockCandidateShortcut(e))return;
+    if($('#nlpdfExportModal').classList.contains('open'))return;
     if(ignoreDeleteKey(e))return;
     const cmd=e.ctrlKey||e.metaKey;
     if(cmd&&!e.altKey&&e.key.toLowerCase()==='z'){

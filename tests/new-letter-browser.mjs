@@ -614,6 +614,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfCreate').click();
     assert.deepEqual(await page.locator('.nlpdf-excel-table th').allTextContents(),['Document date','Student ID','Full name (first + last)','(blank)','Passport number','Passport Expiry','Embassy place']);
     assert.equal(await page.locator('.nlpdf-excel-table tbody input').count(),6);
+    await page.locator('.nlpdf-excel-scroll').focus();await page.keyboard.press('Delete');
+    assert.equal(await count(),expectedPages,'keyboard navigation in the Excel table must not delete background PDF pages');
     assert.equal(await page.locator('.nlpdf-excel-table tbody td').count(),7);
     assert.equal(await page.locator('.nlpdf-excel-table tbody td').nth(3).textContent(),'');
     assert.equal(await page.locator('#nlpdfExportName').inputValue(),'Content Linked Name');
@@ -661,13 +663,21 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.deepEqual(await page.evaluate(()=>({remember:window.__studentMemoryRememberCalls,files:window.__mockFiles.length})),before,'editing and copying must not save a shared record or create output files');
     await page.waitForFunction(async()=>{
       const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});
-      try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.linkedData?.studentName==='Excel First Last'&&row.linkedData?.passportExpiry==='2034-03-02'&&row.linkedData?.letterDate==='2026-11-05'&&row.linkedData?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}
+      try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>!row.pendingLetter&&row.linkedData?.studentId==='1690123456'&&row.linkedData?.passport==='EXCEL001'&&row.linkedData?.studentName==='Excel First Last'&&row.linkedData?.passportExpiry==='2034-03-02'&&row.linkedData?.letterDate==='2026-11-05'&&row.linkedData?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}
     },null,{timeout:10000});
-    const acceptRecoveryDialog=dialog=>dialog.accept();
+    const acceptRecoveryDialog=async dialog=>{
+      if(dialog.type()==='beforeunload')return dialog.accept();
+      if(dialog.type()==='confirm')return dialog.dismiss();
+      const line=dialog.message().split('\n').find(line=>line.includes('student:1690123456'));
+      assert(line,'the edited package must appear in the saved draft list');
+      return dialog.accept(line.match(/^(\d+)\./)[1]);
+    };
     page.on('dialog',acceptRecoveryDialog);
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('#buicWorkspaceAuth').waitFor({state:'hidden',timeout:15000});
-    await page.locator('[data-workspace="documents"]').click();await awaitCount(expectedPages);
+    await page.locator('[data-workspace="documents"]').click();
+    await page.getByRole('button',{name:'Restore draft',exact:true}).click();await awaitCount(expectedPages);
+    await page.waitForFunction(()=>!document.getElementById('newLetterPdfWorkspace').inert);
     page.off('dialog',acceptRecoveryDialog);
     await page.locator('#nlpdfCreate').click();
     for(const [id,value] of Object.entries(values))assert.equal(await page.locator('#'+id).inputValue(),value,'draft recovery must retain '+id);
