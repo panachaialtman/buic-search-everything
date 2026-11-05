@@ -643,6 +643,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert(await page.locator('#nlpdfCopyExcelRow').isVisible());
     const mobile=await page.locator('.nlpdf-excel-scroll').evaluate(el=>({scrollable:el.scrollWidth>el.clientWidth,viewportFits:document.documentElement.scrollWidth<=innerWidth+1}));
     assert.deepEqual(mobile,{scrollable:true,viewportFits:true});
+    await page.waitForFunction(()=>document.querySelector('#nlpdfExportModal h2').getBoundingClientRect().top>=document.querySelector('.topbar').getBoundingClientRect().bottom);
     const mobileBounds=await page.evaluate(()=>({headerBottom:document.querySelector('.topbar').getBoundingClientRect().bottom,titleTop:document.querySelector('#nlpdfExportModal h2').getBoundingClientRect().top,actionsBottom:document.querySelector('#nlpdfExportModal .nlpdf-modal-actions').getBoundingClientRect().bottom,height:innerHeight}));
     assert(mobileBounds.titleTop>=mobileBounds.headerBottom,'package title must remain below the site header');
     assert(mobileBounds.actionsBottom<=mobileBounds.height,'package actions must remain visible without scrolling the window');
@@ -725,6 +726,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfChooseDestination').click();await page.locator('#nlpdfConfirmExport').click();await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
     await page.locator('#nlpdfExportLetterType').selectOption('exchange');await page.locator('#nlpdfConfirmLetterType').click();await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
     assert.equal(await page.locator('#nlpdfLetterFinalDate').inputValue(),'2026-11-05','the package document date must enter the Word editor');
+    await page.locator('#nlpdfLetterName').fill('Linked Name QA');await page.locator('#nlpdfLetterName').fill('Linked Name');
     await waitForAsync(async()=>{const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.pendingLetter?.values?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}},null,{timeout:10000});
     assert.equal(await page.locator('#nlpdfLetterStepStudent').isVisible(),true);assert.match(await page.locator('#nlpdfLetterContentLabel').innerText(),/Passport/);
     assert.equal(await page.locator('#nlpdfLetterMagnifierWidth').inputValue(),'300');assert.equal(await page.locator('#nlpdfLetterMagnifierHeight').inputValue(),'200');assert.equal(await page.locator('#nlpdfLetterMagnifierZoom').inputValue(),'2');
