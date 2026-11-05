@@ -692,7 +692,7 @@ function exportModalMarkup(){
     '<div class="nlpdf-modal-head"><div><span class="eyebrow">CREATE 1/2</span><h2>Create Package</h2></div><button class="nlpdf-close" type="button" data-nlpdf-close>×</button></div>'+
     '<div class="nlpdf-modal-body">'+
       '<section class="nlpdf-excel-review" aria-labelledby="nlpdfExcelTitle">'+
-        '<div class="nlpdf-excel-head"><div><h3 id="nlpdfExcelTitle">Excel row</h3><p id="nlpdfExcelHelp">Edit or fill missing details before copying. Copies one row without headings; dates use DD/MM/YYYY.</p></div><button class="nlpdf-dest-btn" id="nlpdfCopyExcelRow" type="button">Copy row for Excel</button></div>'+
+        '<div class="nlpdf-excel-head"><div><h3 id="nlpdfExcelTitle">Excel row</h3><p id="nlpdfExcelHelp">Edit or fill missing details before copying. Copies one row without headings; dates use MMM D, YYYY (e.g. Nov 5, 2026).</p></div><button class="nlpdf-dest-btn" id="nlpdfCopyExcelRow" type="button">Copy row for Excel</button></div>'+
         '<div class="nlpdf-excel-scroll" tabindex="0" role="region" aria-label="Editable Excel row"><table class="nlpdf-excel-table" aria-describedby="nlpdfExcelHelp"><thead><tr><th scope="col">Document date</th><th scope="col">Student ID</th><th scope="col">Full name (first + last)</th><th scope="col">(blank)</th><th scope="col">Passport number</th><th scope="col">Passport Expiry</th><th scope="col">Embassy place</th></tr></thead><tbody><tr>'+
           '<td><input type="date" id="nlpdfExportDate" aria-label="Document date"></td>'+
           '<td><input id="nlpdfExportStudentId" aria-label="Student ID" placeholder="1690000000"></td>'+
@@ -1681,7 +1681,7 @@ function packageExcelCell(value){
   return /^[=+@-]/.test(text)?"'"+text:text;
 }
 function packageExcelDate(value){
-  const iso=toIsoDate(value);return iso?iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4):'';
+  return formatDateEn(toIsoDate(value)).replace(/^[A-Za-z]+/,month=>month.slice(0,3));
 }
 function packageExcelRow(){
   return [packageExcelDate($('#nlpdfExportDate').value),$('#nlpdfExportStudentId').value,
