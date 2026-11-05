@@ -2631,7 +2631,7 @@ function appendTextRun(paragraph,text,doc,ns,sourceRun,highlight=false){
 }
 function refreshSelectedEmbassyContext(context){
   const id=clean($('#nlpdfLetterEmbassy')?.value);if(!id)return;const record=(centralReference().embassy||[]).find(r=>embassyValues(r).id===id);if(!record)return;
-  const manual=context.embassyAddressEdited?String(context.values.embassyAddress??''):null,patch=embassyLinkedPatch(record);if(context.embassyAddressEdited){patch.embassyAddress=manual;for(const key of Object.keys(patch))if(/^embassyAddress\d+$/.test(key))delete patch[key];addressLines(manual).forEach((line,i)=>patch['embassyAddress'+(i+1)]=line);}Object.assign(context.values,patch);Object.assign(state.linkedData,patch);
+  const manual=context.embassyAddressEdited?String(context.values.embassyAddress??''):null,patch=embassyLinkedPatch(record);if(context.values.embassyCity!==undefined)patch.embassyCity=context.values.embassyCity;if(context.embassyAddressEdited){patch.embassyAddress=manual;for(const key of Object.keys(patch))if(/^embassyAddress\d+$/.test(key))delete patch[key];addressLines(manual).forEach((line,i)=>patch['embassyAddress'+(i+1)]=line);}Object.assign(context.values,patch);Object.assign(state.linkedData,patch);
 }
 function isTaiwanTradeOfficeContext(context){
   return clean(context?.values?.embassyRecordId)==='E096'||(clean(context?.values?.embassyCountry)==='Taiwan'&&/Thailand Trade and Economic Office/i.test(clean(context?.values?.embassy)||clean(context?.values?.embassyOffice)));

@@ -1953,7 +1953,10 @@ html[data-theme-mode="dark"] .nlpdf-paper{box-shadow:0 16px 48px rgba(0,0,0,.38)
 
 
 /* Editable package row follows the seven columns in the visa Excel log. */
-#nlpdfExportModal .nlpdf-modal-card{width:min(1200px,96vw)}
+#nlpdfExportModal{inset:var(--bu-topbar-bottom,72px) 0 0;padding:14px}
+#nlpdfExportModal .nlpdf-modal-card{width:min(1200px,96vw);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+#nlpdfExportModal .nlpdf-modal-head,#nlpdfExportModal .nlpdf-modal-actions{flex-shrink:0}
+#nlpdfExportModal .nlpdf-modal-body{min-height:0;overflow-y:auto}
 .nlpdf-excel-review{display:grid;gap:9px;min-width:0}
 .nlpdf-excel-head{display:flex;align-items:center;justify-content:space-between;gap:15px}
 .nlpdf-excel-head h3{margin:0;font-size:13px;color:var(--text)}

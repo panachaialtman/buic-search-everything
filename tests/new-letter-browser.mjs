@@ -631,6 +631,9 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert(await page.locator('#nlpdfCopyExcelRow').isVisible());
     const mobile=await page.locator('.nlpdf-excel-scroll').evaluate(el=>({scrollable:el.scrollWidth>el.clientWidth,viewportFits:document.documentElement.scrollWidth<=innerWidth+1}));
     assert.deepEqual(mobile,{scrollable:true,viewportFits:true});
+    const mobileBounds=await page.evaluate(()=>({headerBottom:document.querySelector('.topbar').getBoundingClientRect().bottom,titleTop:document.querySelector('#nlpdfExportModal h2').getBoundingClientRect().top,actionsBottom:document.querySelector('#nlpdfExportModal .nlpdf-modal-actions').getBoundingClientRect().bottom,height:innerHeight}));
+    assert(mobileBounds.titleTop>=mobileBounds.headerBottom,'package title must remain below the site header');
+    assert(mobileBounds.actionsBottom<=mobileBounds.height,'package actions must remain visible without scrolling the window');
     await page.screenshot({path:'test-results/package-excel-mobile.png'});
     await page.setViewportSize({width:1440,height:900});
     // A denied clipboard still exposes the exact row for a manual copy.
@@ -660,10 +663,12 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
       const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});
       try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.linkedData?.studentName==='Excel First Last'&&row.linkedData?.passportExpiry==='2034-03-02'&&row.linkedData?.letterDate==='2026-11-05'&&row.linkedData?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}
     },null,{timeout:10000});
-    page.once('dialog',dialog=>dialog.accept());
+    const acceptRecoveryDialog=dialog=>dialog.accept();
+    page.on('dialog',acceptRecoveryDialog);
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('#buicWorkspaceAuth').waitFor({state:'hidden',timeout:15000});
     await page.locator('[data-workspace="documents"]').click();await awaitCount(expectedPages);
+    page.off('dialog',acceptRecoveryDialog);
     await page.locator('#nlpdfCreate').click();
     for(const [id,value] of Object.entries(values))assert.equal(await page.locator('#'+id).inputValue(),value,'draft recovery must retain '+id);
     await page.locator('#nlpdfExportModal .nlpdf-cancel').click();
