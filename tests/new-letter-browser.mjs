@@ -73,6 +73,7 @@ try{
       }
       if(url==='https://buic-central-hub.vercel.app/api/staff/students/remember'){
         window.__studentMemoryRememberCalls++;
+        window.__lastMemoryPayload=JSON.parse(init.body);
         return new Response(JSON.stringify({student:{student_id:'QA',full_name:'QA'}}),{status:200,headers:{'Content-Type':'application/json'}});
       }
       if(url.startsWith('https://buic-central-hub.vercel.app/api/staff/')&&
@@ -101,7 +102,7 @@ try{
     await page.evaluate(()=>{
       window.dispatchEvent(new CustomEvent('buic-student-memory-selected',{detail:{
         student:{student_id:'1690888888',full_name:'Remembered QA',nationality_en:'Myanmar',nationality_th:'เมียนมา',country_en:'Myanmar',country_th:'เมียนมา',extra_data:{recipientLocation:'Yangon, Myanmar'}},
-        passport:{passport_number:'MEM12345'},
+        passport:{passport_number:'MEM12345',expiry_date:'2032-07-09'},
         academic:{faculty_en:'BU International',major_en:'Business Administration',extra_data:{semester:'Second',academicYear:'2026'}}
       }}));
     });
@@ -109,6 +110,9 @@ try{
     assert.equal(await page.locator('#nlpdfExportName').inputValue(),'Remembered QA');
     assert.equal(await page.locator('#nlpdfExportPassport').inputValue(),'MEM12345');
     assert.equal(await page.locator('#nlpdfExportStudentId').inputValue(),'1690888888');
+    assert.equal(await page.locator('#nlpdfExportPassportExpiry').inputValue(),'2032-07-09');
+    await page.evaluate(()=>window.dispatchEvent(new CustomEvent('buic-student-memory-selected',{detail:{student:{student_id:'1690888888',full_name:'Remembered QA'},passport:{passport_number:'MEM-NEW-NO-EXPIRY'}}})));
+    assert.equal(await page.locator('#nlpdfExportPassportExpiry').inputValue(),'','a different passport with unknown expiry must not inherit the previous expiry');
     await page.waitForTimeout(100);
     assert.equal(await page.evaluate(()=>window.__studentMemoryRememberCalls||0),rememberBefore,'selecting/typing a student must not persist central memory');
     await page.locator('[data-nlpdf-close]').last().click();
@@ -569,6 +573,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await page.locator('#nlpdfContentPanel').isVisible(),true);
     await page.locator('#nlpdfContentName').fill('Content Linked Name');
     await page.locator('#nlpdfContentPassport').fill('PP998877');
+    assert.equal(await page.locator('#nlpdfContentPassportExpiry').getAttribute('type'),'date');
+    await page.locator('#nlpdfContentPassportExpiry').fill('2033-08-19');
     await page.locator('#nlpdfContentLocation').fill('Goes, Netherlands');
     await page.locator('#nlpdfContentNationality').click();
     await page.locator('#nlpdfReferencePicker').waitFor({state:'visible'});
@@ -599,6 +605,68 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfReferencePickerSearch').fill('Yangon');
     const embassyResult=page.locator('#nlpdfReferencePickerResults [data-reference-result]').first();
     if(await embassyResult.count())await embassyResult.click();
+  });
+
+  await run('Create Package has an editable seven-column Excel row, exact copy, and draft recovery',async()=>{
+    const before=await page.evaluate(()=>({remember:window.__studentMemoryRememberCalls,files:window.__mockFiles.length}));
+    const expectedPages=await count();
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:'http://127.0.0.1:8123'});
+    await page.locator('#nlpdfCreate').click();
+    assert.deepEqual(await page.locator('.nlpdf-excel-table th').allTextContents(),['Document date','Student ID','Full name (first + last)','(blank)','Passport number','Passport Expiry','Embassy place']);
+    assert.equal(await page.locator('.nlpdf-excel-table tbody input').count(),6);
+    assert.equal(await page.locator('.nlpdf-excel-table tbody td').count(),7);
+    assert.equal(await page.locator('.nlpdf-excel-table tbody td').nth(3).textContent(),'');
+    assert.equal(await page.locator('#nlpdfExportName').inputValue(),'Content Linked Name');
+    assert.equal(await page.locator('#nlpdfExportPassport').inputValue(),'PP998877');
+    assert.equal(await page.locator('#nlpdfExportPassportExpiry').inputValue(),'2033-08-19');
+    assert.equal(await page.locator('#nlpdfExportEmbassyCity').inputValue(),'Yangon','the selected embassy must prefill its city, not the student location');
+    const values={nlpdfExportDate:'2026-11-05',nlpdfExportStudentId:'1690123456',nlpdfExportName:'Excel First Last',nlpdfExportPassport:'EXCEL001',nlpdfExportPassportExpiry:'2034-03-02',nlpdfExportEmbassyCity:'Ho Chi Minh City'};
+    for(const [id,value] of Object.entries(values))await page.locator('#'+id).fill(value);
+    const expected='05/11/2026\t1690123456\tExcel First Last\t\tEXCEL001\t02/03/2034\tHo Chi Minh City';
+    await page.locator('#nlpdfCopyExcelRow').click();
+    await page.waitForFunction(()=>document.querySelector('#nlpdfExcelCopyStatus').textContent.startsWith('Row copied'));
+    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),expected,'Excel paste must receive one data row, seven columns, no header and an empty fourth column');
+    await page.screenshot({path:'test-results/package-excel-desktop.png'});
+    await page.setViewportSize({width:390,height:844});
+    assert(await page.locator('#nlpdfCopyExcelRow').isVisible());
+    const mobile=await page.locator('.nlpdf-excel-scroll').evaluate(el=>({scrollable:el.scrollWidth>el.clientWidth,viewportFits:document.documentElement.scrollWidth<=innerWidth+1}));
+    assert.deepEqual(mobile,{scrollable:true,viewportFits:true});
+    await page.screenshot({path:'test-results/package-excel-mobile.png'});
+    await page.setViewportSize({width:1440,height:900});
+    // A denied clipboard still exposes the exact row for a manual copy.
+    await page.evaluate(()=>{
+      window.__nativeClipboard=navigator.clipboard;window.__nativeCopyCommand=document.execCommand;
+      Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new DOMException('QA clipboard blocked','NotAllowedError');}}});
+      document.execCommand=()=>false;
+    });
+    await page.locator('#nlpdfCopyExcelRow').click();
+    await page.locator('#nlpdfExcelFallback').waitFor({state:'visible'});
+    assert.equal(await page.locator('#nlpdfExcelCopyText').inputValue(),expected);
+    assert.equal(await page.locator('#nlpdfExcelCopyText').evaluate(el=>el.selectionEnd-el.selectionStart),expected.length);
+    await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:window.__nativeClipboard});document.execCommand=window.__nativeCopyCommand;});
+    // Missing information is allowed; reopening must keep deliberately empty cells.
+    for(const id of Object.keys(values))await page.locator('#'+id).fill('');
+    await page.locator('#nlpdfCopyExcelRow').click();
+    await page.waitForFunction(()=>document.querySelector('#nlpdfExcelCopyStatus').textContent.startsWith('Row copied'));
+    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'\t\t\t\t\t\t');
+    await page.locator('#nlpdfExportModal .nlpdf-cancel').click();await page.locator('#nlpdfCreate').click();
+    for(const id of Object.keys(values))assert.equal(await page.locator('#'+id).inputValue(),'');
+    for(const [id,value] of Object.entries(values))await page.locator('#'+id).fill(value);
+    await page.locator('#nlpdfExportModal .nlpdf-cancel').click();
+    await page.locator('#nlpdfPageContentType').selectOption('passport');
+    assert.equal(await page.locator('#nlpdfContentPassportExpiry').inputValue(),'2034-03-02','package edits must update the Passport form');
+    assert.deepEqual(await page.evaluate(()=>({remember:window.__studentMemoryRememberCalls,files:window.__mockFiles.length})),before,'editing and copying must not save a shared record or create output files');
+    await page.waitForFunction(async()=>{
+      const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});
+      try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.linkedData?.studentName==='Excel First Last'&&row.linkedData?.passportExpiry==='2034-03-02'&&row.linkedData?.letterDate==='2026-11-05'&&row.linkedData?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}
+    },null,{timeout:10000});
+    page.once('dialog',dialog=>dialog.accept());
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.locator('#buicWorkspaceAuth').waitFor({state:'hidden',timeout:15000});
+    await page.locator('[data-workspace="documents"]').click();await awaitCount(expectedPages);
+    await page.locator('#nlpdfCreate').click();
+    for(const [id,value] of Object.entries(values))assert.equal(await page.locator('#'+id).inputValue(),value,'draft recovery must retain '+id);
+    await page.locator('#nlpdfExportModal .nlpdf-cancel').click();
   });
 
   await run('Content selector and metadata panel stay pinned while the A4 stage scrolls',async()=>{
@@ -638,6 +706,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('input[name="nlpdfOutput"][value="pdf"]').uncheck();await page.locator('input[name="nlpdfOutput"][value="folder"]').uncheck();await page.locator('input[name="nlpdfOutput"][value="letter"]').check();
     await page.locator('#nlpdfChooseDestination').click();await page.locator('#nlpdfConfirmExport').click();await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
     await page.locator('#nlpdfExportLetterType').selectOption('exchange');await page.locator('#nlpdfConfirmLetterType').click();await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
+    assert.equal(await page.locator('#nlpdfLetterFinalDate').inputValue(),'2026-11-05','the package document date must enter the Word editor');
+    await page.waitForFunction(async()=>{const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.pendingLetter?.values?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}},null,{timeout:10000});
     assert.equal(await page.locator('#nlpdfLetterStepStudent').isVisible(),true);assert.match(await page.locator('#nlpdfLetterContentLabel').innerText(),/Passport/);
     assert.equal(await page.locator('#nlpdfLetterMagnifierWidth').inputValue(),'300');assert.equal(await page.locator('#nlpdfLetterMagnifierHeight').inputValue(),'200');assert.equal(await page.locator('#nlpdfLetterMagnifierZoom').inputValue(),'2');
     await page.locator('#nlpdfLetterContentCanvas').hover({position:{x:180,y:220}});await page.locator('#nlpdfLetterMagnifier').waitFor({state:'visible'});let lens=await page.locator('#nlpdfLetterMagnifier').boundingBox();assert(lens&&Math.abs(lens.width-304)<2&&Math.abs(lens.height-204)<2,'first-use magnifier should be 300×200 plus its border');assert.equal(await page.locator('#nlpdfLetterMagnifier').getAttribute('data-zoom'),'2');
@@ -680,6 +750,8 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert((await page.evaluate(()=>window.__studentMemoryRememberCalls||0))>memoryBeforeCreate,'final Create Letter must persist shared student memory');
     const out=await page.evaluate(async before=>{const file=window.__mockFiles.slice(before).find(f=>f.name==='Letter_Linked Name_AB1234567_1690000000.docx');if(!file)return null;const zip=await JSZip.loadAsync(file.bytes),xml=await zip.file('word/document.xml').async('string'),doc=new DOMParser().parseFromString(xml,'application/xml'),ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const paras=[...doc.getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join(''));const plain=paras.join('\n');const footerXmls=await Promise.all(zip.file(/^word\/(?:footer|header)\d+\.xml$/i).map(f=>f.async('string')));const allContactText=[xml,...footerXmls].map(content=>[...new DOMParser().parseFromString(content,'application/xml').getElementsByTagNameNS(ns,'p')].map(p=>[...p.getElementsByTagNameNS(ns,'t')].map(t=>t.textContent||'').join('')).join('\n')).join('\n');return{signatoryLines:paras.filter(p=>p.includes('Somyot Wattanakamolchai')),contactUpdated:allContactText.includes('โทร (+66) 2407 3888 ต่อ 2441'),contactLegacy:/โทร\s*0\s*2407\s*3888\s*ต่อ\s*2441/.test(allContactText),finished:file.finished,highlight:/<w:highlight\b[^>]*(?:w:val|val)="yellow"/i.test(xml),name:(xml.match(/Linked Name/g)||[]).length,passport:(xml.match(/AB1234567/g)||[]).length,englishDate:xml.includes('October 8, 2026'),thaiDate:xml.includes('8 ตุลาคม 2569'),studyPeriod:xml.includes('January 11, 2027 to June 15, 2027'),editedOrientation:xml.includes('January 4 - 9, 2027'),customAddress:xml.includes('Custom Embassy Address'),englishSchoolCountry:plain.includes('QA Home University, France'),thaiSchoolComma:/QA Home University\s*,\s*[\u0E00-\u0E7F]/.test(plain),thaiSchoolPresent:paras.some(p=>/[\u0E00-\u0E7F]/.test(p)&&p.includes('QA Home University สาธารณรัฐฝรั่งเศส')),staleThaiCountryPlaceholder:/\bประเทศ\s+ตั้งแต่ภาคการศึกษา/.test(plain),staleThaiSchoolPlaceholder:/Their\s*school/i.test(plain),schoolLines:paras.filter(p=>p.includes('QA Home University')),thaiParagraphs:paras.filter(p=>/[\u0E00-\u0E7F]/.test(p)&&/(?:school|มหาวิทยาลัย|ประเทศ)/i.test(p)).slice(0,12),taiwanMission:plain.includes('Thailand Trade and Economic Office in Taipei, Taiwan (ROC)'),oldTaipeiName:plain.includes('Thailand Trade and Economic Office (Taipei)'),directorCount:paras.filter(p=>p.trim()==='Dear The Director').length,staleConsul:paras.some(p=>/^(?:The Consul|Dear Consul\b)/i.test(p.trim())),thaiDirector:plain.includes('เรียน ผู้อำนวยการใหญ่'),myanmarCitizen:/\bMyanmar\s+Citizen\b/.test(plain),oldMyanmarNationality:plain.includes('Myanmar / Burmese Citizen'),orientationParagraphs:paras.filter(p=>/\borientation\b/i.test(p))};},before);
     assertSignatory(out?.signatoryLines,'Exchange');
+    assert.equal(await page.evaluate(()=>window.__lastMemoryPayload?.passport?.expiry_date),'2034-03-02','the created letter must remember the entered passport expiry');
+    assert.equal(await page.evaluate(()=>window.__lastMemoryPayload?.snapshot?.passportExpiry),'2034-03-02');
     assert(out&&out.finished);assert.equal(out.contactUpdated,true,'Exchange Word letter must use (+66) International Center telephone');assert.equal(out.contactLegacy,false,'Exchange Word letter must not retain the legacy phone number');assert.equal(out.highlight,true);assert(out.name>=1);assert(out.passport>=1);assert.equal(out.englishDate,true);assert.equal(out.thaiDate,true);assert.equal(out.studyPeriod,true);assert.equal(out.editedOrientation,true);assert.equal(out.customAddress,true,'manual Embassy address must be used in final Word output');assert.equal(out.taiwanMission,true,'Taiwan mission must use the full Taipei, Taiwan (ROC) wording');assert.equal(out.oldTaipeiName,false,'old Taiwan mission name must not remain');assert.equal(out.directorCount,1,'Taiwan must contain one Dear The Director addressee');assert.equal(out.staleConsul,false,'Taiwan must not retain The Consul or Dear Consul');assert.equal(out.thaiDirector,true,'Taiwan Thai addressee must be เรียน ผู้อำนวยการใหญ่');assert.equal(out.myanmarCitizen,true,'English nationality should be Myanmar Citizen');assert.equal(out.oldMyanmarNationality,false,'Myanmar / Burmese must not appear as the English nationality');assert.equal(out.englishSchoolCountry,true,'Exchange English school must be followed by comma then country; school lines: '+JSON.stringify(out.schoolLines));assert.equal(out.thaiSchoolPresent,true,'Exchange Thai paragraph must use the full official Thai school country name สาธารณรัฐฝรั่งเศส after the untruncated university name, with no comma; Thai paragraphs: '+JSON.stringify(out.thaiParagraphs));assert.equal(out.staleThaiCountryPlaceholder,false,'Exchange Thai paragraph must not retain the literal ประเทศ placeholder');assert.equal(out.staleThaiSchoolPlaceholder,false,'Exchange Thai paragraph must not retain Theirschool or Their school');assert.equal(out.thaiSchoolComma,false,'Exchange Thai school must not have comma after the school name; school lines: '+JSON.stringify(out.schoolLines));assert(out.orientationParagraphs.some(p=>/\bJanuary 4 - 9, 2027\.$/.test(p.trim())),'Exchange orientation sentence must end with one period after the updated date: '+JSON.stringify(out.orientationParagraphs));assert(out.orientationParagraphs.every(p=>!/\.\.$/.test(p.trim())),'Orientation line must not contain duplicate periods');
   });
 
@@ -965,9 +1037,14 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
       await visa.locator('[data-view="'+key+'"]').click();
       assert.equal((await visa.locator('#pageTitle').innerText()).trim(),title);
       assert.equal(await visa.locator('#'+viewId).getAttribute('class').then(v=>v.includes('active')),true);
-      assert.equal(await visa.locator('#'+formId).isVisible(),true);
+      assert.equal(await visa.locator('#'+key+'CaseList').isVisible(),true);
+      assert.equal(await visa.locator('#'+formId).isVisible(),false);
       assert.equal(await visa.locator('#draftsBtn').isVisible(),false);
-      assert.equal(await visa.locator('#addStudentBtn').isVisible(),false);
+      assert.equal(await visa.locator('#addStudentBtn').isVisible(),true);
+      await visa.locator('#addStudentBtn').click();
+      await visa.locator('#'+key+'LetterModal').waitFor({state:'visible'});
+      assert.equal(await visa.locator('#'+formId).isVisible(),true);
+      await visa.locator('#'+key+'LetterModal [data-close]').first().click();
     }
     await visa.locator('[data-view="workspace"][data-case-category="normal"]').click();
     assert.equal(await visa.locator('#addStudentBtn').isVisible(),true);
