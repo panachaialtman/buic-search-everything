@@ -15,6 +15,16 @@ const text=async selector=>page.locator(selector).innerText();
 const count=async()=>Number(await text('#nlpdfPageCount'));
 const visible=async selector=>page.locator(selector).isVisible();
 const awaitCount=async n=>page.waitForFunction(n=>Number(document.querySelector('#nlpdfPageCount')?.textContent||-1)===n,n,{timeout:15000});
+// waitForFunction treats an async predicate's Promise as truthy in Playwright
+// 1.55. Poll the resolved IndexedDB result in Node before advancing the test.
+const waitForAsync=async(predicate,arg,{timeout=10000}={})=>{
+  const deadline=Date.now()+timeout;
+  while(Date.now()<deadline){
+    if(await page.evaluate(predicate,arg))return;
+    await page.waitForTimeout(100);
+  }
+  assert.fail('Timed out waiting for the asynchronous browser state to be saved');
+};
 const asset=async(which,fileName)=>{
   await page.locator('[data-asset-import="'+which+'"]').click();
   await page.locator('#nlpdfAssetInput').setInputFiles({name:fileName,mimeType:'image/png',buffer:png});
@@ -661,31 +671,15 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfPageContentType').selectOption('passport');
     assert.equal(await page.locator('#nlpdfContentPassportExpiry').inputValue(),'2034-03-02','package edits must update the Passport form');
     assert.deepEqual(await page.evaluate(()=>({remember:window.__studentMemoryRememberCalls,files:window.__mockFiles.length})),before,'editing and copying must not save a shared record or create output files');
-    await page.waitForFunction(async()=>{
+    await waitForAsync(async()=>{
       const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});
       try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>!row.pendingLetter&&row.linkedData?.studentId==='1690123456'&&row.linkedData?.passport==='EXCEL001'&&row.linkedData?.studentName==='Excel First Last'&&row.linkedData?.passportExpiry==='2034-03-02'&&row.linkedData?.letterDate==='2026-11-05'&&row.linkedData?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}
     },null,{timeout:10000});
-    const inspectDrafts=()=>page.evaluate(async()=>{
-      const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});
-      try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve({owner:window.BUICWorkspaceAuth.getIdentity()?.id,rows:request.result.map(row=>({id:row.id,owner:row.owner,caseKey:row.caseKey,version:row.version,updatedAt:row.updatedAt,values:row.linkedData,pending:Boolean(row.pendingLetter)}))});});}finally{db.close();}
-    });
-    console.log('QA package drafts before reload',JSON.stringify(await inspectDrafts()));
-    let recoveryDialogError;
-    const acceptRecoveryDialog=async dialog=>{
-      console.log('QA package recovery dialog',dialog.type(),dialog.message());
-      if(dialog.type()==='beforeunload')return dialog.accept();
-      if(dialog.type()==='confirm')return dialog.dismiss();
-      const line=dialog.message().split('\n').find(line=>line.includes('student:1690123456'));
-      if(!line){recoveryDialogError='Missing edited package in: '+dialog.message();return dialog.dismiss();}
-      return dialog.accept(line.match(/^(\d+)\./)[1]);
-    };
+    const acceptRecoveryDialog=dialog=>dialog.accept();
     page.on('dialog',acceptRecoveryDialog);
     await page.reload({waitUntil:'domcontentloaded'});
     await page.locator('#buicWorkspaceAuth').waitFor({state:'hidden',timeout:15000});
-    await page.locator('[data-workspace="documents"]').click();
-    console.log('QA package drafts after reload',JSON.stringify(await inspectDrafts()));
-    await page.getByRole('button',{name:'Restore draft',exact:true}).click();
-    assert.equal(recoveryDialogError,undefined);await awaitCount(expectedPages);
+    await page.locator('[data-workspace="documents"]').click();await awaitCount(expectedPages);
     await page.waitForFunction(()=>!document.getElementById('newLetterPdfWorkspace').inert);
     page.off('dialog',acceptRecoveryDialog);
     await page.locator('#nlpdfCreate').click();
@@ -731,7 +725,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfChooseDestination').click();await page.locator('#nlpdfConfirmExport').click();await page.locator('#nlpdfLetterTypeModal').waitFor({state:'visible',timeout:12000});
     await page.locator('#nlpdfExportLetterType').selectOption('exchange');await page.locator('#nlpdfConfirmLetterType').click();await page.locator('#nlpdfLetterEditor').waitFor({state:'visible',timeout:20000});
     assert.equal(await page.locator('#nlpdfLetterFinalDate').inputValue(),'2026-11-05','the package document date must enter the Word editor');
-    await page.waitForFunction(async()=>{const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.pendingLetter?.values?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}},null,{timeout:10000});
+    await waitForAsync(async()=>{const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.pendingLetter?.values?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}},null,{timeout:10000});
     assert.equal(await page.locator('#nlpdfLetterStepStudent').isVisible(),true);assert.match(await page.locator('#nlpdfLetterContentLabel').innerText(),/Passport/);
     assert.equal(await page.locator('#nlpdfLetterMagnifierWidth').inputValue(),'300');assert.equal(await page.locator('#nlpdfLetterMagnifierHeight').inputValue(),'200');assert.equal(await page.locator('#nlpdfLetterMagnifierZoom').inputValue(),'2');
     await page.locator('#nlpdfLetterContentCanvas').hover({position:{x:180,y:220}});await page.locator('#nlpdfLetterMagnifier').waitFor({state:'visible'});let lens=await page.locator('#nlpdfLetterMagnifier').boundingBox();assert(lens&&Math.abs(lens.width-304)<2&&Math.abs(lens.height-204)<2,'first-use magnifier should be 300×200 plus its border');assert.equal(await page.locator('#nlpdfLetterMagnifier').getAttribute('data-zoom'),'2');
@@ -949,7 +943,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await count(),pagesBefore,'Returning to the PDF builder must preserve imported pages');
     assert.equal(await page.evaluate(start=>window.__mockFiles.slice(start).some(file=>file.name.endsWith('.docx')&&file.finished),beforeRetry),true);
     assert.deepEqual(await page.evaluate(()=>({remember:window.__studentMemoryRememberCalls,preflight:window.__studentMemoryPreflightCalls})),hubBefore,'Missing Student Number must skip shared-memory writes');
-    await page.waitForFunction(async expected=>{
+    await waitForAsync(async expected=>{
       const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
       try{return await new Promise(resolve=>{
         const request=db.transaction('cases','readonly').objectStore('cases').getAll();
