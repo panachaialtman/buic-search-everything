@@ -617,6 +617,72 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     if(await embassyResult.count())await embassyResult.click();
   });
 
+  await run('Student location history can be searched, reused, deleted and entered again',async()=>{
+    await page.locator('#nlpdfPageContentType').selectOption('passport');
+    const location=page.locator('#nlpdfContentLocation'),panel=page.locator('#nlpdfContentLocationHistory');
+    await location.click();
+    assert.equal(await panel.locator('[data-student-location-select="Goes, Netherlands"]').count(),1,'a location entered earlier must be remembered');
+    await location.fill('Meiktila, Myanmar');await location.press('Tab');
+    await location.fill('Bangkok, Thailand');await location.press('Tab');
+    await location.fill('Meik');
+    assert.equal(await panel.locator('[data-student-location-select]').count(),1,'typing must filter saved locations');
+    await panel.locator('[data-student-location-select="Meiktila, Myanmar"]').click();
+    assert.equal(await location.inputValue(),'Meiktila, Myanmar');
+    assert.equal(await panel.isVisible(),false);
+    await page.locator('#nlpdfContentLocationHistory').locator('..').locator('[data-student-location-toggle]').click();
+    assert.equal(await panel.locator('[data-student-location-select]').count()>=2,true);
+    await page.screenshot({path:'test-results/student-location-history.png'});
+    await panel.locator('[data-student-location-remove="Bangkok, Thailand"]').click();
+    assert.equal(await panel.locator('[data-student-location-select="Bangkok, Thailand"]').count(),0);
+    assert.equal(await location.inputValue(),'Meiktila, Myanmar','removing a suggestion must not clear the student location');
+    await location.fill('MEIKTILA, MYANMAR');
+    await panel.locator('[data-student-location-remove="Meiktila, Myanmar"]').click();
+    await page.locator('#nlpdfContentName').click();
+    await location.click();
+    assert.equal(await panel.locator('[data-student-location-select="Meiktila, Myanmar"]').count(),0,'blur must not recreate a just-deleted location');
+    await location.fill('Meiktila, Myanmar ');await location.press('Enter');
+    await location.click();
+    assert.equal(await panel.locator('[data-student-location-select="Meiktila, Myanmar"]').count(),1,'explicitly entering a deleted location should save it again');
+    const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('buic-student-location-history-v1')||'[]'));
+    assert.equal(saved.filter(value=>value.toLowerCase()==='meiktila, myanmar').length,1,'history must be case-insensitively deduplicated');
+    assert.equal(saved.includes('Bangkok, Thailand'),false);
+    const pages=await count();await panel.locator('[data-student-location-remove="Meiktila, Myanmar"]').focus();await page.keyboard.press('Delete');assert.equal(await count(),pages,'history controls must not trigger background page deletion');
+    await location.press('Escape');
+  });
+
+  await run('Receipt selections advance with the keyboard and display each next menu',async()=>{
+    const pages=await count();await page.locator('#nlpdfPageContentType').selectOption('receipt');
+    await page.evaluate(()=>{
+      window.__receiptPickerCalls=[];window.__nativeReceiptPicker=HTMLSelectElement.prototype.showPicker;
+      HTMLSelectElement.prototype.showPicker=function(){window.__receiptPickerCalls.push(this.id);if(window.__forceReceiptFallback)throw new DOMException('Synthetic fallback','NotAllowedError');return window.__nativeReceiptPicker.call(this);};
+    });
+    const ids=['nlpdfContentFaculty','nlpdfContentProgram','nlpdfContentSemester','nlpdfContentAcademicYear'];
+    await page.locator('#'+ids[0]).selectOption('');await page.locator('#'+ids[2]).selectOption('');await page.locator('#'+ids[3]).selectOption('');
+    await page.locator('#'+ids[0]).focus();
+    for(let i=0;i<ids.length-1;i++){
+      await page.keyboard.press('ArrowDown');
+      assert.equal(await page.evaluate(()=>document.activeElement.id),ids[i],'arrow navigation must stay in the current field until Enter');
+      assert.equal(await count(),pages,'arrow navigation must not change the selected PDF page');
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(id=>document.activeElement?.id===id,ids[i+1],{timeout:5000});
+      assert.equal(await page.evaluate(id=>window.__receiptPickerCalls.includes(id),ids[i+1]),true,'the next menu should be opened');
+      const shown=await page.locator('#'+ids[i+1]).evaluate(el=>{try{return el.size>1||el.matches(':open');}catch{return el.size>1;}});
+      assert.equal(shown,true,'the next select must show its options');
+    }
+    await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(()=>document.activeElement.id),ids[3],'academic year is the final field');
+    await page.keyboard.press('Escape');
+    await page.locator('#nlpdfPageContentType').selectOption('passport');
+    await page.locator('#nlpdfPageContentType').selectOption('receipt');
+    await page.locator('#'+ids[0]).selectOption('');
+    await page.evaluate(()=>{window.__forceReceiptFallback=true;});
+    await page.locator('#'+ids[0]).focus();await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+    await page.waitForFunction(id=>document.activeElement?.id===id&&document.activeElement.size>1,ids[1],{timeout:5000});
+    await page.keyboard.press('Escape');
+    await page.evaluate(()=>{HTMLSelectElement.prototype.showPicker=window.__nativeReceiptPicker;delete window.__forceReceiptFallback;});
+    await page.locator('#nlpdfPageContentType').selectOption('passport');
+  });
+
   await run('Create Package has an editable seven-column Excel row, exact copy, and draft recovery',async()=>{
     const before=await page.evaluate(()=>({remember:window.__studentMemoryRememberCalls,files:window.__mockFiles.length}));
     const expectedPages=await count();
@@ -688,6 +754,15 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfExportModal .nlpdf-cancel').click();
   });
 
+  await run('Location history survives draft recovery without restoring deleted entries',async()=>{
+    await page.locator('#nlpdfPageContentType').selectOption('passport');
+    const input=page.locator('#nlpdfContentLocation'),panel=page.locator('#nlpdfContentLocationHistory');
+    await input.click();
+    assert.equal(await panel.locator('[data-student-location-select="Meiktila, Myanmar"]').count(),1);
+    assert.equal(await panel.locator('[data-student-location-select="Bangkok, Thailand"]').count(),0);
+    await input.press('Escape');
+  });
+
   await run('Content selector and metadata panel stay pinned while the A4 stage scrolls',async()=>{
     await page.locator('#nlpdfPageContentType').selectOption('passport');
     await page.locator('#nlpdfZoomFit').click();
@@ -729,6 +804,10 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfLetterName').fill('Linked Name QA');await page.locator('#nlpdfLetterName').fill('Linked Name');
     await waitForAsync(async()=>{const db=await new Promise(resolve=>{const request=indexedDB.open('buic-new-letter-working-drafts-v1',1);request.onsuccess=()=>resolve(request.result);});try{return await new Promise(resolve=>{const request=db.transaction('cases','readonly').objectStore('cases').getAll();request.onsuccess=()=>resolve(request.result.some(row=>row.pendingLetter?.values?.embassyCity==='Ho Chi Minh City'));});}finally{db.close();}},null,{timeout:10000});
     assert.equal(await page.locator('#nlpdfLetterStepStudent').isVisible(),true);assert.match(await page.locator('#nlpdfLetterContentLabel').innerText(),/Passport/);
+    await page.locator('#nlpdfLetterLocation').click();
+    assert.equal(await page.locator('#nlpdfLetterLocationHistory [data-student-location-select="Meiktila, Myanmar"]').count(),1,'letter editor shares location history with the Passport form');
+    await page.locator('#nlpdfLetterLocationHistory [data-student-location-select="Meiktila, Myanmar"]').click();
+    assert.equal(await page.locator('#nlpdfLetterLocation').inputValue(),'Meiktila, Myanmar');
     assert.equal(await page.locator('#nlpdfLetterMagnifierWidth').inputValue(),'300');assert.equal(await page.locator('#nlpdfLetterMagnifierHeight').inputValue(),'200');assert.equal(await page.locator('#nlpdfLetterMagnifierZoom').inputValue(),'2');
     await page.locator('#nlpdfLetterContentCanvas').hover({position:{x:180,y:220}});await page.locator('#nlpdfLetterMagnifier').waitFor({state:'visible'});let lens=await page.locator('#nlpdfLetterMagnifier').boundingBox();assert(lens&&Math.abs(lens.width-304)<2&&Math.abs(lens.height-204)<2,'first-use magnifier should be 300×200 plus its border');assert.equal(await page.locator('#nlpdfLetterMagnifier').getAttribute('data-zoom'),'2');
     assert.equal(await page.locator('#nlpdfLetterMagnifierWidth').getAttribute('min'),'0','width must accept 0 px');
@@ -1077,6 +1156,45 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('[data-workspace="documents"]').click();
     assert.equal(await page.locator('#nlpdfAddFiles').isVisible(),true);
   });
+  await run('Previously saved local drafts contribute locations once, and deleted suggestions stay deleted',async()=>{
+    const context=await browser.newContext({viewport:{width:1200,height:900}});
+    try{
+      await context.addInitScript(()=>{
+        sessionStorage.setItem('buic-student-memory-staff-token-v1','qa-seed-token');
+        const nativeFetch=fetch.bind(window);
+        window.fetch=async(input,init={})=>{
+          const url=typeof input==='string'?input:input?.url||'';
+          if(url==='https://buic-central-hub.vercel.app/api/staff/session')return new Response(JSON.stringify({ok:true,staff:{id:'qa-seed-staff',username:'qa-seed'}}),{status:200,headers:{'Content-Type':'application/json'}});
+          if(url.startsWith('https://buic-central-hub.vercel.app/api/staff/')&&!['GET','HEAD'].includes(String(init.method||'GET').toUpperCase()))throw Error('Unexpected shared write in isolated history test');
+          return nativeFetch(input,init);
+        };
+      });
+      const testPage=await context.newPage();const localErrors=[];testPage.on('pageerror',e=>localErrors.push(e.message));
+      testPage.on('dialog',d=>d.type()==='beforeunload'?d.accept():d.dismiss());
+      await testPage.goto('http://127.0.0.1:8123/',{waitUntil:'domcontentloaded'});
+      await testPage.locator('#buicWorkspaceAuth').waitFor({state:'hidden',timeout:15000});
+      await testPage.locator('[data-workspace="documents"]').click();await testPage.locator('#nlpdfAddFiles').waitFor({state:'visible',timeout:60000});
+      await testPage.waitForFunction(()=>localStorage.getItem('buic-student-location-drafts-imported-v1')==='1');
+      await testPage.evaluate(async()=>{
+        const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('buic-new-letter-working-drafts-v1',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+        try{await new Promise((resolve,reject)=>{const tx=db.transaction('cases','readwrite');tx.objectStore('cases').put({id:'qa-seed-staff|student:OLD',owner:'qa-seed-staff',version:1,caseKey:'student:OLD',updatedAt:'2020-01-01T00:00:00Z',sources:[],pages:[],linkedData:{recipientLocation:'Vientiane, Laos'}});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}finally{db.close();}
+        localStorage.removeItem('buic-student-location-history-v1');localStorage.removeItem('buic-student-location-drafts-imported-v1');
+      });
+      await testPage.reload({waitUntil:'domcontentloaded'});await testPage.locator('#buicWorkspaceAuth').waitFor({state:'hidden',timeout:15000});
+      await testPage.locator('[data-workspace="documents"]').click();await testPage.locator('#nlpdfFileInput').waitFor({state:'attached',timeout:60000});
+      await testPage.waitForFunction(()=>JSON.parse(localStorage.getItem('buic-student-location-history-v1')||'[]').includes('Vientiane, Laos'),null,{timeout:15000});
+      await testPage.locator('#nlpdfFileInput').setInputFiles({name:'qa-history.png',mimeType:'image/png',buffer:png});
+      await testPage.waitForFunction(()=>document.querySelector('#nlpdfPageCount')?.textContent==='1');
+      await testPage.locator('#nlpdfPageContentType').selectOption('passport');await testPage.locator('#nlpdfContentLocation').click();
+      await testPage.locator('#nlpdfContentLocationHistory [data-student-location-remove="Vientiane, Laos"]').click();
+      assert.equal(await testPage.evaluate(()=>JSON.parse(localStorage.getItem('buic-student-location-history-v1')||'[]').includes('Vientiane, Laos')),false);
+      await testPage.reload({waitUntil:'domcontentloaded'});await testPage.locator('#buicWorkspaceAuth').waitFor({state:'hidden',timeout:15000});
+      await testPage.locator('[data-workspace="documents"]').click();await testPage.locator('#nlpdfAddFiles').waitFor({state:'visible',timeout:60000});
+      assert.equal(await testPage.evaluate(()=>JSON.parse(localStorage.getItem('buic-student-location-history-v1')||'[]').includes('Vientiane, Laos')),false,'deleted old locations must not be imported again');
+      assert.deepEqual(localErrors,[]);
+    }finally{await context.close();}
+  });
+
   await run('No browser runtime errors occurred during editor operations',async()=>{
     assert.deepEqual(errors,[]);
   });

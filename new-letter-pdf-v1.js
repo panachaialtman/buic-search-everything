@@ -6,6 +6,8 @@ const PREF_KEY='buic-new-letter-pdf-prefs-v4';
 const NO_IEN_OVERRIDE_KEY='bu-ic-bachelor-no-ien-template-override-v1';
 const LETTER_PACKAGE_DATES_KEY='buic-letter-package-dates-v1';
 const LETTER_SCHOOL_LIST_KEY='buic-letter-school-list-v1';
+const STUDENT_LOCATION_HISTORY_KEY='buic-student-location-history-v1';
+const STUDENT_LOCATION_DRAFT_IMPORT_KEY='buic-student-location-drafts-imported-v1';
 const LETTER_LAST_ACADEMIC_YEAR_KEY='buic-letter-last-academic-year-v1';
 const LETTER_MAGNIFIER_PREF_KEY='buic-letter-magnifier-v1';
 const A4={wMM:210,hMM:297,wPt:595.28,hPt:841.89};
@@ -751,7 +753,7 @@ function letterEditorMarkup(){
               '<label><span>Student name</span><input id="nlpdfLetterName" data-form-key="studentName"></label>'+ 
               '<label><span>Passport number</span><input id="nlpdfLetterPassport" data-form-key="passport"></label>'+ 
               '<label><span>Nationality / Country</span><button class="nlpdf-reference-select" id="nlpdfLetterCountry" type="button"><span class="nlpdf-reference-select-value">Search nationality / country</span><small>Search</small></button></label>'+ 
-              '<label><span>Student location</span><input id="nlpdfLetterLocation" data-form-key="recipientLocation"></label>'+ 
+              studentLocationMarkup('nlpdfLetterLocation',false)+
             '</div></section>'+ 
             '<section class="nlpdf-letter-step-panel hidden" id="nlpdfLetterStepAcademic" data-letter-panel="1"><div class="nlpdf-letter-panel-title"><strong>Academic</strong><span>Receipt is shown first when both Receipt and BU Application are attached.</span></div>'+ 
               '<div class="nlpdf-letter-panel-tools"><button class="nlpdf-school-manager-fab" id="nlpdfSchoolManagerBtn" type="button">School Lists</button><button class="nlpdf-letter-package-fab" id="nlpdfPackageManagerBtn" type="button">Package dates</button></div>'+ 
@@ -2238,6 +2240,136 @@ function linkedEmbassyLabel(){
 }
 function contentTypeLabel(type){return ({passport:'Passport',bu_application:'BU Application',visa_application:'Visa Application',receipt:'Receipt'})[type]||'Document information';}
 function contentFacultyGroup(){const seed=state.linkedData.facultyEn||'';return facultyGroups().find(g=>facultyKey(g.label)===facultyKey(seed))||null;}
+// Student locations are stored on this browser. Import available local drafts
+// once so locations entered before this feature are also offered.
+let studentLocationMemory=[],studentLocationMemoryOnly=false,studentLocationSeeded=false,studentLocationSeedPromise=null;
+const studentLocationsRemovedDuringSeed=new Set();
+function studentLocationValue(value){return clean(value).replace(/\s+/g,' ');}
+function studentLocationKey(value){return studentLocationValue(value).toLowerCase();}
+function validStudentLocation(value){return typeof value==='string'&&studentLocationValue(value).length>0&&studentLocationValue(value).length<=240;}
+function studentLocationEntries(){
+  if(!studentLocationMemoryOnly){
+    try{const raw=localStorage.getItem(STUDENT_LOCATION_HISTORY_KEY);if(raw!==null){const parsed=JSON.parse(raw);if(Array.isArray(parsed))studentLocationMemory=parsed.filter(validStudentLocation).map(studentLocationValue);}}
+    catch{studentLocationMemoryOnly=true;}
+  }
+  const seen=new Set();return studentLocationMemory.filter(value=>{const key=studentLocationKey(value);if(seen.has(key))return false;seen.add(key);return true;});
+}
+function saveStudentLocationEntries(values){
+  studentLocationMemory=values.filter(validStudentLocation).map(studentLocationValue);
+  if(!studentLocationMemoryOnly){try{localStorage.setItem(STUDENT_LOCATION_HISTORY_KEY,JSON.stringify(studentLocationMemory));}
+    catch{studentLocationMemoryOnly=true;toast('Location history will last until this tab is closed.');}}
+}
+function rememberStudentLocation(value){
+  if(!validStudentLocation(value))return;
+  const normalized=studentLocationValue(value),key=studentLocationKey(normalized);
+  studentLocationsRemovedDuringSeed.delete(key);
+  saveStudentLocationEntries([normalized,...studentLocationEntries().filter(item=>studentLocationKey(item)!==key)]);
+}
+function removeStudentLocation(value){
+  const key=studentLocationKey(value);if(!studentLocationSeeded)studentLocationsRemovedDuringSeed.add(key);
+  saveStudentLocationEntries(studentLocationEntries().filter(item=>studentLocationKey(item)!==key));
+}
+async function seedStudentLocationsFromDrafts(){
+  if(studentLocationSeeded||studentLocationSeedPromise)return studentLocationSeedPromise;
+  const owner=reviewDraftOwner();if(!owner)return;
+  try{if(localStorage.getItem(STUDENT_LOCATION_DRAFT_IMPORT_KEY)==='1'){studentLocationSeeded=true;return;}}catch{studentLocationMemoryOnly=true;}
+  studentLocationSeedPromise=(async()=>{
+    try{
+      const rows=await reviewSavedDrafts();if(owner!==reviewDraftOwner())return;
+      rows.sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+      const items=studentLocationEntries(),seen=new Set(items.map(studentLocationKey));
+      for(const row of rows){
+        const value=row.linkedData?.recipientLocation;if(!validStudentLocation(value))continue;
+        const location=studentLocationValue(value),key=studentLocationKey(location);
+        if(!seen.has(key)&&!studentLocationsRemovedDuringSeed.has(key)){items.push(location);seen.add(key);}
+      }
+      if(items.length!==studentLocationEntries().length)saveStudentLocationEntries(items);
+      if(!studentLocationMemoryOnly)try{localStorage.setItem(STUDENT_LOCATION_DRAFT_IMPORT_KEY,'1');}catch{}
+      studentLocationSeeded=true;studentLocationsRemovedDuringSeed.clear();
+      const current=document.activeElement?.closest?.('[data-student-location-input]');
+      if(current&&!current.closest('.nlpdf-location-field')?.querySelector('.nlpdf-location-list')?.classList.contains('hidden'))renderStudentLocationHistory(current,current.closest('.nlpdf-location-field').dataset.locationQuery||'');
+    }catch(error){console.warn('Could not read local location history',error);}
+    finally{studentLocationSeedPromise=null;}
+  })();
+  return studentLocationSeedPromise;
+}
+function studentLocationMarkup(id,content){
+  const binding=content?' data-content-linked="recipientLocation"':' data-form-key="recipientLocation"';
+  const initial=content?state.linkedData.recipientLocation||'':'';
+  return '<div class="nlpdf-location-field'+(content?' wide':'')+'"><label for="'+id+'"><span>Student location</span></label>'+
+    '<div class="nlpdf-location-entry"><input id="'+id+'"'+binding+' data-student-location-input autocomplete="off" placeholder="City, Country" value="'+esc(initial)+'" aria-controls="'+id+'History">'+
+    '<button type="button" data-student-location-toggle aria-label="Show saved student locations" aria-controls="'+id+'History" aria-expanded="false">▾</button></div>'+
+    '<div class="nlpdf-location-list hidden" id="'+id+'History" role="region" aria-label="Saved student locations"></div></div>';
+}
+function closeStudentLocationHistory(field){
+  const panel=field?.querySelector('.nlpdf-location-list'),button=field?.querySelector('[data-student-location-toggle]');
+  panel?.classList.add('hidden');button?.setAttribute('aria-expanded','false');
+}
+function renderStudentLocationHistory(input,query=''){
+  const field=input.closest('.nlpdf-location-field'),panel=field?.querySelector('.nlpdf-location-list'),button=field?.querySelector('[data-student-location-toggle]');if(!field||!panel||!button)return;
+  const filter=studentLocationKey(query),items=studentLocationEntries().filter(value=>!filter||studentLocationKey(value).includes(filter));
+  field.dataset.locationQuery=query;
+  panel.innerHTML='<div class="nlpdf-location-caption">Saved in this browser</div>'+(items.length?'<ul>'+items.map(value=>'<li><button type="button" data-student-location-select="'+esc(value)+'">'+esc(value)+'</button><button type="button" class="nlpdf-location-remove" data-student-location-remove="'+esc(value)+'" aria-label="Remove '+esc(value)+' from saved locations">×</button></li>').join('')+'</ul>':'<p>'+(filter?'No matching saved locations.':'No saved locations yet.')+'</p>');
+  panel.classList.remove('hidden');button.setAttribute('aria-expanded','true');
+}
+function bindStudentLocationHistory(){
+  const root=$('#workspaceDocuments');if(!root)return;
+  root.addEventListener('focusin',event=>{
+    const input=event.target.closest?.('[data-student-location-input]'),field=event.target.closest?.('.nlpdf-location-field');
+    root.querySelectorAll('.nlpdf-location-field').forEach(other=>{if(other!==field)closeStudentLocationHistory(other);});
+    if(input)renderStudentLocationHistory(input);
+  });
+  root.addEventListener('pointerdown',event=>{
+    if(event.target.closest?.('[data-student-location-toggle],[data-student-location-select],[data-student-location-remove]'))event.preventDefault();
+    if(!event.target.closest?.('.nlpdf-location-field'))root.querySelectorAll('.nlpdf-location-field').forEach(closeStudentLocationHistory);
+  });
+  root.addEventListener('input',event=>{
+    const input=event.target.closest?.('[data-student-location-input]');if(!input)return;
+    delete input.dataset.locationRemovedKey;renderStudentLocationHistory(input,input.value);
+  });
+  root.addEventListener('change',event=>{
+    const input=event.target.closest?.('[data-student-location-input]');if(!input)return;
+    if(input.dataset.locationRemovedKey!==studentLocationKey(input.value))rememberStudentLocation(input.value);
+  });
+  root.addEventListener('keydown',event=>{
+    if(reviewDraftCandidateInstalling)return;
+    const field=event.target.closest?.('.nlpdf-location-field');if(!field)return;
+    const input=field.querySelector('[data-student-location-input]');if(!input)return;
+    if(event.key==='Escape'&&!field.querySelector('.nlpdf-location-list')?.classList.contains('hidden')){
+      event.preventDefault();event.stopPropagation();input.focus();closeStudentLocationHistory(field);return;
+    }
+    if(event.target===input&&event.key==='Enter'&&!event.isComposing){
+      event.preventDefault();event.stopPropagation();
+      if(input.dataset.locationRemovedKey!==studentLocationKey(input.value))rememberStudentLocation(input.value);
+      closeStudentLocationHistory(field);return;
+    }
+    if(event.target===input&&event.key==='ArrowDown'){
+      const first=field.querySelector('[data-student-location-select]');if(first&&!field.querySelector('.nlpdf-location-list').classList.contains('hidden')){event.preventDefault();event.stopPropagation();first.focus();}
+    }
+  });
+  root.addEventListener('click',event=>{
+    const directInput=event.target.closest?.('[data-student-location-input]');
+    if(directInput){const field=directInput.closest('.nlpdf-location-field');if(field?.querySelector('.nlpdf-location-list')?.classList.contains('hidden'))renderStudentLocationHistory(directInput);return;}
+    const button=event.target.closest?.('[data-student-location-toggle],[data-student-location-select],[data-student-location-remove]');if(!button)return;
+    const field=button.closest('.nlpdf-location-field'),input=field?.querySelector('[data-student-location-input]');if(!field||!input)return;
+    if(button.hasAttribute('data-student-location-toggle')){
+      const open=!field.querySelector('.nlpdf-location-list').classList.contains('hidden');
+      if(open)closeStudentLocationHistory(field);else{input.focus();renderStudentLocationHistory(input);}
+    }else if(button.hasAttribute('data-student-location-remove')){
+      const value=button.dataset.studentLocationRemove;removeStudentLocation(value);
+      if(studentLocationKey(input.value)===studentLocationKey(value))input.dataset.locationRemovedKey=studentLocationKey(value);
+      const query=field.dataset.locationQuery||'';input.focus();renderStudentLocationHistory(input,query);
+    }else{
+      input.value=button.dataset.studentLocationSelect;delete input.dataset.locationRemovedKey;
+      input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
+      input.focus();closeStudentLocationHistory(field);
+    }
+  });
+  document.addEventListener('pointerdown',event=>{if(!root.contains(event.target))root.querySelectorAll('.nlpdf-location-field').forEach(closeStudentLocationHistory);});
+  window.addEventListener('storage',event=>{if(event.key!==STUDENT_LOCATION_HISTORY_KEY)return;const input=document.activeElement?.closest?.('[data-student-location-input]');if(input&&!input.closest('.nlpdf-location-field')?.querySelector('.nlpdf-location-list')?.classList.contains('hidden'))renderStudentLocationHistory(input,input.closest('.nlpdf-location-field').dataset.locationQuery||'');});
+  window.addEventListener('buic-workspace-verified',()=>void seedStudentLocationsFromDrafts());
+  if(window.BUICWorkspaceAuth?.isAuthenticated?.())queueMicrotask(()=>void seedStudentLocationsFromDrafts());
+}
 function contentField(id,label,key,wide=false,placeholder='',type='text'){
   return '<label'+(wide?' class="wide"':'')+'><span>'+esc(label)+'</span><input type="'+type+'" id="'+id+'" data-content-linked="'+esc(key)+'" value="'+esc(state.linkedData[key]||'')+'" placeholder="'+esc(placeholder)+'"></label>';
 }
@@ -2257,7 +2389,7 @@ function contentPanelMarkup(type){
   if(type==='passport')return contentField('nlpdfContentName','Name','studentName')+contentField('nlpdfContentPassport','Passport number','passport')+
     contentField('nlpdfContentPassportExpiry','Passport Expiry','passportExpiry',true,'','date')+
     '<label class="wide"><span>Nationality</span><button class="nlpdf-content-reference" id="nlpdfContentNationality" type="button"><span>'+esc(linkedCountryLabel())+'</span><small>Search</small></button></label>'+
-    contentField('nlpdfContentLocation','Student location','recipientLocation',true,'City, Country');
+    studentLocationMarkup('nlpdfContentLocation',true);
   if(type==='bu_application'||type==='receipt')return contentField('nlpdfContentName','Name','studentName')+contentField('nlpdfContentStudentId','Student ID','studentId')+
     contentFacultySelect()+contentProgramSelect()+
     '<label><span>Semester</span><select id="nlpdfContentSemester"><option value="">Select</option><option value="First" '+(state.linkedData.semester==='First'?'selected':'')+'>First</option><option value="Second" '+(state.linkedData.semester==='Second'?'selected':'')+'>Second</option><option value="Summer" '+(state.linkedData.semester==='Summer'?'selected':'')+'>Summer</option></select></label>'+
@@ -2274,13 +2406,57 @@ function renderContentPanel(page=activePage()){
 }
 function applyContentFaculty(key){
   const g=facultyGroups().find(x=>x.key===key);
-  if(!g){state.linkedData.facultyEn='';state.linkedData.facultyTh='';state.linkedData.programEn='';state.linkedData.programTh='';renderContentPanel();recordEdit();return;}
-  Object.assign(state.linkedData,{facultyEn:g.label,facultyTh:g.thai||'',programEn:'',programTh:''});renderContentPanel();recordEdit();
+  if(!g)Object.assign(state.linkedData,{facultyEn:'',facultyTh:'',programEn:'',programTh:''});
+  else Object.assign(state.linkedData,{facultyEn:g.label,facultyTh:g.thai||'',programEn:'',programTh:''});
+  if(activePage()?.contentType==='receipt'){
+    const major=$('#nlpdfContentProgram');if(major?.parentElement)major.parentElement.outerHTML=contentProgramSelect();
+  }else renderContentPanel();
+  recordEdit();
 }
 function applyContentProgram(id){
   const r=(centralReference().faculty||[]).find(x=>facultyValues(x).id===id);
-  if(!r){state.linkedData.programEn='';state.linkedData.programTh='';recordEdit();return;}
-  const x=facultyValues(r);Object.assign(state.linkedData,{programEn:x.programEn,programTh:x.programTh,facultyEn:x.facultyEn,facultyTh:x.facultyTh});renderContentPanel();recordEdit();
+  if(!r)Object.assign(state.linkedData,{programEn:'',programTh:''});
+  else{const x=facultyValues(r);Object.assign(state.linkedData,{programEn:x.programEn,programTh:x.programTh,facultyEn:x.facultyEn,facultyTh:x.facultyTh});}
+  if(activePage()?.contentType!=='receipt'&&r)renderContentPanel();
+  recordEdit();
+}
+const RECEIPT_FIELD_SEQUENCE=['nlpdfContentFaculty','nlpdfContentProgram','nlpdfContentSemester','nlpdfContentAcademicYear'];
+function closeExpandedReceiptSelect(select){
+  if(select?.dataset.receiptExpanded==='1'){select.removeAttribute('size');select.classList.remove('nlpdf-receipt-expanded');delete select.dataset.receiptExpanded;}
+}
+function advanceReceiptSelection(select){
+  const page=activePage(),index=RECEIPT_FIELD_SEQUENCE.indexOf(select.id);
+  if(!page||page.contentType!=='receipt'||index<0||index===RECEIPT_FIELD_SEQUENCE.length-1)return;
+  const pageId=page.id;
+  setTimeout(()=>{
+    if(reviewDraftCandidateInstalling||!select.isConnected||activePage()?.id!==pageId||activePage()?.contentType!=='receipt'||document.activeElement!==select||!select.value)return;
+    const next=$('#'+RECEIPT_FIELD_SEQUENCE[index+1]);if(!next||next.disabled||next.options.length<2)return;
+    closeExpandedReceiptSelect(select);next.focus();next.dataset.receiptOpened='1';
+    try{if(typeof next.showPicker==='function'){next.showPicker();return;}}catch{}
+    // Browsers without showPicker still display a selectable list on focus.
+    next.size=Math.min(Math.max(next.options.length,2),8);next.dataset.receiptExpanded='1';next.classList.add('nlpdf-receipt-expanded');
+  },0);
+}
+function bindReceiptKeyboardFlow(){
+  const host=$('#nlpdfContentPanelBody');if(!host)return;
+  host.addEventListener('focusin',event=>{
+    const select=event.target.closest?.('select');if(activePage()?.contentType!=='receipt'||!select||!RECEIPT_FIELD_SEQUENCE.includes(select.id))return;
+    delete select.dataset.receiptDirty;delete select.dataset.receiptArrow;delete select.dataset.receiptOpened;
+  });
+  host.addEventListener('focusout',event=>{const select=event.target.closest?.('select');if(select)closeExpandedReceiptSelect(select);});
+  host.addEventListener('keydown',event=>{
+    if(reviewDraftCandidateInstalling)return;
+    const select=event.target.closest?.('select');if(activePage()?.contentType!=='receipt'||!select||!RECEIPT_FIELD_SEQUENCE.includes(select.id))return;
+    if(['ArrowDown','ArrowUp','Home','End','PageDown','PageUp'].includes(event.key)){
+      select.dataset.receiptDirty='1';select.dataset.receiptArrow='1';
+      setTimeout(()=>{delete select.dataset.receiptArrow;},0);
+    }else if(event.key==='Enter'&&(select.dataset.receiptDirty==='1'||select.dataset.receiptOpened==='1'))advanceReceiptSelection(select);
+    else if(event.key==='Escape')closeExpandedReceiptSelect(select);
+  });
+  host.addEventListener('change',event=>{
+    const select=event.target.closest?.('select');if(!event.isTrusted||activePage()?.contentType!=='receipt'||!select||!RECEIPT_FIELD_SEQUENCE.includes(select.id))return;
+    if(select.dataset.receiptArrow!=='1')advanceReceiptSelection(select);
+  });
 }
 function openReferencePicker(kind,target){
   state.referencePicker={kind,target};const title=$('#nlpdfReferencePickerTitle'),hint=$('#nlpdfReferencePickerHint'),input=$('#nlpdfReferencePickerSearch');
@@ -3200,7 +3376,7 @@ function setupSignatureDrag(){
   const end=()=>{if(d){d=null;img.classList.remove('dragging');savePrefs();recordEdit();}};
   img.addEventListener('pointerup',end);img.addEventListener('pointercancel',end);
 }
-function ignoreDeleteKey(e){const t=e.target;if(!t)return false;if(t.isContentEditable||t.tagName==='TEXTAREA')return true;if(t.tagName==='INPUT')return !['range','checkbox','radio','button','submit'].includes((t.type||'').toLowerCase());return false;}
+function ignoreDeleteKey(e){const t=e.target;if(!t)return false;if(t.isContentEditable||t.tagName==='TEXTAREA')return true;if(t.tagName==='INPUT')return !['range','checkbox','radio','button','submit'].includes((t.type||'').toLowerCase());if(t.tagName==='SELECT')return true;return false;}
 
 async function build(){
   const docs=$('#workspaceDocuments'),legacy=docs?.querySelector('.document-workspace-grid');if(!docs||!legacy)return;
@@ -3259,6 +3435,7 @@ async function build(){
     const visible=$('#workspaceDocuments');
     if(!visible||visible.classList.contains('hidden')||getComputedStyle(visible).display==='none')return;
     if(reviewBlockCandidateShortcut(e))return;
+    if(e.target.closest?.('.nlpdf-location-field'))return;
     if($('#nlpdfExportModal').classList.contains('open'))return;
     if(ignoreDeleteKey(e))return;
     const cmd=e.ctrlKey||e.metaKey;
@@ -3332,7 +3509,7 @@ async function build(){
   $('#nlpdfExportPdfName').addEventListener('input',e=>{e.target.dataset.auto='0';syncExportPreview();});$$('input[name="nlpdfOutput"]').forEach(x=>x.addEventListener('change',syncExportPreview));
 
   renderAssets();await updateAssetInfo();await renderAll();updateControls();fitPaper();resetHistory();updateDuplicateControls();renderPackageProfileList();
-  reviewBindDraftControls();
+  bindStudentLocationHistory();bindReceiptKeyboardFlow();reviewBindDraftControls();
 }
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>build().catch(console.error),{once:true});else build().catch(console.error);
