@@ -631,6 +631,7 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     assert.equal(await panel.isVisible(),false);
     await page.locator('#nlpdfContentLocationHistory').locator('..').locator('[data-student-location-toggle]').click();
     assert.equal(await panel.locator('[data-student-location-select]').count()>=2,true);
+    await page.screenshot({path:'test-results/student-location-history.png'});
     await panel.locator('[data-student-location-remove="Bangkok, Thailand"]').click();
     assert.equal(await panel.locator('[data-student-location-select="Bangkok, Thailand"]').count(),0);
     assert.equal(await location.inputValue(),'Meiktila, Myanmar','removing a suggestion must not clear the student location');

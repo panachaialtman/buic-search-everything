@@ -2266,7 +2266,7 @@ function rememberStudentLocation(value){
   saveStudentLocationEntries([normalized,...studentLocationEntries().filter(item=>studentLocationKey(item)!==key)]);
 }
 function removeStudentLocation(value){
-  const key=studentLocationKey(value);studentLocationsRemovedDuringSeed.add(key);
+  const key=studentLocationKey(value);if(!studentLocationSeeded)studentLocationsRemovedDuringSeed.add(key);
   saveStudentLocationEntries(studentLocationEntries().filter(item=>studentLocationKey(item)!==key));
 }
 async function seedStudentLocationsFromDrafts(){
@@ -2347,6 +2347,8 @@ function bindStudentLocationHistory(){
     }
   });
   root.addEventListener('click',event=>{
+    const directInput=event.target.closest?.('[data-student-location-input]');
+    if(directInput){const field=directInput.closest('.nlpdf-location-field');if(field?.querySelector('.nlpdf-location-list')?.classList.contains('hidden'))renderStudentLocationHistory(directInput);return;}
     const button=event.target.closest?.('[data-student-location-toggle],[data-student-location-select],[data-student-location-remove]');if(!button)return;
     const field=button.closest('.nlpdf-location-field'),input=field?.querySelector('[data-student-location-input]');if(!field||!input)return;
     if(button.hasAttribute('data-student-location-toggle')){
