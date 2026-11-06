@@ -2284,7 +2284,7 @@ async function seedStudentLocationsFromDrafts(){
         if(!seen.has(key)&&!studentLocationsRemovedDuringSeed.has(key)){items.push(location);seen.add(key);}
       }
       if(items.length!==studentLocationEntries().length)saveStudentLocationEntries(items);
-      try{localStorage.setItem(STUDENT_LOCATION_DRAFT_IMPORT_KEY,'1');}catch{}
+      if(!studentLocationMemoryOnly)try{localStorage.setItem(STUDENT_LOCATION_DRAFT_IMPORT_KEY,'1');}catch{}
       studentLocationSeeded=true;studentLocationsRemovedDuringSeed.clear();
       const current=document.activeElement?.closest?.('[data-student-location-input]');
       if(current&&!current.closest('.nlpdf-location-field')?.querySelector('.nlpdf-location-list')?.classList.contains('hidden'))renderStudentLocationHistory(current,current.closest('.nlpdf-location-field').dataset.locationQuery||'');
@@ -2332,6 +2332,7 @@ function bindStudentLocationHistory(){
     if(input.dataset.locationRemovedKey!==studentLocationKey(input.value))rememberStudentLocation(input.value);
   });
   root.addEventListener('keydown',event=>{
+    if(reviewDraftCandidateInstalling)return;
     const field=event.target.closest?.('.nlpdf-location-field');if(!field)return;
     const input=field.querySelector('[data-student-location-input]');if(!input)return;
     if(event.key==='Escape'&&!field.querySelector('.nlpdf-location-list')?.classList.contains('hidden')){
@@ -2428,7 +2429,7 @@ function advanceReceiptSelection(select){
   if(!page||page.contentType!=='receipt'||index<0||index===RECEIPT_FIELD_SEQUENCE.length-1)return;
   const pageId=page.id;
   setTimeout(()=>{
-    if(!select.isConnected||activePage()?.id!==pageId||activePage()?.contentType!=='receipt'||document.activeElement!==select||!select.value)return;
+    if(reviewDraftCandidateInstalling||!select.isConnected||activePage()?.id!==pageId||activePage()?.contentType!=='receipt'||document.activeElement!==select||!select.value)return;
     const next=$('#'+RECEIPT_FIELD_SEQUENCE[index+1]);if(!next||next.disabled||next.options.length<2)return;
     closeExpandedReceiptSelect(select);next.focus();next.dataset.receiptOpened='1';
     try{if(typeof next.showPicker==='function'){next.showPicker();return;}}catch{}
@@ -2444,6 +2445,7 @@ function bindReceiptKeyboardFlow(){
   });
   host.addEventListener('focusout',event=>{const select=event.target.closest?.('select');if(select)closeExpandedReceiptSelect(select);});
   host.addEventListener('keydown',event=>{
+    if(reviewDraftCandidateInstalling)return;
     const select=event.target.closest?.('select');if(activePage()?.contentType!=='receipt'||!select||!RECEIPT_FIELD_SEQUENCE.includes(select.id))return;
     if(['ArrowDown','ArrowUp','Home','End','PageDown','PageUp'].includes(event.key)){
       select.dataset.receiptDirty='1';select.dataset.receiptArrow='1';
