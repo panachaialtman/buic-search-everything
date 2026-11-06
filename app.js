@@ -215,7 +215,7 @@
 
   function loadCore() {
     const core = document.createElement('script');
-    core.src = 'app-core.js?v=20261002-letter-editor-v1';
+    core.src = 'app-core.js?v=20261106-pdf-combine';
     core.async = false;
     core.onload = () => {
       const enhancement = document.createElement('script');

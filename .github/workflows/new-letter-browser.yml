@@ -5,7 +5,15 @@ on:
       - 'new-letter-pdf-v1.js'
       - 'new-letter-pdf-v1.css'
       - 'index.html'
+      - 'app.js'
+      - 'app-core.js'
+      - 'pdf-combine.js'
+      - 'pdf-combine.css'
+      - 'vendor/pdf-lib-1.17.1.min.js'
+      - 'vendor/pdf-lib-LICENSE.md'
       - 'student-memory.js'
+      - 'tests/pdf-combine.test.cjs'
+      - 'tests/pdf-combine-browser.mjs'
       - 'tests/student-memory-outbox.test.cjs'
       - 'tests/student-memory-outbox-browser.mjs'
       - 'tests/new-letter-browser.mjs'
@@ -39,8 +47,10 @@ jobs:
         run: node --test tests/student-memory-outbox.test.cjs
       - name: Install Playwright and Chromium
         run: |
-          npm install --no-save playwright@1.55.1
+          npm install --no-save playwright@1.55.1 pdf-lib@1.17.1
           npx playwright install --with-deps chromium
+      - name: Verify PDF Combine page ordering and form handling
+        run: node --test tests/pdf-combine.test.cjs
       - name: Start local app
         run: |
           python3 -m http.server 8123 --bind 127.0.0.1 > /tmp/new-letter-http.log 2>&1 &
@@ -48,6 +58,8 @@ jobs:
           curl -fsS http://127.0.0.1:8123/ >/dev/null
       - name: Exercise Student DB recovery with real IndexedDB and Web Locks
         run: node tests/student-memory-outbox-browser.mjs
+      - name: Exercise PDF Combine in Chromium
+        run: node tests/pdf-combine-browser.mjs
       - name: Exercise New Letter in Chromium
         run: node tests/new-letter-browser.mjs
       - name: Upload browser screenshots and logs

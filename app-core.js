@@ -783,7 +783,7 @@
   syncWorkspaceViewport();
 
   function setWorkspace(name){
-    activeWorkspace=['reference','communication','documents','extend','data'].includes(name)?name:'reference';
+    activeWorkspace=['reference','communication','documents','extend','combine','data'].includes(name)?name:'reference';
     $$('.workspace-tab').forEach(b=>b.classList.toggle('active',b.dataset.workspace===activeWorkspace));
     $$('.workspace-pane').forEach(p=>p.classList.remove('active'));
     const pane=$(`#workspace${activeWorkspace.charAt(0).toUpperCase()+activeWorkspace.slice(1)}`);if(pane)pane.classList.add('active');
