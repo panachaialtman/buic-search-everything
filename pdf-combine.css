@@ -46,5 +46,13 @@
 .pdfc-form-check{padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2)}
 .pdfc-output{display:flex;align-items:end;gap:10px;padding-top:14px;border-top:1px solid var(--line)}.pdfc-output label{flex:1}.pdfc-output button{min-width:185px}
 .pdfc-progress{display:grid;gap:7px}.pdfc-progress-text{color:var(--muted);font-size:11px}.pdfc-progress progress{width:100%;height:9px;accent-color:var(--accent)}
+/* Give the expanded workspace navigation a full row before it reaches the
+   theme and account controls on medium-width desktop screens. */
+@media (min-width:1051px) and (max-width:1550px){
+  .topbar{grid-template-columns:auto auto;grid-template-areas:"brand actions" "nav nav";padding:8px 14px;gap:7px;min-height:108px}
+  .brand-wrap{grid-area:brand}.top-actions{grid-area:actions;justify-self:end}
+  .topbar .workspace-nav{grid-area:nav;justify-self:stretch;justify-content:center}
+  .is-searching .hero-panel{top:108px}.comm-topic-panel{top:124px}.main-layout{padding-top:32px}
+}
 @media(max-width:900px){.pdfc-layout{grid-template-columns:1fr}.pdfc-sequence{order:2}.pdfc-setting-grid{grid-template-columns:1fr 1fr}.pdfc-setting-actions{align-self:end}}
 @media(max-width:600px){.pdfc-card{padding:16px}.pdfc-settings{padding:0}.pdfc-settings>summary,.pdfc-settings-body{padding:16px}.pdfc-file{grid-template-columns:minmax(0,1fr) 32px}.pdfc-file label{grid-column:1/-1;grid-row:2}.pdfc-file-remove{grid-column:2;grid-row:1}.pdfc-setting-grid{grid-template-columns:1fr}.pdfc-output{align-items:stretch;flex-direction:column}.pdfc-output button{width:100%}}
