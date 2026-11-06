@@ -54,5 +54,9 @@
   .topbar .workspace-nav{grid-area:nav;justify-self:stretch;justify-content:center}
   .is-searching .hero-panel{top:108px}.comm-topic-panel{top:124px}.main-layout{padding-top:32px}
 }
+/* The New Letter workspace and its editor must start below the actual header
+   height when the workspace tabs wrap to another row. */
+#workspaceDocuments.nlpdf-primary{inset:var(--bu-topbar-bottom,72px) 0 0!important}
+#workspaceDocuments.nlpdf-primary .nlpdf-letter-editor{top:var(--bu-topbar-bottom,72px)}
 @media(max-width:900px){.pdfc-layout{grid-template-columns:1fr}.pdfc-sequence{order:2}.pdfc-setting-grid{grid-template-columns:1fr 1fr}.pdfc-setting-actions{align-self:end}}
 @media(max-width:600px){.pdfc-card{padding:16px}.pdfc-settings{padding:0}.pdfc-settings>summary,.pdfc-settings-body{padding:16px}.pdfc-file{grid-template-columns:minmax(0,1fr) 32px}.pdfc-file label{grid-column:1/-1;grid-row:2}.pdfc-file-remove{grid-column:2;grid-row:1}.pdfc-setting-grid{grid-template-columns:1fr}.pdfc-output{align-items:stretch;flex-direction:column}.pdfc-output button{width:100%}}
