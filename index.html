@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="vendor/flags.css" />
   <link rel="stylesheet" href="styles.css?v=10" />
   <link rel="stylesheet" href="new-letter-pdf-v1.css?v=20261106-location-receipt" data-new-letter-pdf-v1 />
+  <link rel="stylesheet" href="pdf-combine.css?v=20261106-pdf-combine" />
 </head>
 <body>
   <div class="app-shell">
@@ -26,6 +27,7 @@
       <button class="workspace-tab" data-workspace="communication" type="button">Communication</button>
       <button class="workspace-tab" data-workspace="documents" type="button">New Letter</button>
       <button class="workspace-tab" data-workspace="extend" type="button">Current Letter</button>
+      <button class="workspace-tab" data-workspace="combine" type="button">PDF Combine</button>
       <button class="workspace-tab" data-workspace="data" type="button">Data</button>
     </nav>
       <div class="top-actions">
@@ -204,6 +206,36 @@
         <iframe class="extend-letter-frame" src="/new-student-local/" title="Visa extension case workspace" loading="lazy" allow="clipboard-read; clipboard-write"></iframe>
       </section>
 
+      <section id="workspaceCombine" class="workspace-pane pdf-combine" aria-labelledby="pdfCombineTitle">
+        <div class="pdfc-shell">
+          <div class="pdfc-heading"><div class="pdfc-eyebrow">BATCH DOCUMENTS</div><h1 id="pdfCombineTitle">PDF Combine</h1><p>Arrange batch PDFs into one print-ready document, one student at a time.</p></div>
+          <div class="pdfc-layout">
+            <section class="pdfc-card pdfc-sources" aria-labelledby="pdfcSourcesTitle">
+              <div class="pdfc-section-heading"><div><span class="pdfc-step">01 / FILES</span><h2 id="pdfcSourcesTitle">Choose your PDFs</h2><p id="pdfcChooseHelp">Add one batch PDF for each document type in your setup.</p></div><button id="pdfcClear" class="pdfc-text-button" type="button">Clear files</button></div>
+              <div class="pdfc-drop" id="pdfcDrop"><div class="pdfc-drop-icon" aria-hidden="true">＋</div><strong>Drop PDF files here</strong><span>or choose them from your device</span><button class="pdfc-secondary" id="pdfcChoose" type="button">Choose PDF files</button><input id="pdfcFiles" type="file" accept="application/pdf,.pdf" multiple hidden><small>Files are processed in this browser.</small></div>
+              <div id="pdfcFileList" class="pdfc-file-list" aria-label="Selected PDF files"></div>
+              <p id="pdfcStatus" class="pdfc-status" role="status" aria-live="polite">Add your PDF files to get started.</p>
+            </section>
+            <aside class="pdfc-card pdfc-sequence" aria-labelledby="pdfcSequenceTitle"><span class="pdfc-step">YOUR SETUP</span><h2 id="pdfcSequenceTitle">One student’s pages</h2><p>The files are combined in this order for each student.</p><ol id="pdfcSequence"></ol><p class="pdfc-sequence-foot" id="pdfcPagesPerStudent"></p><button class="pdfc-secondary pdfc-settings-jump" id="pdfcOpenSettings" type="button">Edit setup</button></aside>
+          </div>
+          <details class="pdfc-card pdfc-settings" id="pdfcSettings"><summary><span><span class="pdfc-step">CUSTOMIZE</span><strong>Edit setup</strong><small>File names, pages per student, order and blank pages</small></span><span aria-hidden="true">⌄</span></summary>
+            <div class="pdfc-settings-body"><p>Changes apply after you choose <strong>Save setup</strong>. Save a setup file to use it again or move it to another browser.</p><label class="pdfc-check"><input type="checkbox" id="pdfcDetect"><span>Detect document types using filename keywords</span></label>
+              <div id="pdfcSettingsList" class="pdfc-settings-list"></div>
+              <div class="pdfc-settings-buttons"><button class="pdfc-secondary" type="button" id="pdfcAddType">Add PDF type</button><button class="pdfc-secondary" type="button" id="pdfcAddBlank">Add blank pages</button><button class="pdfc-secondary" type="button" id="pdfcResetSetup">Restore default setup</button></div>
+              <div class="pdfc-settings-actions"><div><button class="pdfc-text-button" type="button" id="pdfcExportSetup">Download setup</button><button class="pdfc-text-button" type="button" id="pdfcImportSetup">Import setup</button><input id="pdfcImportFile" type="file" accept="application/json,.json" hidden></div><div><button class="pdfc-secondary" type="button" id="pdfcCancelSetup">Cancel</button><button class="pdfc-primary" type="button" id="pdfcSaveSetup">Save setup</button></div></div><p id="pdfcSettingsStatus" class="pdfc-status" role="status" aria-live="polite"></p>
+            </div>
+          </details>
+          <section class="pdfc-card pdfc-review" id="pdfcReview" aria-labelledby="pdfcReviewTitle" hidden><div class="pdfc-section-heading"><div><span class="pdfc-step">02 / REVIEW</span><h2 id="pdfcReviewTitle">Ready to combine</h2><p id="pdfcSummary"></p></div></div>
+            <p class="pdfc-review-note">Pages are grouped by their order in the source files. Student names are not checked automatically.</p><p id="pdfcDuplexNote" class="pdfc-duplex-note" hidden></p>
+            <div class="pdfc-preview-scroll" role="region" tabindex="0" aria-label="Page order preview"><table class="pdfc-preview"><thead id="pdfcPreviewHead"></thead><tbody id="pdfcPreviewBody"></tbody></table></div><p class="pdfc-preview-note" id="pdfcPreviewNote"></p>
+            <label class="pdfc-check" id="pdfcOrderLabel"><input id="pdfcOrderConfirmed" type="checkbox"><span>I checked that the students are in the same order in all source PDFs.</span></label>
+            <label class="pdfc-check pdfc-form-check" id="pdfcFlattenLabel" hidden><input id="pdfcFlattenConfirmed" type="checkbox"><span>Create a print-only copy of the fillable fields in these PDFs. Check the generated file before printing.</span></label>
+            <div class="pdfc-output"><label><span>Output filename</span><input id="pdfcFilename" value="Combined_Student_Documents.pdf" autocomplete="off"></label><button class="pdfc-primary" id="pdfcGenerate" type="button" disabled>Combine and download</button></div>
+            <div class="pdfc-progress" id="pdfcProgress" hidden><div class="pdfc-progress-text" id="pdfcProgressText" role="status" aria-live="polite"></div><progress id="pdfcProgressBar" max="100" value="0" aria-label="Combining progress"></progress></div>
+          </section>
+        </div>
+      </section>
+
       <section id="workspaceData" class="workspace-pane workspace-page">
         <div class="workspace-page-heading"><div><div class="hero-eyebrow">DATA</div><h1>Excel remains the master database.</h1><p>Countries, programs, embassies, communication topics, document options and generated templates all come from the workbook.</p></div></div>
         <div class="data-workspace-grid">
@@ -373,6 +405,7 @@
   <script src="student-memory.js?v=20261104-outbox"></script>
   <script src="data/letter-templates.js?v=20261030-signatory"></script>
   <script src="new-letter-pdf-v1.js?v=20261106-location-receipt" data-new-letter-pdf-v1></script>
-  <script src="app.js?v=20261002-letter-editor"></script>
+  <script src="pdf-combine.js?v=20261106-pdf-combine"></script>
+  <script src="app.js?v=20261106-pdf-combine"></script>
 </body>
 </html>
