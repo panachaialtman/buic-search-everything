@@ -359,7 +359,7 @@ try{
     await page.keyboard.press('Control+z');
     assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').first().getAttribute('data-page-id'),first);
   });
-  await run('ZIP import extracts supported images and ignores other files',async()=>{
+  await run('ZIP import extracts supported images and reports unsupported files',async()=>{
     const {execFileSync}=await import('node:child_process');
     const z=`import zipfile,base64,os
 with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
@@ -369,6 +369,9 @@ with zipfile.ZipFile('test-results/synthetic-attachments.zip','w') as z:
     await page.locator('#nlpdfFileInput').setInputFiles('test-results/synthetic-attachments.zip');
     await awaitCount(4);
     assert.equal(await page.locator('#nlpdfFilmstrip [data-page-id]').count(),4);
+    await page.locator('#nlpdfImportReport').waitFor({state:'visible'});
+    assert.match(await page.locator('#nlpdfImportReportFiles').innerText(),/ignore-me.txt/);
+    await page.locator('#nlpdfImportReport [data-import-report-close]').last().click();
   });
   await run('Real PDF import keeps page count and editable preview',async()=>{
     await page.evaluate(async()=>{
