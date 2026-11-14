@@ -670,7 +670,7 @@ function workspaceMarkup(){
       '<div class="nlpdf-toolbar">'+
         '<button class="nlpdf-tool" id="nlpdfUndo" type="button" disabled title="Undo (Ctrl+Z)">↶ Undo</button><button class="nlpdf-tool" id="nlpdfRedo" type="button" disabled title="Redo (Ctrl+Y)">↷ Redo</button>'+ 
         '<button class="nlpdf-tool" id="nlpdfDuplicate" type="button" disabled>⧉ Duplicate</button><button class="nlpdf-tool" id="nlpdfDelete" type="button" disabled>⌫ Delete</button>'+
-        '<span class="nlpdf-toolbar-spacer"></span><span class="nlpdf-selection-label" id="nlpdfSelectionLabel">No page selected</span>'+
+        '<button class="nlpdf-import-review hidden" id="nlpdfReviewImport" type="button">Review import warning</button><span class="nlpdf-toolbar-spacer"></span><span class="nlpdf-selection-label" id="nlpdfSelectionLabel">No page selected</span>'+
         '<div class="nlpdf-toolbar-safe" id="nlpdfToolbarSafe"></div>'+
         '<div class="nlpdf-view-toggle"><button class="active" id="nlpdfSingleView" type="button">Single</button><button id="nlpdfGridView" type="button">Grid</button></div>'+
       '</div>'+
@@ -687,7 +687,44 @@ function workspaceMarkup(){
       '<footer class="nlpdf-footer"><div class="nlpdf-footer-stats"><div class="nlpdf-footer-stat"><strong id="nlpdfPageCount">0</strong><span>Document pages</span></div><div class="nlpdf-footer-stat"><strong id="nlpdfFileCount">0</strong><span>Source files</span></div></div><div class="nlpdf-footer-center" id="nlpdfStatus">Ready · Files stay in this browser</div><div class="nlpdf-footer-actions"><button class="nlpdf-create" id="nlpdfCreate" type="button" disabled>Create Package</button></div></footer>'+
     '</main>'+
   '</div></section>'+
-  packageManagerMarkup()+schoolManagerMarkup()+referencePickerMarkup()+exportModalMarkup();
+  packageManagerMarkup()+schoolManagerMarkup()+referencePickerMarkup()+exportModalMarkup()+importReportMarkup();
+}
+function importReportMarkup(){
+  return '<dialog class="nlpdf-import-dialog" id="nlpdfImportReport" aria-labelledby="nlpdfImportReportTitle" aria-describedby="nlpdfImportReportSummary">'+
+    '<div class="nlpdf-modal-head"><div><span class="eyebrow">IMPORT CHECK</span><h2 id="nlpdfImportReportTitle">Some files need your attention</h2></div><button class="nlpdf-close" type="button" data-import-report-close aria-label="Close import warning">×</button></div>'+
+    '<div class="nlpdf-import-report-body"><p id="nlpdfImportReportSummary" role="status"></p><p>These files were not added to the PDF Builder. Check the original ZIP before creating your package.</p><ul id="nlpdfImportReportFiles"></ul>'+
+      '<div class="nlpdf-import-next"><strong>What to do next</strong><ul><li>Convert HEIC / HEIF images to JPG, PNG, or PDF, then add them again.</li><li>Extract any ZIP inside the ZIP, check its contents, then add its PDF or image files.</li></ul><p>Supported files: PDF, JPG, PNG, and WebP. Your original files stay unchanged.</p></div></div>'+
+    '<div class="nlpdf-modal-actions"><button class="nlpdf-confirm" type="button" data-import-report-close autofocus>Got it</button></div></dialog>';
+}
+let lastImportReport=null;
+function showImportReport(report){
+  if(!report.files.length)return;
+  lastImportReport=report;
+  const dialog=$('#nlpdfImportReport'),review=$('#nlpdfReviewImport');
+  if(review){review.textContent='Import warning ('+report.files.length+')';review.classList.remove('hidden');}
+  if(!dialog)return;
+  $('#nlpdfImportReportSummary').textContent='Added '+report.added+' page'+(report.added===1?'':'s')+' · '+report.files.length+' file'+(report.files.length===1?' was':'s were')+' not added.';
+  $('#nlpdfImportReportFiles').innerHTML=report.files.map(file=>'<li><strong>'+esc(file.path)+'</strong>'+
+    (file.archive?'<small>In '+esc(file.archive)+'</small>':'')+'<span>'+esc(file.reason)+'</span></li>').join('');
+  if(!dialog.open)dialog.showModal();
+}
+function resetImportReport(){
+  lastImportReport=null;
+  $('#nlpdfReviewImport')?.classList.add('hidden');
+}
+function inspectZipEntries(zip){
+  const supported=[],skipped=[];
+  for(const entry of Object.values(zip.files)){
+    const path=entry.name.replace(/\\/g,'/'),name=path.split('/').pop();
+    // Ignore OS metadata, which is not a student document.
+    if(entry.dir||path.split('/').includes('__MACOSX')||/^\._/.test(name)||['.DS_Store','Thumbs.db'].includes(name))continue;
+    if(/\.(pdf|png|jpe?g|webp)$/i.test(name)){supported.push(entry);continue;}
+    let reason='Unsupported file type. Use PDF, JPG, PNG, or WebP.';
+    if(/\.(heic|heif)$/i.test(name))reason='HEIC / HEIF image — convert it to JPG, PNG, or PDF, then add it again.';
+    else if(/\.zip$/i.test(name))reason='ZIP inside this ZIP — extract it and add the documents separately.';
+    skipped.push({path:entry.unsafeOriginalName||entry.name,reason});
+  }
+  return{supported,skipped};
 }
 function exportModalMarkup(){
   return '<div class="nlpdf-modal" id="nlpdfExportModal" aria-hidden="true"><div class="nlpdf-modal-backdrop" data-nlpdf-close></div><section class="nlpdf-modal-card" role="dialog" aria-modal="true">'+
@@ -979,9 +1016,9 @@ async function normalizeImage(file){
   if(file.type==='image/png'||/\.png$/i.test(file.name))return{mime:'image/png',bytes:new Uint8Array(await file.arrayBuffer()),previewUrl:URL.createObjectURL(file)};
   const b=await convertImageBlob(file);return{mime:'image/png',bytes:new Uint8Array(await b.arrayBuffer()),previewUrl:URL.createObjectURL(b)};
 }
-async function importFile(file,reviewParentOperation=null){
+async function importFile(file,reviewParentOperation=null,importReport=null){
   return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;
-  if(/\.zip$/i.test(file.name)||file.type==='application/zip'||file.type==='application/x-zip-compressed')return importZip(file,reviewOperation);
+  if(/\.zip$/i.test(file.name)||file.type==='application/zip'||file.type==='application/x-zip-compressed')return importZip(file,reviewOperation,importReport);
   const key=uid();
   if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)){
     const bytes=new Uint8Array(await file.arrayBuffer()),doc=await window.pdfjsLib.getDocument({data:bytes.slice()}).promise;
@@ -997,24 +1034,37 @@ async function importFile(file,reviewParentOperation=null){
 
   },reviewParentOperation);
 }
-async function importZip(file,reviewParentOperation=null){
+async function importZip(file,reviewParentOperation=null,importReport=null){
   return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;
   await ensureZip();const zip=await window.JSZip.loadAsync(file);
-  const entries=Object.values(zip.files).filter(x=>!x.dir&&/\.(pdf|png|jpe?g|webp)$/i.test(x.name));let count=0;
-  for(const z of entries){const ext=(z.name.split('.').pop()||'').toLowerCase(),mime=ext==='pdf'?'application/pdf':ext==='png'?'image/png':ext==='webp'?'image/webp':'image/jpeg',blob=await z.async('blob'),f=new File([blob],z.name.split('/').pop(),{type:mime});count+=await importFile(f,reviewOperation);}
-  if(!entries.length)toast('ZIP contained no supported PDF/image files.');return count;
+  const {supported,skipped}=inspectZipEntries(zip),report=importReport||{added:0,files:[]};let count=0;
+  report.files.push(...skipped.map(item=>({...item,archive:file.name})));
+  for(const z of supported){
+    try{
+      const ext=(z.name.split('.').pop()||'').toLowerCase(),mime=ext==='pdf'?'application/pdf':ext==='png'?'image/png':ext==='webp'?'image/webp':'image/jpeg';
+      const blob=await z.async('blob'),f=new File([blob],z.name.split('/').pop(),{type:mime});
+      count+=await importFile(f,reviewOperation,report);
+    }catch(err){
+      console.error(err);
+      report.files.push({archive:file.name,path:z.unsafeOriginalName||z.name,reason:'Could not read this file. Check that it opens correctly, then add it again.'});
+    }
+  }
+  if(!supported.length&&!skipped.length)toast('ZIP contained no supported PDF/image files.');
+  if(!importReport){report.added=count;showImportReport(report);}
+  return count;
 
   },reviewParentOperation);
 }
 async function addFiles(files,reviewParentOperation=null){
   return reviewRunWorkspaceOperation(async reviewOperation=>{if(reviewDraftCandidateInstalling)return;
-  const list=[...files];if(!list.length)return;state.busy=true;updateControls();setStatus('Importing '+list.length+' item'+(list.length===1?'':'s')+'…');
+  const list=[...files];if(!list.length)return;state.busy=true;updateControls();resetImportReport();setStatus('Importing '+list.length+' item'+(list.length===1?'':'s')+'…');
+  const report={added:0,files:[]};
   try{
-    await ensurePdfLibs();let added=0;
-    for(const f of list){try{added+=await importFile(f,reviewOperation);}catch(err){console.error(err);toast(err.message||('Could not import '+f.name));}}
+    await ensurePdfLibs();
+    for(const f of list){try{report.added+=await importFile(f,reviewOperation,report);}catch(err){console.error(err);report.files.push({path:f.name,reason:err.message||'Could not import this file. Check it and try again.'});}}
     if(!state.activeId&&state.pages[0]){state.activeId=state.pages[0].id;state.selected.add(state.activeId);state.anchorIndex=0;}if($('#nlpdfSigScope')?.value==='page'&&!state.signaturePageId)state.signaturePageId=state.activeId;
-    await renderAll();recordEdit();setStatus('Added '+added+' page'+(added===1?'':'s')+'.');state.duplicateDismissed.clear();scanDuplicates().catch(console.error);
-  }finally{state.busy=false;updateControls();}
+    await renderAll();recordEdit();setStatus('Added '+report.added+' page'+(report.added===1?'':'s')+'.'+(report.files.length?' '+report.files.length+' file'+(report.files.length===1?'':'s')+' not added — review import warning.':''));state.duplicateDismissed.clear();scanDuplicates().catch(console.error);
+  }finally{state.busy=false;updateControls();showImportReport(report);}
 
   },reviewParentOperation);
 }
@@ -1186,6 +1236,7 @@ function clearAllDocuments(){if(reviewDraftCandidateInstalling)return;
   if(!state.pages.length||state.busy)return;
   if(state.cropMode){state.cropMode=false;state.cropDraft=null;state.cropBounds=null;}
   state.pages=[];
+  resetImportReport();
   state.selected.clear();
   state.activeId='';
   state.anchorIndex=-1;
@@ -3384,6 +3435,8 @@ async function build(){
   await ensurePdfLibs();await loadAssets();
   const p=prefs();state.safeArea=Boolean(p.safeArea);state.duplicateDetection=p.duplicateDetection!==false;$('#nlpdfSafeArea').checked=state.safeArea;$('#nlpdfDetectDuplicates').checked=state.duplicateDetection;$('#nlpdfSigScope').value='all';$('#nlpdfSigSize').value=Math.round(state.sig.widthPct*100);$('#nlpdfSigSizeValue').textContent=Math.round(state.sig.widthPct*100)+'%';
 
+  $('#nlpdfReviewImport').addEventListener('click',()=>{if(lastImportReport)showImportReport(lastImportReport);});
+  $$('[data-import-report-close]').forEach(button=>button.addEventListener('click',()=>$('#nlpdfImportReport').close()));
   $('#nlpdfAddNewFile').addEventListener('click',()=>$('#nlpdfFileInput').click());
   $('#nlpdfAddFiles').addEventListener('click',()=>$('#nlpdfFileInput').click());$('#nlpdfFileInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='';});
   $$('[data-asset-import]').forEach(b=>b.addEventListener('click',()=>{state.pendingAsset=b.dataset.assetImport;const i=$('#nlpdfAssetInput');i.accept=state.pendingAsset==='signature'?'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp':'application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp';i.click();}));
@@ -3434,6 +3487,7 @@ async function build(){
   document.addEventListener('keydown',e=>{
     const visible=$('#workspaceDocuments');
     if(!visible||visible.classList.contains('hidden')||getComputedStyle(visible).display==='none')return;
+    if($('#nlpdfImportReport')?.open)return;
     if(reviewBlockCandidateShortcut(e))return;
     if(e.target.closest?.('.nlpdf-location-field'))return;
     if($('#nlpdfExportModal').classList.contains('open'))return;

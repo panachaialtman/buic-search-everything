@@ -17,6 +17,7 @@ on:
       - 'tests/student-memory-outbox.test.cjs'
       - 'tests/student-memory-outbox-browser.mjs'
       - 'tests/new-letter-browser.mjs'
+      - 'tests/new-letter-zip-browser.mjs'
       - 'tests/workspace-operation-barrier.test.cjs'
       - 'tests/audit-letter-phone.py'
       - '.github/workflows/new-letter-browser.yml'
@@ -60,6 +61,8 @@ jobs:
         run: node tests/student-memory-outbox-browser.mjs
       - name: Exercise PDF Combine in Chromium
         run: node tests/pdf-combine-browser.mjs
+      - name: Exercise ZIP warnings in New Letter
+        run: node tests/new-letter-zip-browser.mjs
       - name: Exercise New Letter in Chromium
         run: node tests/new-letter-browser.mjs
       - name: Upload browser screenshots and logs
