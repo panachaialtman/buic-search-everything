@@ -1849,11 +1849,22 @@ function snapshotRows(sheet){
   const rows=window.REFERENCE_SNAPSHOT?.[sheet];if(!Array.isArray(rows)||rows.length<2)return[];
   const headers=rows[0].map(clean);return rows.slice(1).map(row=>Object.fromEntries(headers.map((h,i)=>[h,row[i]??''])));
 }
-function centralReference(){
-  if(state.pendingLetter?.frozenReferences)return state.pendingLetter.frozenReferences;
+function centralReference(useFrozen=true){
   const live=window.BUIC_REFERENCE_DATA;
-  if(live?.countries&&live?.faculty&&live?.embassy)return live;
-  return {countries:snapshotRows('Countries'),faculty:snapshotRows('Faculty_Major'),embassy:snapshotRows('Embassy')};
+  const available=live?.countries&&live?.faculty&&live?.embassy?live:
+    {countries:snapshotRows('Countries'),faculty:snapshotRows('Faculty_Major'),embassy:snapshotRows('Embassy')};
+  const frozen=useFrozen?state.pendingLetter?.frozenReferences:null;
+  const source=frozen||available;
+  const published=Boolean(live&&window.BUICHubReference?.getAppliedVersion?.());
+  const result={};
+  for(const key of ['countries','faculty','embassy']){
+    // Retired workbook rows are retained for audit/history, not new selections.
+    const current=(available[key]||[]).filter(r=>clean(r.Active??'YES').toUpperCase()==='YES');
+    const activeIds=frozen&&published?new Set(current.map(r=>clean(r['Record ID']))):null;
+    result[key]=(source[key]||[]).filter(r=>clean(r.Active??'YES').toUpperCase()==='YES'&&
+      (!activeIds||activeIds.has(clean(r['Record ID']))));
+  }
+  return result;
 }
 function countryValues(r){
   return {
@@ -2774,7 +2785,9 @@ async function prepareLetterEditor(context,reviewParentOperation=null){
   const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
   normalizeNewVisaSignatory(doc,ns);
   const model=semanticLetterModel(doc,ns);context.editor={zip,doc,ns,model};context.values={};
-   context.frozenReferences=structuredClone(centralReference());
+   // An explicit restored snapshot is retained, but a new letter must never
+   // inherit the reference snapshot of the previous student's open editor.
+   context.frozenReferences=structuredClone(context.frozenReferences||centralReference(false));
    const refBytes=new TextEncoder().encode(JSON.stringify(context.frozenReferences));
    const refHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',refBytes)))
       .map(b=>b.toString(16).padStart(2,'0')).join('');

@@ -215,7 +215,7 @@
 
   function loadCore() {
     const core = document.createElement('script');
-    core.src = 'app-core.js?v=20261106-pdf-combine';
+    core.src = 'app-core.js?v=20261118-active-reference';
     core.async = false;
     core.onload = () => {
       const enhancement = document.createElement('script');
