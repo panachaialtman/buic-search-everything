@@ -16,10 +16,12 @@ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disab
 try{
   const page=await browser.newPage({viewport:{width:1440,height:900}});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.addInitScript(()=>sessionStorage.setItem('buic-student-memory-staff-token-v1','qa-reference-test-token'));
   await page.route('https://buic-central-hub.vercel.app/**',async route=>{
     const pathname=new URL(route.request().url()).pathname;
     let payload,status=200;
-    if(pathname==='/api/v1/meta')payload={available:true,version:17,datasets:{countries:countries.length,nationalities:countries.length,programs:1,embassies:0}};
+    if(pathname==='/api/staff/session')payload={ok:true,staff:{id:'qa-reference',username:'qa'}};
+    else if(pathname==='/api/v1/meta')payload={available:true,version:17,datasets:{countries:countries.length,nationalities:countries.length,programs:1,embassies:0}};
     else if(datasets[pathname.split('/').pop()]){const dataset=pathname.split('/').pop();payload={version:17,dataset,records:datasets[dataset]};}
     else{status=401;payload={error:'Isolated test has no staff session'};}
     await route.fulfill({status,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(payload)});
@@ -29,6 +31,7 @@ try{
   await page.waitForFunction(()=>window.BUICHubReference?.getAppliedVersion?.()===17 &&
     !window.BUIC_REFERENCE_DATA?.countries.some(row=>row['Record ID']==='C032'));
   await page.waitForSelector('#nlpdfReferencePicker',{state:'attached'});
+  await page.locator('#buicWorkspaceAuth').waitFor({state:'hidden'});
   await page.locator('[data-workspace="documents"]').click();
   assert.equal(await page.evaluate(()=>window.BUIC_REFERENCE_DATA.countries.some(row=>row['Record ID']==='C032')),false,'Core must publish only active Hub records');
   // Put an older, still-active C032 into a restored case snapshot. The current
