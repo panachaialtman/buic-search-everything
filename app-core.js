@@ -1212,9 +1212,9 @@
   function init(){
     loadSignatureLibrary();initTheme();ensureFloatingUI();initEvents();renderRecent();updateLetterPreview();let saved=null,meta=null;try{saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');meta=JSON.parse(localStorage.getItem(STORAGE_META_KEY)||'null');}catch{}
     if(saved)setRows(saved,meta||{type:'excel',title:'Saved Excel data',detail:'Previously loaded workbook data from this browser.'},false);else setRows(window.REFERENCE_SNAPSHOT,{type:'bundled',title:'Bundled data',detail:'Current V4.6.12 workbook snapshot included with this website.'},false);
-    setWorkspace('reference');
+    setWorkspace('documents');
     renderFloatingWindows();
-    setTimeout(()=>$('#searchInput').focus(),120);
+    /* workshop: do not focus hidden reference search */
   }
   init();
   // Sync only public references; browser-local Excel imports have priority.

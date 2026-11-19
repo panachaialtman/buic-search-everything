@@ -1,0 +1,10 @@
+/* Workshop-only UI guard. Original PDF Creator CSS and behavior remain untouched. */
+#workspaceReference,
+#workspaceCommunication,
+#workspaceExtend,
+#workspaceCombine,
+#workspaceData { display:none!important; }
+.workspace-nav .workspace-tab:not([data-workspace="documents"]) { display:none!important; }
+.data-status-compact,
+#buicStudentMemoryLaunch { display:none!important; }
+#workspaceDocuments { display:block; }

@@ -1,16 +1,17 @@
 <!doctype html>
 <html lang="en" data-theme="red-blue">
 <head>
-  <script>document.documentElement.classList.add('buic-auth-pending');</script>
-  <style>html.buic-auth-pending body>*{visibility:hidden!important}</style>
+  
+  
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="light dark" />
-  <title>BU International Center Workspace V4.7</title>
+  <title>BU International Center - New Letter (Workshop)</title>
   <link rel="stylesheet" href="vendor/flags.css" />
   <link rel="stylesheet" href="styles.css?v=10" />
   <link rel="stylesheet" href="new-letter-pdf-v1.css?v=20261114-zip-warning" data-new-letter-pdf-v1 />
   <link rel="stylesheet" href="pdf-combine.css?v=20261106-pdf-combine" />
+  <link rel="stylesheet" href="workshop-new-letter-only.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -19,16 +20,11 @@
         <div class="brand-mark" aria-hidden="true">IC</div>
         <div>
           <div class="brand-title">BU International Center Workspace</div>
-          <div class="brand-subtitle">Reference · Communication · New Letter · Current Letter · Data</div>
+          <div class="brand-subtitle">New Letter · New Visa / PDF Creator · Workshop Demo</div>
         </div>
       </div>
           <nav class="workspace-nav" aria-label="Workspace sections">
-      <button class="workspace-tab active" data-workspace="reference" type="button">Reference Search</button>
-      <button class="workspace-tab" data-workspace="communication" type="button">Communication</button>
-      <button class="workspace-tab" data-workspace="documents" type="button">New Letter</button>
-      <button class="workspace-tab" data-workspace="extend" type="button">Current Letter</button>
-      <button class="workspace-tab" data-workspace="combine" type="button">PDF Combine</button>
-      <button class="workspace-tab" data-workspace="data" type="button">Data</button>
+      <button class="workspace-tab active" data-workspace="documents" type="button">New Letter</button>
     </nav>
       <div class="top-actions">
         <div class="theme-picker-wrap">
@@ -401,8 +397,8 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="data/reference-snapshot.js?v=15"></script>
-  <script src="hub-reference.js?v=20261030-v8"></script>
-  <script src="student-memory.js?v=20261104-outbox"></script>
+  
+  <script src="workshop-demo-stub.js"></script>
   <script src="data/letter-templates.js?v=20261030-signatory"></script>
   <script src="new-letter-pdf-v1.js?v=20261118-active-reference" data-new-letter-pdf-v1></script>
   <script src="pdf-combine.js?v=20261106-pdf-combine"></script>
